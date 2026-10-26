@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "HandsOn",
+    "slug": "handson-frontend",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "handson",
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "com.handson.frontend",
+      "predictiveBackGestureEnabled": true
+    },
+    "ios": {
+      "bundleIdentifier": "com.handson.frontend"
+    },
+    "web": {
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F1F5FD"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

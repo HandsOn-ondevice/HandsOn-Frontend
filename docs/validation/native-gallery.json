@@ -1,0 +1,125 @@
+{
+  "date": "2026-10-26",
+  "logicalDisplay": "412x920dp",
+  "device": "Medium_Phone / Android 16 API 36 / arm64-v8a",
+  "galleryScreens": [
+    {
+      "component": "Button",
+      "pages": 3
+    },
+    {
+      "component": "IconButton",
+      "pages": 2
+    },
+    {
+      "component": "TextField",
+      "pages": 3
+    },
+    {
+      "component": "SelectField",
+      "pages": 2
+    },
+    {
+      "component": "CheckboxRow",
+      "pages": 2
+    },
+    {
+      "component": "SegmentedControl",
+      "pages": 1
+    },
+    {
+      "component": "AppBar",
+      "pages": 2
+    },
+    {
+      "component": "BottomNavigation",
+      "pages": 1
+    },
+    {
+      "component": "SectionHeader",
+      "pages": 1
+    },
+    {
+      "component": "SurfaceCard",
+      "pages": 2
+    },
+    {
+      "component": "ActionShelf",
+      "pages": 2
+    },
+    {
+      "component": "BottomSheet",
+      "pages": 2
+    },
+    {
+      "component": "HeroPanel",
+      "pages": 2
+    },
+    {
+      "component": "StatusBar",
+      "pages": 2
+    },
+    {
+      "component": "StatusBadge",
+      "pages": 2
+    },
+    {
+      "component": "FeedbackPanel",
+      "pages": 2
+    },
+    {
+      "component": "ProcedureCard",
+      "pages": 2
+    },
+    {
+      "component": "SensorCard",
+      "pages": 3
+    },
+    {
+      "component": "MetricTile",
+      "pages": 2
+    },
+    {
+      "component": "ConditionProgress",
+      "pages": 2
+    },
+    {
+      "component": "StepProgress",
+      "pages": 2
+    },
+    {
+      "component": "EvidenceRow",
+      "pages": 3
+    },
+    {
+      "component": "VoicePanel",
+      "pages": 2
+    },
+    {
+      "component": "TimelineItem",
+      "pages": 2
+    },
+    {
+      "component": "ResultChart",
+      "pages": 2
+    },
+    {
+      "component": "RoleCard",
+      "pages": 2
+    },
+    {
+      "component": "Typography",
+      "pages": 2
+    },
+    {
+      "component": "Colors",
+      "pages": 2
+    },
+    {
+      "component": "Icons",
+      "pages": 2
+    }
+  ],
+  "capturedScreenCount": 59,
+  "note": "전체 카탈로그 순회 렌더링 캡처. 스크롤의 대표 프레임을 확인했으며 모든 변형의 픽셀 일치를 수치 측정한 결과는 아님."
+}

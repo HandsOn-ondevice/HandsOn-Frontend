@@ -1,0 +1,245 @@
+{
+  "collectedOn": "2026-10-26",
+  "assets": [
+    {
+      "path": "src/design-system/assets/icons/home.svg",
+      "nodeId": "2081:2",
+      "kind": "icon",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-2",
+      "sha256": "3fa32ad25f5f70bab6705af65f2b62c6a1bda753a3af46ac4f9a64df8d7cb152",
+      "bytes": 575
+    },
+    {
+      "path": "src/design-system/assets/icons/flask.svg",
+      "nodeId": "2081:5",
+      "kind": "icon",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-5",
+      "sha256": "ce31826095df22f9ecc61d64d7597b9431c8d1a233a74bcd4362507b6bb15184",
+      "bytes": 807
+    },
+    {
+      "path": "src/design-system/assets/icons/device.svg",
+      "nodeId": "2081:8",
+      "kind": "icon",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-8",
+      "sha256": "3687ce02362d547ca189dca17027ce0f25c7385f4fd28ed98332f446bfb102d7",
+      "bytes": 953
+    },
+    {
+      "path": "src/design-system/assets/icons/mic.svg",
+      "nodeId": "2081:13",
+      "kind": "icon",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-13",
+      "sha256": "0cf828283e6746abbaaadef014187efa7080a740ee0b7efbf82a0c262c660f39",
+      "bytes": 883
+    },
+    {
+      "path": "src/design-system/assets/icons/guidance.svg",
+      "nodeId": "2081:17",
+      "kind": "icon",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-17",
+      "sha256": "aad7509c5e69ff9aed065b81b2ed1fe73ee745d38d7ea6e36cae1d734cf569be",
+      "bytes": 599
+    },
+    {
+      "path": "src/design-system/assets/icons/pause.svg",
+      "nodeId": "2081:20",
+      "kind": "icon",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-20",
+      "sha256": "55a1de171a2203baeaffc8af6b38ce0d3a34846fc41baeaaf5bee596103525bd",
+      "bytes": 353
+    },
+    {
+      "path": "src/design-system/assets/icons/retry.svg",
+      "nodeId": "2081:23",
+      "kind": "icon",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-23",
+      "sha256": "23c2cdb92a2d2dfc6d4bc8d3a3da8552ea2cdccd8085eed9f6b44a704544df11",
+      "bytes": 714
+    },
+    {
+      "path": "src/design-system/assets/icons/alert.svg",
+      "nodeId": "2081:26",
+      "kind": "icon",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-26",
+      "sha256": "1d68b6e34626828705d5dc9e78e3fb8191235b21ad6145e5d313343ad32e1c81",
+      "bytes": 370
+    },
+    {
+      "path": "src/design-system/assets/icons/power.svg",
+      "nodeId": "2081:29",
+      "kind": "icon",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-29",
+      "sha256": "e9eb86e4e6badb207bea345e864f0f83ecc940be26ade47527ffa31da808d403",
+      "bytes": 697
+    },
+    {
+      "path": "src/design-system/assets/icons/light.svg",
+      "nodeId": "2081:32",
+      "kind": "icon",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-32",
+      "sha256": "557adea018b0989c69cc2fa7ec65e02bb5e8c52ce226798412ea604901ca48bc",
+      "bytes": 874
+    },
+    {
+      "path": "src/design-system/assets/icons/environment.svg",
+      "nodeId": "2081:35",
+      "kind": "icon",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-35",
+      "sha256": "8a361e66a02a2374a665186ba2105d3c89124df99bd4ad2060e15ef63a271375",
+      "bytes": 909
+    },
+    {
+      "path": "src/design-system/assets/icons/clock.svg",
+      "nodeId": "2081:38",
+      "kind": "icon",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-38",
+      "sha256": "025406cf573c19a4ab45608a80d17b02e5e1300ca49429bbeb41917c47f48c72",
+      "bytes": 582
+    },
+    {
+      "path": "src/design-system/assets/icons/history.svg",
+      "nodeId": "2081:42",
+      "kind": "icon",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-42",
+      "sha256": "2542d5592836b636f715a59ab5cc01a3d616db7234e2559c80772fa94e988e27",
+      "bytes": 746
+    },
+    {
+      "path": "src/design-system/assets/icons/approval.svg",
+      "nodeId": "2081:45",
+      "kind": "icon",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-45",
+      "sha256": "64284e8fedcb7512fba87a6810fa8b2c11dac37d193f618f6ab136662c57ba44",
+      "bytes": 569
+    },
+    {
+      "path": "src/design-system/assets/icons/edit.svg",
+      "nodeId": "2081:49",
+      "kind": "icon",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-49",
+      "sha256": "114f0a5415440bba17c9442b294f90ce6ff0c4daf725f003b2ff4d730de9cba1",
+      "bytes": 423
+    },
+    {
+      "path": "src/design-system/assets/icons/result.svg",
+      "nodeId": "2081:52",
+      "kind": "icon",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-52",
+      "sha256": "5d49e1fadd68b3e8ff635fbc658d020f0d7111b92bb154ec8304255c20410168",
+      "bytes": 389
+    },
+    {
+      "path": "src/design-system/assets/icons/check.svg",
+      "nodeId": "2081:55",
+      "kind": "icon",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-55",
+      "sha256": "b75dc8e2a5327a81cc09901f4ba4d7886480f156a846806eea464a16af606ace",
+      "bytes": 338
+    },
+    {
+      "path": "src/design-system/assets/icons/person.svg",
+      "nodeId": "2081:58",
+      "kind": "icon",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-58",
+      "sha256": "2093db536dda31f1f7c38b52c4a858d4d319bdc19bbf00fbaa65d4645ccbfd3c",
+      "bytes": 605
+    },
+    {
+      "path": "src/design-system/assets/icons/back.svg",
+      "nodeId": "2081:62",
+      "kind": "icon",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-62",
+      "sha256": "4d86c45ced6ea20cc876a282765b741b976e3d4e81a8e87aaf0248f531a5de8a",
+      "bytes": 337
+    },
+    {
+      "path": "src/design-system/assets/icons/arrow.svg",
+      "nodeId": "2081:65",
+      "kind": "icon",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-65",
+      "sha256": "aa9b0fa964d40f918aa2e32fab3c1ffb46f900395c8d36ba857cc1dc5ba882c2",
+      "bytes": 367
+    },
+    {
+      "path": "src/design-system/assets/icons/more.svg",
+      "nodeId": "2081:68",
+      "kind": "icon",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-68",
+      "sha256": "cbe8d8c7d32458ec939144e15c72ca3da2fe0e1377af9bd1b674cb9abafc9779",
+      "bytes": 1064
+    },
+    {
+      "path": "src/design-system/assets/icons/play.svg",
+      "nodeId": "2081:73",
+      "kind": "icon",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-73",
+      "sha256": "7cabe051d134b26c433ce60da96d6710b85bf932c2e09eab0fa422a9b0ce56aa",
+      "bytes": 349
+    },
+    {
+      "path": "src/design-system/assets/icons/bolt.svg",
+      "nodeId": "2081:76",
+      "kind": "icon",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-76",
+      "sha256": "8a0e7bf9f026399d2a8f6374a3926c00664cc516f4925eb5d1aa2204b2d78a23",
+      "bytes": 390
+    },
+    {
+      "path": "src/design-system/assets/icons/lock.svg",
+      "nodeId": "2081:79",
+      "kind": "icon",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-79",
+      "sha256": "b88d0736d866c0bfb52d4904da4dccb444f4e41244a944ad9319f83ef71334ac",
+      "bytes": 863
+    },
+    {
+      "path": "src/design-system/assets/symbol.png",
+      "nodeId": "2081:83",
+      "kind": "illustration",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-83",
+      "sha256": "5f51ce9c91afe2551b29bd1bbd816dfcf586b4d7ec01440417b31dc7d834fad7",
+      "bytes": 448691
+    },
+    {
+      "path": "src/design-system/assets/brand-logo.png",
+      "nodeId": "2081:1721",
+      "kind": "brand",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-1721",
+      "sha256": "5f51ce9c91afe2551b29bd1bbd816dfcf586b4d7ec01440417b31dc7d834fad7",
+      "bytes": 448691
+    },
+    {
+      "path": "src/design-system/assets/fonts/NotoSansKR-Regular.ttf",
+      "kind": "font",
+      "source": "https://github.com/expo/google-fonts/tree/master/font-packages/noto-sans-kr",
+      "package": "@expo-google-fonts/noto-sans-kr@0.4.4",
+      "sha256": "b4a747e78805bc25b610dcfc3003cb5fb2e2ec034763774b24216ed15889eef4",
+      "bytes": 6191364
+    },
+    {
+      "path": "src/design-system/assets/fonts/NotoSansKR-Medium.ttf",
+      "kind": "font",
+      "source": "https://github.com/expo/google-fonts/tree/master/font-packages/noto-sans-kr",
+      "package": "@expo-google-fonts/noto-sans-kr@0.4.4",
+      "sha256": "b4fc86835fba456ea5ca4a3295e5b0afc98d15b713e821ec3a1fc97bf071e3c6",
+      "bytes": 6188880
+    },
+    {
+      "path": "src/design-system/assets/fonts/NotoSansKR-SemiBold.ttf",
+      "kind": "font",
+      "source": "https://github.com/expo/google-fonts/tree/master/font-packages/noto-sans-kr",
+      "package": "@expo-google-fonts/noto-sans-kr@0.4.4",
+      "sha256": "131664ca93a3abd646beca72779b4332db02949eb0f3e763ecd7e756589330fa",
+      "bytes": 6187524
+    },
+    {
+      "path": "src/design-system/assets/fonts/NotoSansKR-Bold.ttf",
+      "kind": "font",
+      "source": "https://github.com/expo/google-fonts/tree/master/font-packages/noto-sans-kr",
+      "package": "@expo-google-fonts/noto-sans-kr@0.4.4",
+      "sha256": "c76f806dc46b8e7981410cb083801f7f124b7f8bc0d181cdae80e78f16d0e9cc",
+      "bytes": 6189424
+    }
+  ]
+}

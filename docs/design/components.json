@@ -1,0 +1,244 @@
+{
+  "collectedAt": "2026-10-26",
+  "components": [
+    {
+      "name": "StatusBadge",
+      "nodeId": "2081:114",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-114",
+      "variants": ["Tone=Info", "Tone=Success", "Tone=Warning", "Tone=Danger", "Tone=Neutral"]
+    },
+    {
+      "name": "Button",
+      "nodeId": "2081:140",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-140",
+      "variants": [
+        "Hierarchy=Primary, State=Default",
+        "Hierarchy=Primary, State=Pressed",
+        "Hierarchy=Primary, State=Focus",
+        "Hierarchy=Primary, State=Disabled",
+        "Hierarchy=Primary, State=Loading",
+        "Hierarchy=Secondary, State=Default",
+        "Hierarchy=Secondary, State=Pressed",
+        "Hierarchy=Secondary, State=Focus",
+        "Hierarchy=Secondary, State=Disabled",
+        "Hierarchy=Secondary, State=Loading",
+        "Hierarchy=Tertiary, State=Default",
+        "Hierarchy=Tertiary, State=Pressed",
+        "Hierarchy=Tertiary, State=Focus",
+        "Hierarchy=Tertiary, State=Disabled",
+        "Hierarchy=Tertiary, State=Loading",
+        "Hierarchy=Danger, State=Default",
+        "Hierarchy=Danger, State=Pressed",
+        "Hierarchy=Danger, State=Focus",
+        "Hierarchy=Danger, State=Disabled",
+        "Hierarchy=Danger, State=Loading"
+      ]
+    },
+    {
+      "name": "IconButton",
+      "nodeId": "2081:257",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-257",
+      "variants": [
+        "Tone=Light, State=Default",
+        "Tone=Light, State=Pressed",
+        "Tone=Light, State=Focus",
+        "Tone=Light, State=Disabled",
+        "Tone=Inverse, State=Default",
+        "Tone=Inverse, State=Pressed",
+        "Tone=Inverse, State=Focus",
+        "Tone=Inverse, State=Disabled"
+      ]
+    },
+    {
+      "name": "TextField",
+      "nodeId": "2081:292",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-292",
+      "variants": [
+        "Kind=Single, State=Default",
+        "Kind=Single, State=Focus",
+        "Kind=Single, State=Filled",
+        "Kind=Single, State=Error",
+        "Kind=Single, State=Disabled",
+        "Kind=Multiline, State=Default",
+        "Kind=Multiline, State=Focus",
+        "Kind=Multiline, State=Filled",
+        "Kind=Multiline, State=Error",
+        "Kind=Multiline, State=Disabled"
+      ]
+    },
+    {
+      "name": "SelectField",
+      "nodeId": "2081:336",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-336",
+      "variants": ["State=Default", "State=Focus", "State=Disabled"]
+    },
+    {
+      "name": "CheckboxRow",
+      "nodeId": "2081:360",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-360",
+      "variants": [
+        "State=Pending",
+        "State=Checked",
+        "State=Current",
+        "State=Issue",
+        "State=Disabled"
+      ]
+    },
+    {
+      "name": "SegmentedControl",
+      "nodeId": "2081:394",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-394",
+      "variants": ["Selected=1", "Selected=2", "Selected=3", "Selected=4"]
+    },
+    {
+      "name": "AppBar",
+      "nodeId": "2081:431",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-431",
+      "variants": [
+        "Tone=Light, Mode=Brand",
+        "Tone=Light, Mode=Back",
+        "Tone=Inverse, Mode=Brand",
+        "Tone=Inverse, Mode=Back"
+      ]
+    },
+    {
+      "name": "BottomNavigation",
+      "nodeId": "2081:496",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-496",
+      "variants": [
+        "Role=Student, Active=Home",
+        "Role=Student, Active=Work",
+        "Role=Student, Active=Device",
+        "Role=Student, Active=History",
+        "Role=Expert, Active=Home",
+        "Role=Expert, Active=Work",
+        "Role=Expert, Active=Device",
+        "Role=Expert, Active=History"
+      ]
+    },
+    {
+      "name": "SectionHeader",
+      "nodeId": "2081:679",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-679",
+      "variants": ["Action=None", "Action=Link"]
+    },
+    {
+      "name": "SurfaceCard",
+      "nodeId": "2081:686",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-686",
+      "variants": ["Tone=Paper", "Tone=Subtle", "Tone=Inverse"]
+    },
+    {
+      "name": "ActionShelf",
+      "nodeId": "2081:696",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-696",
+      "variants": ["Layout=Single", "Layout=Dual", "Layout=Disabled", "Layout=DualDisabled"]
+    },
+    {
+      "name": "BottomSheet",
+      "nodeId": "2081:708",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-708",
+      "variants": ["Tone=Info", "Tone=Warning", "Tone=Success"]
+    },
+    {
+      "name": "ProcedureCard",
+      "nodeId": "2081:737",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-737",
+      "variants": ["State=Approved", "State=Selected", "State=Draft", "State=Unresolved"]
+    },
+    {
+      "name": "SensorCard",
+      "nodeId": "2081:786",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-786",
+      "variants": ["State=Normal", "State=Stale", "State=Disconnected", "State=OutOfRange"]
+    },
+    {
+      "name": "MetricTile",
+      "nodeId": "2081:820",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-820",
+      "variants": ["Tone=Info", "Tone=Success", "Tone=Warning", "Tone=Danger", "Tone=Neutral"]
+    },
+    {
+      "name": "ConditionProgress",
+      "nodeId": "2081:845",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-845",
+      "variants": ["State=Planned", "State=Running", "State=Issue", "State=Complete"]
+    },
+    {
+      "name": "StepProgress",
+      "nodeId": "2081:917",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-917",
+      "variants": ["State=Running", "State=Paused", "State=Complete"]
+    },
+    {
+      "name": "EvidenceRow",
+      "nodeId": "2081:942",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-942",
+      "variants": [
+        "Kind=Human, State=Pending",
+        "Kind=Human, State=Confirmed",
+        "Kind=Human, State=Issue",
+        "Kind=Sensor, State=Pending",
+        "Kind=Sensor, State=Confirmed",
+        "Kind=Sensor, State=Issue",
+        "Kind=Program, State=Pending",
+        "Kind=Program, State=Confirmed",
+        "Kind=Program, State=Issue"
+      ]
+    },
+    {
+      "name": "VoicePanel",
+      "nodeId": "2081:1048",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-1048",
+      "variants": [
+        "State=Idle",
+        "State=Listening",
+        "State=Processing",
+        "State=Confirmed",
+        "State=Clarify",
+        "State=Error"
+      ]
+    },
+    {
+      "name": "TimelineItem",
+      "nodeId": "2081:1105",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-1105",
+      "variants": ["State=Valid", "State=Invalid", "State=Recovery", "State=Pending"]
+    },
+    {
+      "name": "FeedbackPanel",
+      "nodeId": "2081:1142",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-1142",
+      "variants": ["Tone=Info", "Tone=Success", "Tone=Warning", "Tone=Danger"]
+    },
+    {
+      "name": "ResultChart",
+      "nodeId": "2081:1175",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-1175",
+      "variants": ["State=Preview", "State=Reviewed"]
+    },
+    {
+      "name": "RoleCard",
+      "nodeId": "2081:1220",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-1220",
+      "variants": [
+        "Role=Student, State=Default",
+        "Role=Student, State=Selected",
+        "Role=Expert, State=Default",
+        "Role=Expert, State=Selected"
+      ]
+    },
+    {
+      "name": "HeroPanel",
+      "nodeId": "2081:1257",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-1257",
+      "variants": ["Tone=Aurora", "Tone=Quiet"]
+    },
+    {
+      "name": "StatusBar",
+      "nodeId": "2081:1264",
+      "source": "https://www.figma.com/design/PDVmFhYGwSHs6ZrQmsowek?node-id=2081-1264",
+      "variants": ["Tone=Light", "Tone=Inverse"]
+    }
+  ]
+}
