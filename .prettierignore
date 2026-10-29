@@ -8,3 +8,6 @@ package-lock.json
 src/design-system/assets
 docs/design/figma-tokens.json
 artifacts
+
+# 원본 이슈 템플릿의 서식을 보존한다.
+.github/ISSUE_TEMPLATE/
