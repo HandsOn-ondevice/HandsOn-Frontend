@@ -26,6 +26,7 @@
     "react-native-worklets": "0.13.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@testing-library/react-native": "^14.1.0",
     "@types/jest": "30.0.0",
     "@types/react": "~19.3.0",
@@ -48,6 +49,8 @@
     "format:check": "prettier --check .",
     "test": "jest",
     "test:ci": "jest --runInBand --ci",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "doctor": "expo-doctor",
     "export:android": "expo export --platform android"
   },

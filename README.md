@@ -69,6 +69,40 @@ npm run export:android
 
 PR과 main push에서 같은 검사를 GitHub Actions로 실행합니다. 번들·단위 테스트는 실제 기기의 제스처·키보드·레이아웃 확인을 대체하지 않습니다. 검증 결과와 남은 제한은 [검증 기록](docs/validation/README.md)에 적습니다.
 
+## 웹 E2E 환경 확인
+
+Playwright로 Expo 개발 웹 화면을 실행하고 `컴포넌트 갤러리`가 표시되는지 확인합니다. 현재는 환경 확인용 스모크 테스트 1개이며, Chromium을 실행용 브라우저로 사용합니다. 기능 시나리오, API·테스트 데이터, 브라우저·기기별 검증 범위와 CI 연동은 추후 결정합니다. Android/iOS 네이티브 앱 검증은 별도입니다.
+
+Node 환경과 의존성을 준비한 뒤 Playwright 버전에 맞는 브라우저를 설치합니다. 웹 검사에는 Android SDK와 JDK가 필요하지 않습니다.
+
+```sh
+nvm install
+nvm use
+npm ci
+npx playwright install chromium
+npm run test:e2e
+```
+
+테스트가 `http://localhost:8081`의 Expo 웹 서버를 자동으로 시작하고 종료합니다. 같은 저장소의 개발 서버가 이미 해당 주소에서 실행 중이면 재사용합니다. 앱을 먼저 열어 확인하려면 별도 터미널에서 아래 명령을 실행하고 브라우저로 해당 주소에 접속합니다.
+
+```sh
+npm run web -- --localhost --port 8081
+```
+
+UI 모드에서는 아래 명령을 실행한 뒤 테스트를 선택해 실행할 수 있습니다.
+
+```sh
+npm run test:e2e:ui
+```
+
+실행 결과는 터미널과 `artifacts/playwright/report/`의 HTML 리포트에서 확인합니다. 테스트 생성물은 `artifacts/playwright/test-results/`에 저장되며, 두 경로 모두 기존 `artifacts/` 제외 규칙으로 Git 추적·린트·포맷 검사에서 제외됩니다.
+
+```sh
+npx playwright show-report artifacts/playwright/report
+```
+
+설정은 `playwright.config.ts`, 테스트는 `e2e/`에서 관리합니다. Jest는 기존 `__tests__/`만 실행합니다. 자세한 사용법은 [Playwright 실행 가이드](https://playwright.dev/docs/running-tests)를 참고합니다.
+
 ## GitHub Flow
 
 1. 최신 main에서 작업별 단기 브랜치를 만듭니다.
