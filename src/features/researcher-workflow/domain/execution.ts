@@ -1,6 +1,7 @@
 import type { DeviceDiagnosticsReport, DiagnosticIssue } from './device-check';
 import { validateDiagnostics, selectDeviceCheck } from './device-check';
 import type { ExperimentSession } from './models';
+import type { VoiceResolution } from './voice-clarification';
 
 /** Mock 초안. 팀의 승인된 전체 단계 번호·안전 기준·API DTO를 뜻하지 않는다. */
 export interface ExecutionDefinition {
@@ -46,12 +47,14 @@ export interface PendingVoiceCommand {
   readonly utterance: string;
   readonly createdAt: string;
   readonly source: 'mock' | 'api';
+  readonly sampleAttemptId: string | null;
 }
 
 export interface ExecutionState {
   readonly cursor: ExecutionCursor | null;
   readonly attempts: readonly MeasurementAttempt[];
   readonly pendingVoice: PendingVoiceCommand | null;
+  readonly voiceResolutions?: readonly VoiceResolution[];
 }
 
 export function validExecutionDefinition(definition: ExecutionDefinition | undefined) {
@@ -128,7 +131,7 @@ export function selectExecution(session: ExperimentSession) {
       : completed
         ? 'Mock 반복 측정을 마쳤습니다. 종료 검토·장치 정리·제출은 후속 화면에서 진행합니다.'
         : pendingVoice
-          ? '모호한 음성은 실행하지 않았습니다. S07 연결 안내에서 돌아와 주세요.'
+          ? '모호한 음성은 실행하지 않았습니다. S07에서 뜻을 확인하거나 취소해 주세요.'
           : sampling
             ? 'Mock 응답을 기다리고 있습니다. 완료 요청은 아직 할 수 없습니다.'
             : (latest?.issue?.message ??

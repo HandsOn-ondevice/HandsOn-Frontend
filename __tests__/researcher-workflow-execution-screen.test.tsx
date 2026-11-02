@@ -131,15 +131,16 @@ describe('S06 화면 조작과 재진입', () => {
         <VoiceClarificationConnectionScreen sessionId={session.sessionId} onBack={onBack} />
       </WorkflowProvider>,
     );
-    await screen.findByText('“다시 해줘” 확인 대기');
-    await fireEvent.press(screen.getByRole('button', { name: '명령 실행 없이 S06으로 돌아가기' }));
+    await screen.findByText('“다시 해줘”가\n어떤 뜻인가요?');
+    await fireEvent.press(screen.getByRole('button', { name: '선택하지 않고 취소' }));
     await waitFor(() => expect(onBack).toHaveBeenCalledTimes(1));
     await screen.rerender(view());
     await waitFor(() => expect(screen.getByRole('button', { name: '완료 요청' })).toBeEnabled());
     const restored = await repository.getSession(session.sessionId);
     expect(restored.execution?.cursor).toEqual(ready.execution?.cursor);
     expect(restored.execution?.attempts).toEqual(ready.execution?.attempts);
-    expect(restored.evidence).toEqual(ready.evidence);
+    expect(restored.evidence.slice(0, ready.evidence.length)).toEqual(ready.evidence);
+    expect(restored.evidence.at(-1)?.action).toBe('voiceClarificationCancelled');
     await fireEvent.press(screen.getByRole('button', { name: '안내 반복' }));
     expect(screen.getByText(/안내 반복 시뮬레이션 · 실제 TTS 없음/)).toBeTruthy();
   });

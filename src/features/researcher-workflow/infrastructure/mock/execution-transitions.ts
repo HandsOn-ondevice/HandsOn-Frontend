@@ -8,6 +8,7 @@ import {
   type ExecutionCursor,
 } from '../../domain/execution';
 import type { TransitionMetadata } from './transition-engine';
+import { resolveVoiceClarification } from './voice-clarification-transitions';
 
 export function initialExecution(
   session: ExperimentSession,
@@ -253,6 +254,7 @@ export function requestVoiceClarification(
         utterance,
         createdAt: meta.now,
         source: 'mock',
+        sampleAttemptId: state.latest?.attemptId ?? null,
       },
     },
     events: [
@@ -263,6 +265,7 @@ export function requestVoiceClarification(
         type: 'voiceClarificationRequested',
         occurredAt: meta.now,
         cursor: state.cursor,
+        commandId,
       },
     ],
   };
@@ -273,27 +276,5 @@ export function dismissVoiceClarification(
   commandId: string,
   meta: TransitionMetadata,
 ): ExperimentSession {
-  const execution = session.execution;
-  if (
-    !selectExecution(session).authorized ||
-    !execution ||
-    execution.pendingVoice?.commandId !== commandId
-  )
-    invalid('돌아갈 음성 확인 요청이 없습니다.');
-  return {
-    ...session,
-    revision: session.revision + 1,
-    updatedAt: meta.now,
-    execution: { ...execution, pendingVoice: null },
-    events: [
-      ...session.events,
-      {
-        eventId: meta.eventId,
-        requestId: meta.requestId,
-        type: 'voiceClarificationDismissed',
-        occurredAt: meta.now,
-        cursor: execution.cursor ?? undefined,
-      },
-    ],
-  };
+  return resolveVoiceClarification(session, commandId, 'cancel', undefined, meta);
 }

@@ -6,6 +6,7 @@ import type {
   DiagnosticIssue,
 } from './device-check';
 import type { ExecutionDefinition, ExecutionState, ExecutionCursor } from './execution';
+import type { VoiceChoice } from './voice-clarification';
 
 export type PreparationCheckId =
   'materials' | 'device' | 'powerOff' | 'wiring' | 'distance' | 'communication';
@@ -52,7 +53,9 @@ export interface Evidence {
     | 'deviceCheckFailed'
     | 'executionStarted'
     | 'measurementConfirmed'
-    | 'measurementAccepted';
+    | 'measurementAccepted'
+    | 'voiceClarificationConfirmed'
+    | 'voiceClarificationCancelled';
   readonly recordedAt: string;
   readonly source: 'mock' | 'api';
   readonly attemptId?: string;
@@ -61,6 +64,8 @@ export interface Evidence {
   readonly issue?: DiagnosticIssue;
   readonly diagnostics?: DeviceDiagnosticsReport;
   readonly cursor?: ExecutionCursor;
+  readonly commandId?: string;
+  readonly voiceChoice?: VoiceChoice | 'cancel';
 }
 
 export interface WorkflowEvent {
@@ -80,12 +85,15 @@ export interface WorkflowEvent {
     | 'executionSampleRejected'
     | 'measurementAccepted'
     | 'voiceClarificationRequested'
-    | 'voiceClarificationDismissed';
+    | 'voiceClarificationDismissed'
+    | 'voiceClarificationResolved';
   readonly occurredAt: string;
   readonly evidenceId?: string;
   readonly checkId?: PreparationCheckId;
   readonly attemptId?: string;
   readonly cursor?: ExecutionCursor;
+  readonly commandId?: string;
+  readonly voiceChoice?: VoiceChoice | 'cancel';
 }
 
 export interface ExperimentSession {
@@ -124,7 +132,12 @@ export type WorkflowCommand =
       readonly cursorId: string;
       readonly utterance: string;
     }
-  | { readonly type: 'dismissVoiceClarification'; readonly commandId: string };
+  | { readonly type: 'dismissVoiceClarification'; readonly commandId: string }
+  | {
+      readonly type: 'resolveVoiceClarification';
+      readonly commandId: string;
+      readonly choice: VoiceChoice;
+    };
 
 export interface CommandContext {
   readonly requestId: string;

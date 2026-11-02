@@ -19,6 +19,7 @@ import {
   type MockDiagnosticsRunner,
 } from './device-check-scenarios';
 import { selectExecution } from '../../domain/execution';
+import { resolveVoiceClarification } from './voice-clarification-transitions';
 import {
   beginExecutionSample,
   finishExecutionSample,
@@ -155,7 +156,11 @@ export class MockWorkflowRepository implements WorkflowRepository {
       evidenceId: this.id(),
     };
     const attemptId = command.type === 'startDeviceCheck' ? this.id() : undefined;
-    const sampleId = command.type === 'requestExecutionSample' ? this.id() : undefined;
+    const sampleId =
+      command.type === 'requestExecutionSample' ||
+      (command.type === 'resolveVoiceClarification' && command.choice === 'remeasure')
+        ? this.id()
+        : undefined;
     const next =
       command.type === 'startDeviceCheck'
         ? beginDeviceCheck(session, attemptId!, metadata)
@@ -181,14 +186,32 @@ export class MockWorkflowRepository implements WorkflowRepository {
                   )
                 : command.type === 'dismissVoiceClarification'
                   ? dismissVoiceClarification(session, command.commandId, metadata)
-                  : transitionPreparation(session, command, metadata);
+                  : command.type === 'resolveVoiceClarification'
+                    ? resolveVoiceClarification(
+                        session,
+                        command.commandId,
+                        command.choice,
+                        sampleId,
+                        metadata,
+                      )
+                    : transitionPreparation(session, command, metadata);
+    // 의미 확인과 재측정 요청을 원자적으로 저장한다. 중복 확인은 새 요청을 만들지 않는다.
+    const resolved =
+      sampleId && command.type === 'resolveVoiceClarification' && next !== session
+        ? beginExecutionSample(next, next.execution!.cursor!.cursorId, sampleId, {
+            ...metadata,
+            eventId: this.id(),
+            evidenceId: this.id(),
+          })
+        : next;
     requests.set(context.requestId, signature);
     this.commandRequests.set(sessionId, requests);
-    this.sessions.set(sessionId, next);
-    if (next !== session) this.publish(next);
-    if (attemptId) this.scheduleInspection(next, attemptId, context.requestId);
-    if (sampleId) this.scheduleExecutionSample(next, sampleId, context.requestId);
-    return copy(next);
+    this.sessions.set(sessionId, resolved);
+    if (resolved !== session) this.publish(resolved);
+    if (attemptId) this.scheduleInspection(resolved, attemptId, context.requestId);
+    if (sampleId && resolved !== session)
+      this.scheduleExecutionSample(resolved, sampleId, context.requestId);
+    return copy(resolved);
   }
 
   /** Mock 제어는 정식 Repository 명령·API 입력과 분리한다. 실행 중인 시나리오는 바꿀 수 없다. */

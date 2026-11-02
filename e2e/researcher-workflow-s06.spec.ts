@@ -45,9 +45,9 @@ test('412px에서 S06 완료·S05 재진입·S07 연결 왕복으로 상태를 �
   await sample.click();
   await expect(complete).toBeEnabled();
   await page.getByRole('button', { name: /^음성 명령 시뮬레이션,/ }).click();
-  await expect(page).toHaveURL(/\/voice-confirmation-pending$/);
-  await expect(page.getByText('S07 연결 지점 · 의미 선택 미구현', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '명령 실행 없이 S06으로 돌아가기', exact: true }).click();
+  await expect(page).toHaveURL(/\/voice-clarification$/);
+  await expect(page.getByText('모호한 음성 확인', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '선택하지 않고 취소', exact: true }).click();
   await expect(page).toHaveURL(executionURL);
   await expect(page.getByText('유효 측정 1 / 15회', { exact: true })).toBeVisible();
   await expect(complete).toBeEnabled();

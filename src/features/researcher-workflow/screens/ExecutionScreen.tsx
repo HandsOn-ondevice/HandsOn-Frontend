@@ -16,6 +16,7 @@ import {
   spacing,
 } from '@/design-system';
 import { selectExecution } from '../domain/execution';
+import { voiceChoiceLabels } from '../domain/voice-clarification';
 import { useWorkflowSession } from '../state/useWorkflowSession';
 import { ExecutionMetrics } from './ExecutionMetrics';
 import { MockExecutionScenarioControl } from './MockExecutionScenarioControl';
@@ -66,6 +67,16 @@ export function ExecutionScreen({
           {session?.procedure.title ?? '실험 진행'}
         </AppText>
         <AppText variant="caption">Mock 초안 절차 · 실제 측정·출력 제어·음성 동작 없음</AppText>
+        {session?.execution?.voiceResolutions?.slice(-1).map((result) => (
+          <AppText key={result.commandId} variant="caption" accessibilityLiveRegion="polite">
+            S07 Mock 처리: {voiceChoiceLabels[result.choice]} ·{' '}
+            {result.choice === 'repeatGuidance'
+              ? '안내 반복 시뮬레이션, 실제 TTS 없음'
+              : result.choice === 'remeasure'
+                ? '같은 회차 Mock 응답 요청, 자동 완료 없음'
+                : '측정 상태 유지, 실제 명령 실행 없음'}
+          </AppText>
+        ))}
         {loading ? (
           <AppText accessibilityLiveRegion="polite">실험 상태를 불러오고 있습니다.</AppText>
         ) : null}

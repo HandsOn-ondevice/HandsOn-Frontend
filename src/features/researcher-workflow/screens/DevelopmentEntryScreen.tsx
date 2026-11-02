@@ -45,8 +45,7 @@ export function DevelopmentEntryScreen({ onOpen }: { onOpen: (sessionId: string)
       <AppText variant="heading">연구생 워크플로 개발 진입</AppText>
       <AppText>Mock 환경 · 실제 실험이나 장비 제어를 수행하지 않습니다.</AppText>
       <AppText>
-        S04 준비 확인, S05 장치 점검과 S06 Mock 실험 진행을 제공합니다. S07 의미 선택은
-        미구현입니다.
+        S04 준비 확인, S05 장치 점검, S06 실험 진행과 S07 의미 선택을 Mock으로 제공합니다.
       </AppText>
       <Button
         label="새 Mock 실험 준비 시작"

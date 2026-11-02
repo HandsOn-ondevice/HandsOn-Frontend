@@ -15,7 +15,7 @@ export default function ExecutionRoute() {
       }
       onClarification={() =>
         router.push({
-          pathname: '/researcher-workflow/[sessionId]/voice-confirmation-pending',
+          pathname: '/researcher-workflow/[sessionId]/voice-clarification',
           params: { sessionId },
         })
       }

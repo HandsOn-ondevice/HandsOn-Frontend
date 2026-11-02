@@ -1,18 +1,13 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { VoiceClarificationConnectionScreen } from '@/features/researcher-workflow/screens/VoiceClarificationConnectionScreen';
+import { Redirect, useLocalSearchParams } from 'expo-router';
 
 export default function VoiceClarificationRoute() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
   return (
-    <VoiceClarificationConnectionScreen
-      key={sessionId}
-      sessionId={sessionId}
-      onBack={() =>
-        router.dismissTo({
-          pathname: '/researcher-workflow/[sessionId]/execution',
-          params: { sessionId },
-        })
-      }
+    <Redirect
+      href={{
+        pathname: '/researcher-workflow/[sessionId]/voice-clarification',
+        params: { sessionId },
+      }}
     />
   );
 }
