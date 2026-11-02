@@ -182,12 +182,17 @@ describe('S04 사용자 흐름', () => {
     });
     const screen = await render(
       <WorkflowProvider repository={repo}>
-        <DeviceCheckConnectionScreen sessionId={session.sessionId} onBack={() => {}} />
+        <DeviceCheckConnectionScreen
+          sessionId={session.sessionId}
+          onBack={() => {}}
+          onExecution={() => {}}
+        />
       </WorkflowProvider>,
     );
     await screen.findByText('S04 준비 확인이 필요합니다');
-    expect(screen.getByText('S05 연결 지점 · 미구현')).toBeTruthy();
-    expect(screen.getByText('Mock 환경 · 실제 센서 통신을 수행하지 않았습니다.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '실험 측정 시작' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '장치·센서 점검 시작' })).toBeDisabled();
+    expect(screen.getByText('Mock 환경 · 실제 장비 연결·측정 아님')).toBeTruthy();
   });
 
   test('기존 갤러리에서 S06 예제를 열고 돌아올 수 있다', async () => {

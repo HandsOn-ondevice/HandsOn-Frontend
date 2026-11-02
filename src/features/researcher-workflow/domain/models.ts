@@ -1,3 +1,11 @@
+import type {
+  DeviceCheckAttempt,
+  DeviceCheckDefinition,
+  DeviceDiagnosticsReport,
+  SensorReading,
+  DiagnosticIssue,
+} from './device-check';
+
 export type PreparationCheckId =
   'materials' | 'device' | 'powerOff' | 'wiring' | 'distance' | 'communication';
 
@@ -18,6 +26,7 @@ export interface ProcedureSnapshot {
   readonly title: string;
   readonly deviceId: string;
   readonly preparation: readonly PreparationRequirement[];
+  readonly deviceCheck?: DeviceCheckDefinition;
 }
 
 export interface PreparationCheck {
@@ -33,18 +42,38 @@ export interface Evidence {
   readonly checkId?: PreparationCheckId;
   readonly kind: 'human' | 'program' | 'sensor';
   readonly actorId: string;
-  readonly action: 'confirmed' | 'revoked' | 'preparationCompleted';
+  readonly action:
+    | 'confirmed'
+    | 'revoked'
+    | 'preparationCompleted'
+    | 'deviceCheckPassed'
+    | 'deviceCheckFailed'
+    | 'executionStarted';
   readonly recordedAt: string;
   readonly source: 'mock' | 'api';
+  readonly attemptId?: string;
+  readonly sensorId?: string;
+  readonly readings?: readonly SensorReading[];
+  readonly issue?: DiagnosticIssue;
+  readonly diagnostics?: DeviceDiagnosticsReport;
 }
 
 export interface WorkflowEvent {
   readonly eventId: string;
   readonly requestId: string;
-  readonly type: 'sessionCreated' | 'checkConfirmed' | 'checkRevoked' | 'preparationCompleted';
+  readonly type:
+    | 'sessionCreated'
+    | 'checkConfirmed'
+    | 'checkRevoked'
+    | 'preparationCompleted'
+    | 'deviceCheckStarted'
+    | 'deviceCheckPassed'
+    | 'deviceCheckFailed'
+    | 'executionStarted';
   readonly occurredAt: string;
   readonly evidenceId?: string;
   readonly checkId?: PreparationCheckId;
+  readonly attemptId?: string;
 }
 
 export interface ExperimentSession {
@@ -52,13 +81,14 @@ export interface ExperimentSession {
   readonly operatorId: string;
   readonly source: 'mock' | 'api';
   readonly procedure: ProcedureSnapshot;
-  readonly phase: 'preparing' | 'awaitingDeviceCheck';
+  readonly phase: 'preparing' | 'awaitingDeviceCheck' | 'readyToExecute' | 'running';
   readonly revision: number;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly checks: readonly PreparationCheck[];
   readonly evidence: readonly Evidence[];
   readonly events: readonly WorkflowEvent[];
+  readonly deviceChecks: readonly DeviceCheckAttempt[];
 }
 
 export type WorkflowCommand =
@@ -67,7 +97,9 @@ export type WorkflowCommand =
       readonly checkId: PreparationCheckId;
       readonly checked: boolean;
     }
-  | { readonly type: 'completePreparation' };
+  | { readonly type: 'completePreparation' }
+  | { readonly type: 'startDeviceCheck' }
+  | { readonly type: 'startExecution' };
 
 export interface CommandContext {
   readonly requestId: string;

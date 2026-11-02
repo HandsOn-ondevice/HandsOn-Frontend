@@ -7,6 +7,40 @@ export const mockProcedure: ProcedureSnapshot = {
   approval: 'approved',
   title: 'LED 출력 단계별 조도·소비전력 측정',
   deviceId: 'LED-M03',
+  deviceCheck: {
+    deviceId: 'mock-orange-pi-5-plus',
+    title: 'Orange Pi 5+',
+    sensors: [
+      {
+        sensorId: 'bh1750',
+        title: 'BH1750',
+        description: '조도 센서 · 0x23',
+        required: true,
+        metrics: [{ id: 'illuminance', label: '조도', unit: 'lx' }],
+      },
+      {
+        sensorId: 'ina219',
+        title: 'INA219',
+        description: '전압·전류 센서 · 0x40',
+        required: true,
+        metrics: [
+          { id: 'voltage', label: '전압', unit: 'V' },
+          { id: 'current', label: '전류', unit: 'mA' },
+          { id: 'power', label: '전력', unit: 'mW' },
+        ],
+      },
+      {
+        sensorId: 'bme280',
+        title: 'BME280',
+        description: '환경 센서 · 0x76',
+        required: true,
+        metrics: [
+          { id: 'temperature', label: '온도', unit: '°C' },
+          { id: 'humidity', label: '습도', unit: '%' },
+        ],
+      },
+    ],
+  },
   preparation: [
     {
       id: 'materials',

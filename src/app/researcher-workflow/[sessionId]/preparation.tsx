@@ -10,7 +10,7 @@ export default function PreparationRoute() {
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/researcher-workflow'))}
       onDeviceCheck={() =>
         router.push({
-          pathname: '/researcher-workflow/[sessionId]/device-check-pending',
+          pathname: '/researcher-workflow/[sessionId]/device-check',
           params: { sessionId },
         })
       }

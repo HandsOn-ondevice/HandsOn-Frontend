@@ -16,6 +16,7 @@ export function selectPreparation(session: ExperimentSession) {
     missing,
     current,
     canContinue: session.phase === 'preparing' && missing.length === 0,
-    awaitingDeviceCheck: session.phase === 'awaitingDeviceCheck',
+    // 기존 호출부의 "제출 후 잠금·장치 화면 복귀" 의미를 유지한다.
+    awaitingDeviceCheck: session.phase !== 'preparing',
   };
 }

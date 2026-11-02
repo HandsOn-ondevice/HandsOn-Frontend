@@ -11,10 +11,10 @@ export interface TransitionMetadata {
 /** Mock 전용 규칙. 센서 안전 판정이나 실제 절차 승인을 수행하지 않는다. */
 export function transitionPreparation(
   session: ExperimentSession,
-  command: WorkflowCommand,
+  command: Extract<WorkflowCommand, { type: 'setPreparationCheck' | 'completePreparation' }>,
   metadata: TransitionMetadata,
 ): ExperimentSession {
-  if (command.type === 'completePreparation' && session.phase === 'awaitingDeviceCheck') {
+  if (command.type === 'completePreparation' && session.phase !== 'preparing') {
     return session;
   }
   if (session.phase !== 'preparing') {

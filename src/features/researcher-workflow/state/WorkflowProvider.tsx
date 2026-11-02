@@ -21,3 +21,9 @@ export function useWorkflowRepository() {
   if (!repository) throw new Error('WorkflowProvider 안에서 사용해야 합니다.');
   return repository;
 }
+
+/** 개발용 제어만 노출한다. API Repository를 주입하면 Mock 컨트롤은 나타나지 않는다. */
+export function useMockDeviceCheckControls() {
+  const repository = useWorkflowRepository();
+  return repository instanceof MockWorkflowRepository ? repository : null;
+}

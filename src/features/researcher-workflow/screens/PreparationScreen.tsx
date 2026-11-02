@@ -33,7 +33,9 @@ export function PreparationScreen({
   const progress = session ? selectPreparation(session) : null;
   const guidance =
     progress?.current?.guidance ??
-    '작업자 준비 확인이 완료되었습니다. 통신 점검은 S05에서 진행합니다.';
+    (session?.checks.find((check) => check.id === 'communication')?.checked
+      ? '작업자 확인과 통신 점검이 완료되었습니다. 장치 점검 화면에서 다음 단계를 확인해 주세요.'
+      : '작업자 준비 확인이 완료되었습니다. 통신 점검은 S05에서 진행합니다.');
 
   const continuePreparation = async () => {
     if (progress?.awaitingDeviceCheck) {
@@ -96,7 +98,11 @@ export function PreparationScreen({
                 <CheckboxRow
                   key={requirement.id}
                   title={requirement.title}
-                  subtitle={checked ? `작업자 확인 · ${time}` : requirement.description}
+                  subtitle={
+                    checked
+                      ? `${requirement.owner === 'operator' ? '작업자 확인' : 'Mock 시스템 근거'} · ${time}`
+                      : requirement.description
+                  }
                   checked={checked}
                   state={
                     checked

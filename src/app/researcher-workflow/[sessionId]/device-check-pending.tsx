@@ -1,18 +1,10 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { DeviceCheckConnectionScreen } from '@/features/researcher-workflow/screens/DeviceCheckConnectionScreen';
+import { Redirect, useLocalSearchParams } from 'expo-router';
 
 export default function DeviceCheckConnectionRoute() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
   return (
-    <DeviceCheckConnectionScreen
-      key={sessionId}
-      sessionId={sessionId}
-      onBack={() =>
-        router.replace({
-          pathname: '/researcher-workflow/[sessionId]/preparation',
-          params: { sessionId },
-        })
-      }
+    <Redirect
+      href={{ pathname: '/researcher-workflow/[sessionId]/device-check', params: { sessionId } }}
     />
   );
 }
