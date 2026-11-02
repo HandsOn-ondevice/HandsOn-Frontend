@@ -151,7 +151,7 @@ export function DeviceCheckConnectionScreen({
       </ScrollView>
       <ActionShelf
         safeArea
-        primary={state?.executionStarted ? 'S06 연결 안내로 돌아가기' : '실험 측정 시작'}
+        primary={state?.executionStarted ? '실험 진행으로 돌아가기' : '실험 측정 시작'}
         disabled={locked || !state || (!state.canStart && !state.executionStarted)}
         loading={pending}
         onPrimary={() => {

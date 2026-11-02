@@ -7,6 +7,16 @@ export const mockProcedure: ProcedureSnapshot = {
   approval: 'approved',
   title: 'LED 출력 단계별 조도·소비전력 측정',
   deviceId: 'LED-M03',
+  execution: {
+    provenance: 'mock-draft',
+    profileVersion: 'led-draft-1',
+    settlingSeconds: 5,
+    conditions: [0, 25, 50, 75, 100].map((value) => ({
+      id: `output-${value}`,
+      label: `${value}%`,
+      repetitions: 3,
+    })),
+  },
   deviceCheck: {
     deviceId: 'mock-orange-pi-5-plus',
     title: 'Orange Pi 5+',

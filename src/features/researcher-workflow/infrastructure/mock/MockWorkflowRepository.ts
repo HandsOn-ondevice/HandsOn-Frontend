@@ -18,11 +18,26 @@ import {
   type MockDeviceScenario,
   type MockDiagnosticsRunner,
 } from './device-check-scenarios';
+import { selectExecution } from '../../domain/execution';
+import {
+  beginExecutionSample,
+  finishExecutionSample,
+  completeExecutionStep,
+  requestVoiceClarification,
+  dismissVoiceClarification,
+} from './execution-transitions';
+import {
+  runMockExecutionSample,
+  mockExecutionScenarios,
+  type MockExecutionScenario,
+  type MockExecutionRunner,
+} from './execution-scenarios';
 
 export interface MockDependencies {
   readonly now?: () => string;
   readonly id?: () => string;
   readonly inspect?: MockDiagnosticsRunner;
+  readonly sample?: MockExecutionRunner;
 }
 
 const copy = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
@@ -36,11 +51,14 @@ export class MockWorkflowRepository implements WorkflowRepository {
   private readonly id: () => string;
   private readonly inspect: MockDiagnosticsRunner;
   private readonly scenarios = new Map<string, MockDeviceScenario>();
+  private readonly sample: MockExecutionRunner;
+  private readonly executionScenarios = new Map<string, MockExecutionScenario>();
 
   constructor(dependencies: MockDependencies = {}) {
     this.now = dependencies.now ?? (() => new Date().toISOString());
     this.id = dependencies.id ?? createRequestId;
     this.inspect = dependencies.inspect ?? runMockDiagnostics;
+    this.sample = dependencies.sample ?? runMockExecutionSample;
   }
 
   async createSession(input: CreateSessionInput): Promise<ExperimentSession> {
@@ -137,23 +155,111 @@ export class MockWorkflowRepository implements WorkflowRepository {
       evidenceId: this.id(),
     };
     const attemptId = command.type === 'startDeviceCheck' ? this.id() : undefined;
+    const sampleId = command.type === 'requestExecutionSample' ? this.id() : undefined;
     const next =
       command.type === 'startDeviceCheck'
         ? beginDeviceCheck(session, attemptId!, metadata)
         : command.type === 'startExecution'
           ? startMockExecution(session, metadata)
-          : transitionPreparation(session, command, metadata);
+          : command.type === 'requestExecutionSample'
+            ? beginExecutionSample(session, command.cursorId, sampleId!, metadata)
+            : command.type === 'completeExecutionStep'
+              ? completeExecutionStep(
+                  session,
+                  command.cursorId,
+                  command.sampleAttemptId,
+                  this.id(),
+                  metadata,
+                )
+              : command.type === 'requestVoiceClarification'
+                ? requestVoiceClarification(
+                    session,
+                    command.cursorId,
+                    command.utterance,
+                    this.id(),
+                    metadata,
+                  )
+                : command.type === 'dismissVoiceClarification'
+                  ? dismissVoiceClarification(session, command.commandId, metadata)
+                  : transitionPreparation(session, command, metadata);
     requests.set(context.requestId, signature);
     this.commandRequests.set(sessionId, requests);
     this.sessions.set(sessionId, next);
     if (next !== session) this.publish(next);
     if (attemptId) this.scheduleInspection(next, attemptId, context.requestId);
+    if (sampleId) this.scheduleExecutionSample(next, sampleId, context.requestId);
     return copy(next);
   }
 
   /** Mock 제어는 정식 Repository 명령·API 입력과 분리한다. 실행 중인 시나리오는 바꿀 수 없다. */
   getDeviceCheckScenario(sessionId: string): MockDeviceScenario {
     return this.scenarios.get(sessionId) ?? 'normal';
+  }
+
+  getExecutionScenario(sessionId: string): MockExecutionScenario {
+    return this.executionScenarios.get(sessionId) ?? 'normal';
+  }
+
+  setExecutionScenario(sessionId: string, scenario: MockExecutionScenario) {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new WorkflowError('NOT_FOUND', '세션을 찾을 수 없습니다.');
+    const state = selectExecution(session);
+    if (
+      !state.authorized ||
+      state.sampling ||
+      state.pendingVoice ||
+      state.completed ||
+      !mockExecutionScenarios.some((item) => item.value === scenario)
+    ) {
+      throw new WorkflowError(
+        'INVALID_STATE',
+        '현재 상태에서 Mock 실행 시나리오를 변경할 수 없습니다.',
+      );
+    }
+    this.executionScenarios.set(sessionId, scenario);
+  }
+
+  private scheduleExecutionSample(
+    session: ExperimentSession,
+    attemptId: string,
+    requestId: string,
+  ) {
+    const definition = copy(session.procedure.deviceCheck!);
+    const executionDefinition = copy(session.procedure.execution!);
+    const cursor = copy(session.execution!.cursor!);
+    const scenario = this.getExecutionScenario(session.sessionId);
+    void Promise.resolve()
+      .then(() => this.sample({ definition, executionDefinition, cursor, scenario, now: this.now }))
+      .catch(() => ({
+        cursorId: cursor.cursorId,
+        source: 'mock' as const,
+        stability: 'stable' as const,
+        diagnostics: {
+          source: 'mock' as const,
+          deviceId: definition.deviceId,
+          connection: 'error' as const,
+          checkedAt: this.now(),
+          sensors: [],
+          issue: {
+            code: 'MOCK_SAMPLE_ERROR',
+            message: 'Mock 응답 처리 중 오류가 발생했습니다. 현재 회차를 유지합니다.',
+          },
+        },
+      }))
+      .then((report) => {
+        const current = this.sessions.get(session.sessionId);
+        if (!current) return;
+        const next = finishExecutionSample(current, attemptId, copy(report), {
+          requestId,
+          now: this.now(),
+          eventId: this.id(),
+          evidenceId: this.id(),
+        });
+        if (next !== current) {
+          this.sessions.set(next.sessionId, next);
+          this.publish(next);
+        }
+      });
   }
 
   setDeviceCheckScenario(sessionId: string, scenario: MockDeviceScenario) {

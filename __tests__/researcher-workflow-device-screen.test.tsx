@@ -154,12 +154,16 @@ describe('S04~S06 장치 점검 화면 연결', () => {
     const session = await createReady(repository);
     const screen = await render(
       <WorkflowProvider repository={repository}>
-        <ExecutionConnectionScreen sessionId={session.sessionId} onBack={() => {}} />
+        <ExecutionConnectionScreen
+          sessionId={session.sessionId}
+          onBack={() => {}}
+          onClarification={() => {}}
+        />
       </WorkflowProvider>,
     );
     await screen.findByText('S05 점검·시작 요청이 필요합니다');
-    expect(screen.getByText('S06 연결 지점 · 실행 화면 미구현')).toBeTruthy();
-    expect(screen.queryByText('S05 Mock 점검과 시작 요청이 완료되었습니다')).toBeNull();
+    expect(screen.getByText('핵심 실행 화면')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '완료 요청' })).toBeDisabled();
   });
 
   test('Repository 교체 시 Mock 시나리오 컨트롤은 노출하지 않는다', async () => {

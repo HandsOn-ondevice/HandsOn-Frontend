@@ -5,6 +5,7 @@ import type {
   SensorReading,
   DiagnosticIssue,
 } from './device-check';
+import type { ExecutionDefinition, ExecutionState, ExecutionCursor } from './execution';
 
 export type PreparationCheckId =
   'materials' | 'device' | 'powerOff' | 'wiring' | 'distance' | 'communication';
@@ -27,6 +28,7 @@ export interface ProcedureSnapshot {
   readonly deviceId: string;
   readonly preparation: readonly PreparationRequirement[];
   readonly deviceCheck?: DeviceCheckDefinition;
+  readonly execution?: ExecutionDefinition;
 }
 
 export interface PreparationCheck {
@@ -48,7 +50,9 @@ export interface Evidence {
     | 'preparationCompleted'
     | 'deviceCheckPassed'
     | 'deviceCheckFailed'
-    | 'executionStarted';
+    | 'executionStarted'
+    | 'measurementConfirmed'
+    | 'measurementAccepted';
   readonly recordedAt: string;
   readonly source: 'mock' | 'api';
   readonly attemptId?: string;
@@ -56,6 +60,7 @@ export interface Evidence {
   readonly readings?: readonly SensorReading[];
   readonly issue?: DiagnosticIssue;
   readonly diagnostics?: DeviceDiagnosticsReport;
+  readonly cursor?: ExecutionCursor;
 }
 
 export interface WorkflowEvent {
@@ -69,11 +74,18 @@ export interface WorkflowEvent {
     | 'deviceCheckStarted'
     | 'deviceCheckPassed'
     | 'deviceCheckFailed'
-    | 'executionStarted';
+    | 'executionStarted'
+    | 'executionSampleRequested'
+    | 'executionSampleReceived'
+    | 'executionSampleRejected'
+    | 'measurementAccepted'
+    | 'voiceClarificationRequested'
+    | 'voiceClarificationDismissed';
   readonly occurredAt: string;
   readonly evidenceId?: string;
   readonly checkId?: PreparationCheckId;
   readonly attemptId?: string;
+  readonly cursor?: ExecutionCursor;
 }
 
 export interface ExperimentSession {
@@ -89,6 +101,7 @@ export interface ExperimentSession {
   readonly evidence: readonly Evidence[];
   readonly events: readonly WorkflowEvent[];
   readonly deviceChecks: readonly DeviceCheckAttempt[];
+  readonly execution?: ExecutionState;
 }
 
 export type WorkflowCommand =
@@ -99,7 +112,19 @@ export type WorkflowCommand =
     }
   | { readonly type: 'completePreparation' }
   | { readonly type: 'startDeviceCheck' }
-  | { readonly type: 'startExecution' };
+  | { readonly type: 'startExecution' }
+  | { readonly type: 'requestExecutionSample'; readonly cursorId: string }
+  | {
+      readonly type: 'completeExecutionStep';
+      readonly cursorId: string;
+      readonly sampleAttemptId: string;
+    }
+  | {
+      readonly type: 'requestVoiceClarification';
+      readonly cursorId: string;
+      readonly utterance: string;
+    }
+  | { readonly type: 'dismissVoiceClarification'; readonly commandId: string };
 
 export interface CommandContext {
   readonly requestId: string;
