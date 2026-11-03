@@ -125,19 +125,19 @@ export function selectExecution(session: ExperimentSession) {
   const sampling = latest?.status === 'sampling';
   const pendingVoice = execution?.pendingVoice ?? null;
   const reason = !authorized
-    ? 'S05 점검·시작 요청이 필요합니다'
+    ? '장치 점검을 완료하고 실험을 시작해 주세요.'
     : !configured || !execution
       ? '절차의 실행 정의가 없습니다. 담당자와 실행 계약을 확인해 주세요.'
       : completed
-        ? 'Mock 반복 측정을 마쳤습니다. 종료 검토·장치 정리·제출은 후속 화면에서 진행합니다.'
+        ? '반복 측정을 마쳤습니다. 종료 검토·장치 정리·제출은 아직 제공하지 않습니다.'
         : pendingVoice
-          ? '모호한 음성은 실행하지 않았습니다. S07에서 뜻을 확인하거나 취소해 주세요.'
+          ? '모호한 음성은 실행하지 않았습니다. 뜻을 확인하거나 취소해 주세요.'
           : sampling
-            ? 'Mock 응답을 기다리고 있습니다. 완료 요청은 아직 할 수 없습니다.'
+            ? '측정 응답을 기다리고 있습니다. 완료 요청은 아직 할 수 없습니다.'
             : (latest?.issue?.message ??
               (latest?.status === 'ready'
-                ? 'Mock 응답을 확인했습니다. 작업을 확인한 뒤 완료를 요청하세요.'
-                : '현재 회차의 Mock 응답을 먼저 확인해 주세요.'));
+                ? '측정 응답을 확인했습니다. 작업을 확인한 뒤 완료를 요청하세요.'
+                : '현재 회차의 측정값을 먼저 확인해 주세요.'));
   return {
     authorized,
     configured,
@@ -167,4 +167,26 @@ export function selectExecution(session: ExperimentSession) {
       !executionSampleIssue(session, latest),
     canClarify: authorized && configured && !!cursor && !sampling && !pendingVoice,
   };
+}
+
+/** 완료 후 표시용. 저장된 유효 측정과 같은 커서·근거가 있는 응답만 반환한다. */
+export function selectLastValidMeasurement(session: ExperimentSession) {
+  return session.execution?.attempts
+    .slice()
+    .reverse()
+    .find(
+      (attempt) =>
+        attempt.status === 'valid' &&
+        !!attempt.confirmedAt &&
+        !executionSampleIssue(session, attempt) &&
+        session.events.some(
+          (event) => event.type === 'measurementAccepted' && event.attemptId === attempt.attemptId,
+        ) &&
+        session.evidence.some(
+          (evidence) =>
+            evidence.action === 'measurementAccepted' &&
+            evidence.attemptId === attempt.attemptId &&
+            evidence.cursor?.cursorId === attempt.cursor.cursorId,
+        ),
+    );
 }

@@ -31,10 +31,12 @@ export function buildMockDiagnostics({
   definition,
   scenario,
   now,
+  attemptId,
 }: MockDiagnosticsInput): DeviceDiagnosticsReport {
   const checkedAt = now();
   const disconnected = scenario === 'disconnected';
   return {
+    attemptId,
     source: 'mock',
     deviceId: definition.deviceId,
     connection: disconnected ? 'disconnected' : 'connected',
@@ -42,7 +44,7 @@ export function buildMockDiagnostics({
     issue: disconnected
       ? {
           code: 'MOCK_DEVICE_DISCONNECTED',
-          message: 'Mock 장치에 연결되지 않았습니다. 실제 Orange Pi 연결 상태를 나타내지 않습니다.',
+          message: '장치 연결을 확인하지 못했습니다. 연결 상태를 확인한 후 다시 점검해 주세요.',
         }
       : undefined,
     sensors: definition.sensors.map((sensor, index) => {
@@ -62,11 +64,11 @@ export function buildMockDiagnostics({
               code: `MOCK_${status.toUpperCase()}`,
               message:
                 status === 'error'
-                  ? `${sensor.title} 통신 오류 시뮬레이션입니다. 점검 응답을 확인하지 못했습니다. 장치·배선 상태를 점검하는 절차를 확인한 뒤 Mock 시나리오를 정상 연결로 바꾸고 다시 점검해 주세요. 실제 장비 명령은 전송되지 않았습니다.`
+                  ? `${sensor.title} 통신 응답을 확인하지 못했습니다. 장치와 배선의 연결 상태를 확인한 후 다시 점검해 주세요.`
                   : status === 'stale'
-                    ? '이전 값 시뮬레이션 · 최신성 확인 실패. 안전 시간 기준은 확정하지 않았습니다.'
+                    ? '이전 측정값입니다. 새 응답을 확인해 주세요.'
                     : status === 'timeout'
-                      ? '응답 시간 초과 시뮬레이션 · 실제 장비의 제한 시간은 확정하지 않았습니다.'
+                      ? '점검 응답을 받지 못했습니다. 연결 상태를 확인한 후 다시 점검해 주세요.'
                       : '장치 미연결로 센서 응답을 확인할 수 없습니다.',
             };
       return {

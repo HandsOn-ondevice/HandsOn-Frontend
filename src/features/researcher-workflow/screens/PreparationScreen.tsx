@@ -35,7 +35,7 @@ export function PreparationScreen({
     progress?.current?.guidance ??
     (session?.checks.find((check) => check.id === 'communication')?.checked
       ? '작업자 확인과 통신 점검이 완료되었습니다. 장치 점검 화면에서 다음 단계를 확인해 주세요.'
-      : '작업자 준비 확인이 완료되었습니다. 통신 점검은 S05에서 진행합니다.');
+      : '작업자 준비 확인이 완료되었습니다. 통신 점검은 장치 점검 화면에서 진행합니다.');
 
   const continuePreparation = async () => {
     if (progress?.awaitingDeviceCheck) {
@@ -55,7 +55,7 @@ export function PreparationScreen({
           실험 전, 하나씩 확인해요.
         </AppText>
         <AppText variant="caption" color={colors.text.secondary}>
-          Mock 환경 · 실제 장비·음성 연동 없음
+          실험을 시작하기 전에 준비 상태를 확인해 주세요.
         </AppText>
         {loading ? (
           <AppText accessibilityLiveRegion="polite">준비 상태를 불러오고 있습니다.</AppText>
@@ -100,7 +100,7 @@ export function PreparationScreen({
                   title={requirement.title}
                   subtitle={
                     checked
-                      ? `${requirement.owner === 'operator' ? '작업자 확인' : 'Mock 시스템 근거'} · ${time}`
+                      ? `${requirement.owner === 'operator' ? '작업자 확인' : '통신 확인 기록'} · ${time}`
                       : requirement.description
                   }
                   checked={checked}
@@ -132,8 +132,8 @@ export function PreparationScreen({
             </View>
             <AppText variant="caption" color={colors.text.secondary}>
               {progress.canContinue || progress.awaitingDeviceCheck
-                ? '작업자 확인 5개 완료 · 통신 점검은 S05에서 확인합니다.'
-                : `필수 작업자 확인 ${progress.missing.length}개가 남았습니다. 통신 점검은 S05에서 확인합니다.`}
+                ? '작업자 확인 5개 완료 · 통신 점검은 장치 점검 화면에서 확인합니다.'
+                : `필수 작업자 확인 ${progress.missing.length}개가 남았습니다. 통신 점검은 장치 점검 화면에서 확인합니다.`}
             </AppText>
           </>
         ) : null}
@@ -149,9 +149,7 @@ export function PreparationScreen({
         onPrimary={() => {
           void continuePreparation();
         }}
-        onSecondary={() =>
-          setNotice(`안내 재생 시뮬레이션 · 실제 TTS는 실행하지 않습니다. ${guidance}`)
-        }
+        onSecondary={() => setNotice(`안내: ${guidance}`)}
       />
       <BottomSheet
         open={details}
@@ -159,12 +157,11 @@ export function PreparationScreen({
         title="실험 준비 정보"
         icon="flask"
       >
-        <AppText>Mock 세션 · 앱을 재시작하면 초기화됩니다.</AppText>
+        <AppText>앱을 종료하거나 새로고침하면 진행 기록이 초기화됩니다.</AppText>
         <AppText>
           {session ? `${session.procedure.title} · v${session.procedure.version}` : '세션 조회 중'}
         </AppText>
-        <AppText variant="caption">세션 {sessionId}</AppText>
-        <AppText>통신 점검은 S05 담당이며 현재 화면에서 센서 확인을 대신하지 않습니다.</AppText>
+        <AppText>통신 상태는 다음 장치 점검 화면에서 확인합니다.</AppText>
       </BottomSheet>
     </SafeAreaView>
   );

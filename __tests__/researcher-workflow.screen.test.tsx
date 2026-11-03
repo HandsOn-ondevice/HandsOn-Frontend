@@ -89,9 +89,9 @@ describe('S04 사용자 흐름', () => {
     await screen.findByText('준비 진행도 · 1 / 6 항목 완료');
   });
 
-  test('Mock 표시·체크·해제·진행 차단·안내 시뮬레이션을 제공한다', async () => {
+  test('준비 안내·체크·해제·진행 차단·화면 안내를 제공한다', async () => {
     const { screen, onDeviceCheck } = await setup();
-    expect(screen.getByText('Mock 환경 · 실제 장비·음성 연동 없음')).toBeTruthy();
+    expect(screen.getByText('실험을 시작하기 전에 준비 상태를 확인해 주세요.')).toBeTruthy();
     expect(screen.getByRole('button', { name: '확인 완료' })).toBeDisabled();
     const materials = screen.getByRole('checkbox', { name: '필수 준비물 7개 확인' });
     await fireEvent.press(materials);
@@ -103,7 +103,7 @@ describe('S04 사용자 흐름', () => {
     await fireEvent.press(screen.getByRole('button', { name: '확인 완료' }));
     expect(onDeviceCheck).not.toHaveBeenCalled();
     await fireEvent.press(screen.getByRole('button', { name: '안내 다시 듣기' }));
-    expect(screen.getByText(/안내 재생 시뮬레이션 · 실제 TTS/)).toBeTruthy();
+    expect(screen.getByText(/안내: /)).toBeTruthy();
   });
 
   test('작업자 확인 5개 뒤 통신 점검을 남긴 채 연결 지점으로 진행한다', async () => {
@@ -160,12 +160,14 @@ describe('S04 사용자 흐름', () => {
         <DevelopmentEntryScreen onOpen={(id) => opened.push(id)} />
       </WorkflowProvider>,
     );
-    await fireEvent.press(screen.getByRole('button', { name: '새 Mock 실험 준비 시작' }));
+    await fireEvent.press(screen.getByRole('button', { name: '새 실험 준비 시작' }));
     await waitFor(() => expect(opened).toHaveLength(1));
     expect(
       (await repository.getSession(opened[0])).checks.filter((item) => item.checked),
     ).toHaveLength(0);
-    await fireEvent.press(screen.getByRole('button', { name: 'Figma 검증용 2/6 상태 열기' }));
+    expect(screen.queryByRole('button', { name: '준비 항목 2개 확인 상태로 보기' })).toBeNull();
+    await fireEvent.press(screen.getByRole('button', { name: '미리보기 설정' }));
+    await fireEvent.press(screen.getByRole('button', { name: '준비 항목 2개 확인 상태로 보기' }));
     await waitFor(() => expect(opened).toHaveLength(2));
     expect(
       (await repository.getSession(opened[1])).checks.filter((item) => item.checked),
@@ -189,10 +191,10 @@ describe('S04 사용자 흐름', () => {
         />
       </WorkflowProvider>,
     );
-    await screen.findByText('S04 준비 확인이 필요합니다');
+    await screen.findByText('준비 확인이 필요합니다');
     expect(screen.getByRole('button', { name: '실험 측정 시작' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '장치·센서 점검 시작' })).toBeDisabled();
-    expect(screen.getByText('Mock 환경 · 실제 장비 연결·측정 아님')).toBeTruthy();
+    expect(screen.getByText('기기 미연결')).toBeTruthy();
   });
 
   test('기존 갤러리에서 S06 예제를 열고 돌아올 수 있다', async () => {

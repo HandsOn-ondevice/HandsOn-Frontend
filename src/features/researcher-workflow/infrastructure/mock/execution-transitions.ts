@@ -131,7 +131,8 @@ export function completeExecutionStep(
   meta: TransitionMetadata,
 ): ExperimentSession {
   const state = selectExecution(session);
-  if (!state.authorized || !session.execution) invalid('S05 점검·시작 요청이 필요합니다.');
+  if (!state.authorized || !session.execution)
+    invalid('장치 점검을 완료하고 실험을 시작해 주세요.');
   // 새 요청 ID라도 이미 수락된 같은 회차·같은 응답을 재완료하지 않는다.
   if (
     session.execution.attempts.some(

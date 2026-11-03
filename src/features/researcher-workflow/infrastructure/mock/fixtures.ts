@@ -101,7 +101,7 @@ export const mockProcedure: ProcedureSnapshot = {
       id: 'communication',
       title: '전원·센서 통신 점검',
       description: '센서 근거 · 다음 화면에서 확인',
-      guidance: '통신 점검은 S05에서 별도로 수행합니다.',
+      guidance: '통신 점검은 장치 점검 화면에서 별도로 수행합니다.',
       owner: 'system',
       verifiedAt: 'S05',
       requiredForDeviceCheck: false,

@@ -19,6 +19,7 @@ import {
   voiceChoiceLabels,
   type VoiceChoice,
 } from '../domain/voice-clarification';
+import { procedureDisplayTitle } from './procedure-display-title';
 import { useWorkflowSession } from '../state/useWorkflowSession';
 
 export function VoiceClarificationScreen({
@@ -76,20 +77,12 @@ export function VoiceClarificationScreen({
       />
       <ScrollView contentContainerStyle={styles.content}>
         <AppText variant="title" accessibilityRole="header">
-          {session?.procedure.title ?? '음성 확인'}
+          {procedureDisplayTitle(session?.procedure)}
         </AppText>
         {request ? (
           <AppText variant="caption">
             {state?.condition?.label ?? request.cursor.conditionId} 조건 ·{' '}
             {request.cursor.trialIndex}회차
-          </AppText>
-        ) : null}
-        <AppText variant="caption">
-          Mock 발화·선택 예시 · 실제 녹음·STT·AI 해석·장치 실행 없음
-        </AppText>
-        {session ? (
-          <AppText variant="caption">
-            세션 {sessionId} · v{session.procedure.version}
           </AppText>
         ) : null}
         {loading ? (
@@ -120,9 +113,6 @@ export function VoiceClarificationScreen({
               <AppText variant="heading">
                 “{request.utterance}”가{'\n'}어떤 뜻인가요?
               </AppText>
-              <AppText variant="caption">
-                모호한 명령은 실행하지 않고 현재 상태를 유지합니다.
-              </AppText>
             </SurfaceCard>
             <View style={styles.choices}>
               {(['repeatGuidance', 'remeasure', 'doNothing'] as const).map((value) => (
@@ -130,6 +120,7 @@ export function VoiceClarificationScreen({
                   key={value}
                   label={labels[value]}
                   accessibilityLabel={`${labels[value]}${choice === value ? ' · 선택됨' : ''}`}
+                  accessibilityHint="선택 후 하단 현재 작업으로 돌아가기 버튼으로 확정합니다. 뒤로 가면 선택 없이 취소합니다."
                   variant={choice === value ? 'primary' : 'secondary'}
                   icon={
                     value === 'repeatGuidance'
@@ -143,12 +134,8 @@ export function VoiceClarificationScreen({
                 />
               ))}
             </View>
-            <AppText accessibilityLiveRegion="polite">{state?.reason}</AppText>
-            {choice ? (
-              <AppText variant="caption" accessibilityLiveRegion="polite">
-                선택: {labels[choice]}. 하단 ‘현재 작업으로 돌아가기’를 누르면 Mock 선택을
-                확정합니다.
-              </AppText>
+            {!state?.valid ? (
+              <AppText accessibilityLiveRegion="polite">{state?.reason}</AppText>
             ) : null}
             <View style={styles.guard}>
               <Icon name="lock" color={colors.text.secondary} />
@@ -156,14 +143,6 @@ export function VoiceClarificationScreen({
                 현재 단계와 측정 회차는 바꾸지 않았습니다.
               </AppText>
             </View>
-            <Button
-              label="선택하지 않고 취소"
-              variant="tertiary"
-              disabled={loading || pending}
-              onPress={() => {
-                void cancel();
-              }}
-            />
           </>
         ) : !loading && session ? (
           <FeedbackPanel
@@ -174,7 +153,7 @@ export function VoiceClarificationScreen({
             }
             subtitle={
               state?.lastResolution
-                ? `Mock 처리 결과: ${voiceChoiceLabels[state.lastResolution.choice]}. 새 명령은 실행하지 않습니다.`
+                ? `처리 결과: ${voiceChoiceLabels[state.lastResolution.choice]}. 새 명령은 실행하지 않습니다.`
                 : state?.reason
             }
             tone="info"
@@ -191,12 +170,14 @@ export function VoiceClarificationScreen({
         }}
       />
       <BottomSheet open={menu} title="음성 확인 정보" onClose={() => setMenu(false)}>
+        {session ? <AppText variant="caption">절차 v{session.procedure.version}</AppText> : null}
+        <AppText>뜻을 선택한 뒤 하단 버튼으로 확정합니다. 뒤로 가면 선택 없이 취소합니다.</AppText>
         <AppText>
-          선택은 사용자의 의도 확인입니다. 안내 반복은 TTS 시뮬레이션이며, 다시 측정은 같은 회차의
-          새 Mock 응답 요청입니다. 실제 장치 명령이나 측정 완료를 뜻하지 않습니다.
+          음성 입력과 안내 재생 서비스는 아직 연결되지 않았습니다. 안내는 화면에서 확인할 수
+          있습니다. 다시 측정은 현재 회차의 응답을 새로 확인하며 작업을 자동으로 완료하지 않습니다.
         </AppText>
         <AppText>
-          요청의 세션·커서·응답이 바뀌면 선택을 확정할 수 없습니다. 뒤로가기는 선택 없이 취소합니다.
+          현재 작업이나 측정값이 바뀌면 선택을 확정할 수 없습니다. 뒤로 가면 선택 없이 취소합니다.
         </AppText>
       </BottomSheet>
     </SafeAreaView>
@@ -205,14 +186,14 @@ export function VoiceClarificationScreen({
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.surface.canvas },
   content: { paddingHorizontal: spacing[24], paddingVertical: spacing[16], gap: spacing[12] },
-  question: { gap: spacing[20], padding: spacing[24], marginVertical: spacing[8] },
+  question: { gap: spacing[16], padding: spacing[24], minHeight: 224, justifyContent: 'center' },
   mic: {
     alignSelf: 'center',
     backgroundColor: colors.status.warningBg,
     padding: spacing[12],
     borderRadius: spacing[12],
   },
-  choices: { gap: spacing[12] },
+  choices: { gap: spacing[16] },
   guard: { flexDirection: 'row', gap: spacing[8], alignItems: 'center' },
   flex: { flex: 1 },
 });

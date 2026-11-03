@@ -15,11 +15,14 @@ import {
   colors,
   spacing,
 } from '@/design-system';
-import { selectExecution } from '../domain/execution';
+import { selectExecution, selectLastValidMeasurement } from '../domain/execution';
 import { voiceChoiceLabels } from '../domain/voice-clarification';
 import { useWorkflowSession } from '../state/useWorkflowSession';
+import { procedureDisplayTitle } from './procedure-display-title';
 import { ExecutionMetrics } from './ExecutionMetrics';
 import { MockExecutionScenarioControl } from './MockExecutionScenarioControl';
+import { PreviewTools } from './PreviewTools';
+import { useMockDeviceCheckControls } from '../state/WorkflowProvider';
 
 export function ExecutionScreen({
   sessionId,
@@ -30,13 +33,14 @@ export function ExecutionScreen({
   onBack: () => void;
   onClarification: () => void;
 }) {
+  const previewControls = useMockDeviceCheckControls();
   const { session, loading, pending, error, refresh, execute } = useWorkflowSession(sessionId);
   const [menu, setMenu] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const state = session ? selectExecution(session) : null;
   const guidance = state?.cursor
     ? `${state.condition?.label ?? ''} 출력 · ${state.cursor.trialIndex}회차\n측정을 진행하세요`
-    : 'Mock 반복 측정 상태';
+    : '반복 측정 상태';
   const clarify = async () => {
     if (state?.pendingVoice) {
       onClarification();
@@ -64,17 +68,16 @@ export function ExecutionScreen({
       <AppBar title="핵심 실행 화면" mode="back" onBack={onBack} onMore={() => setMenu(true)} />
       <ScrollView contentContainerStyle={styles.content}>
         <AppText variant="title" accessibilityRole="header">
-          {session?.procedure.title ?? '실험 진행'}
+          {procedureDisplayTitle(session?.procedure)}
         </AppText>
-        <AppText variant="caption">Mock 초안 절차 · 실제 측정·출력 제어·음성 동작 없음</AppText>
         {session?.execution?.voiceResolutions?.slice(-1).map((result) => (
           <AppText key={result.commandId} variant="caption" accessibilityLiveRegion="polite">
-            S07 Mock 처리: {voiceChoiceLabels[result.choice]} ·{' '}
+            선택한 명령: {voiceChoiceLabels[result.choice]} ·{' '}
             {result.choice === 'repeatGuidance'
-              ? '안내 반복 시뮬레이션, 실제 TTS 없음'
+              ? '안내를 화면에 표시했습니다'
               : result.choice === 'remeasure'
-                ? '같은 회차 Mock 응답 요청, 자동 완료 없음'
-                : '측정 상태 유지, 실제 명령 실행 없음'}
+                ? '같은 회차의 측정값 확인 요청'
+                : '측정 상태 유지'}
           </AppText>
         ))}
         {loading ? (
@@ -98,9 +101,7 @@ export function ExecutionScreen({
         ) : null}
         {session && state ? (
           <>
-            <AppText variant="caption">
-              세션 {session.sessionId} · v{session.procedure.version}
-            </AppText>
+            <AppText variant="caption">절차 v{session.procedure.version}</AppText>
             {state.authorized && state.configured ? (
               <>
                 <StepProgress
@@ -132,7 +133,7 @@ export function ExecutionScreen({
                 !state.authorized
                   ? '실험 진행이 잠겨 있습니다'
                   : state.completed
-                    ? 'Mock 반복 측정 완료'
+                    ? '반복 측정 완료'
                     : guidance
               }
               subtitle={state.reason}
@@ -149,12 +150,14 @@ export function ExecutionScreen({
             />
             {state.authorized && state.configured ? (
               <>
-                <ExecutionMetrics attempt={state.latest} />
+                <ExecutionMetrics
+                  attempt={state.completed ? selectLastValidMeasurement(session) : state.latest}
+                  completed={state.completed}
+                  conditions={session.procedure.execution?.conditions}
+                />
                 <VoicePanel
-                  title={
-                    state.pendingVoice ? '모호한 음성 확인 대기 · Mock' : '음성 명령 시뮬레이션'
-                  }
-                  subtitle="눌러서 ‘다시 해줘’ 예시를 확인합니다. 실제 녹음·STT는 실행하지 않습니다."
+                  title={state.pendingVoice ? '음성 명령 확인 대기' : '음성 명령 확인'}
+                  subtitle="눌러서 ‘다시 해줘’의 뜻을 선택해 주세요."
                   state={state.pendingVoice ? 'clarify' : 'idle'}
                   onPress={
                     !pending && (state.canClarify || !!state.pendingVoice)
@@ -164,13 +167,8 @@ export function ExecutionScreen({
                       : undefined
                   }
                 />
-                <MockExecutionScenarioControl
-                  key={sessionId}
-                  sessionId={sessionId}
-                  disabled={pending || state.sampling || !!state.pendingVoice || state.completed}
-                />
                 <Button
-                  label={state.sampling ? 'Mock 응답 확인 중' : '현재 회차 Mock 응답 확인'}
+                  label={state.sampling ? '측정값 확인 중' : '현재 회차 측정값 확인'}
                   variant="secondary"
                   loading={state.sampling}
                   disabled={pending || !state.canSample}
@@ -182,10 +180,6 @@ export function ExecutionScreen({
                       });
                   }}
                 />
-                <AppText variant="caption">
-                  안정화 {session.procedure.execution?.settlingSeconds}초는 시나리오 초안입니다.
-                  대기·완료를 Mock 결과로 재현하며 실제 타이머 안전 판정을 하지 않습니다.
-                </AppText>
                 <AppText variant="caption">
                   센서 응답 확인만으로 작업자 완료가 기록되지 않습니다. 완료 요청은 현재 회차의
                   작업자 확인을 뜻합니다.
@@ -204,23 +198,29 @@ export function ExecutionScreen({
         loading={pending}
         disabled={loading || !state?.canComplete}
         onPrimary={complete}
-        onSecondary={() =>
-          setNotice(
-            `안내 반복 시뮬레이션 · 실제 TTS 없음. ${state?.reason ?? '세션을 확인해 주세요.'}`,
-          )
-        }
+        onSecondary={() => setNotice(`안내: ${state?.reason ?? '세션을 확인해 주세요.'}`)}
       />
       <BottomSheet open={menu} onClose={() => setMenu(false)} title="현재 작업 정보" icon="flask">
+        {session && state ? (
+          <PreviewTools available={!!previewControls}>
+            <MockExecutionScenarioControl
+              controls={previewControls}
+              key={sessionId}
+              sessionId={sessionId}
+              disabled={pending || state.sampling || !!state.pendingVoice || state.completed}
+            />
+          </PreviewTools>
+        ) : null}
+        <AppText>일시정지·재개와 오류 복구, 종료 검토는 아직 제공하지 않습니다.</AppText>
+        {session?.source === 'mock' ? (
+          <AppText>현재 값은 장치에서 수집한 실측값이 아닙니다.</AppText>
+        ) : null}
         <AppText>
-          일시정지·재개는 S10~S11, 오류 복구 절차는 S08~S09, 종료 검토는 S12 이후 작업입니다. 아직
-          구현하지 않았습니다.
-        </AppText>
-        <AppText>
-          화면을 나갔다 돌아와도 현재 회차는 유지됩니다. 앱 재시작·새로고침 시 메모리 Mock 세션은
+          화면을 나갔다 돌아와도 현재 회차는 유지됩니다. 앱을 종료하거나 새로고침하면 진행 기록이
           초기화됩니다.
         </AppText>
         <Button
-          label="S05 장치 점검으로 돌아가기"
+          label="장치 점검으로 돌아가기"
           variant="secondary"
           onPress={() => {
             setMenu(false);
@@ -233,5 +233,5 @@ export function ExecutionScreen({
 }
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.surface.canvas },
-  content: { paddingHorizontal: spacing[24], paddingVertical: spacing[16], gap: spacing[8] },
+  content: { padding: spacing[24], gap: spacing[12] },
 });

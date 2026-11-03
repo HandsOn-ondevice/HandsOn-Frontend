@@ -260,7 +260,9 @@ describe('S07 화면 입력과 요청 처리', () => {
     );
     const screen = await render(view);
     await screen.findByText('“다시 해줘”가\n어떤 뜻인가요?');
-    expect(screen.getByText(/Mock 발화·선택 예시/)).toBeTruthy();
+    expect(screen.getByText('현재 단계와 측정 회차는 바꾸지 않았습니다.')).toBeTruthy();
+    expect(screen.queryByText(/선택 전에는 명령을 실행하지 않습니다/)).toBeNull();
+    expect(screen.queryByRole('button', { name: '선택하지 않고 취소' })).toBeNull();
     expect(screen.getByRole('button', { name: '현재 작업으로 돌아가기' })).toBeDisabled();
     await fireEvent.press(screen.getByRole('button', { name: '아무것도 하지 않기' }));
     expect(await repo.getSession(session.sessionId)).toEqual(session);
@@ -334,14 +336,36 @@ describe('S07 화면 입력과 요청 처리', () => {
         <VoiceClarificationScreen sessionId={session.sessionId} onBack={() => {}} />
       </WorkflowProvider>,
     );
-    await screen.findByText('S05 점검·시작 요청이 필요합니다');
+    await screen.findByText('장치 점검을 완료하고 실험을 시작해 주세요.');
     expect(screen.queryByRole('button', { name: '현재 안내를 다시 듣기' })).toBeNull();
     await screen.rerender(
       <WorkflowProvider repository={repo}>
         <VoiceClarificationScreen key="missing" sessionId="missing" onBack={() => {}} />
       </WorkflowProvider>,
     );
-    await screen.findByText(/세션을 찾을 수 없습니다/);
+    await screen.findByText(/실험 기록을 찾을 수 없습니다/);
     expect(screen.queryByRole('button', { name: /회차 다시 측정/ })).toBeNull();
+  });
+
+  test('선택 후 상단 뒤로 가면 확정 없이 취소하고 측정 응답·근거를 보존한다', async () => {
+    const { repo, session } = await setup();
+    const onBack = jest.fn();
+    const screen = await render(
+      <WorkflowProvider repository={repo}>
+        <VoiceClarificationScreen sessionId={session.sessionId} onBack={onBack} />
+      </WorkflowProvider>,
+    );
+    await screen.findByText('“다시 해줘”가\n어떤 뜻인가요?');
+    await fireEvent.press(screen.getByRole('button', { name: '0% 조건 1회차 다시 측정' }));
+    expect(screen.getByRole('button', { name: '0% 조건 1회차 다시 측정 · 선택됨' })).toBeTruthy();
+    expect(await repo.getSession(session.sessionId)).toEqual(session);
+    await fireEvent.press(screen.getByRole('button', { name: '뒤로가기' }));
+    await waitFor(() => expect(onBack).toHaveBeenCalledTimes(1));
+    const canceled = await repo.getSession(session.sessionId);
+    expect(canceled.execution?.attempts).toEqual(session.execution?.attempts);
+    expect(canceled.execution?.cursor).toEqual(session.execution?.cursor);
+    expect(canceled.execution?.pendingVoice).toBeNull();
+    expect(canceled.evidence.slice(0, session.evidence.length)).toEqual(session.evidence);
+    expect(canceled.execution?.voiceResolutions?.at(-1)?.choice).toBe('cancel');
   });
 });

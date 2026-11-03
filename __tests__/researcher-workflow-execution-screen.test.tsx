@@ -59,9 +59,10 @@ async function setup(
 describe('S06 화면 조작과 재진입', () => {
   test('응답 확인 뒤 명시적 완료로 진행하고 재진입 시 이전 회차를 보존한다', async () => {
     const { repository, session, screen, view } = await setup();
-    expect(screen.getByText(/Mock 초안 절차/)).toBeTruthy();
+    expect(screen.getByText('LED 출력 특성 측정')).toBeTruthy();
+    expect((await repository.getSession(session.sessionId)).procedure).toEqual(mockProcedure);
     expect(screen.getByRole('button', { name: '완료 요청' })).toBeDisabled();
-    await fireEvent.press(screen.getByRole('button', { name: '현재 회차 Mock 응답 확인' }));
+    await fireEvent.press(screen.getByRole('button', { name: '현재 회차 측정값 확인' }));
     await screen.findByLabelText(/BH1750 조도, 18.4, lx/);
     expect(screen.getByRole('button', { name: '완료 요청' })).toBeEnabled();
     expect((await repository.getSession(session.sessionId)).evidence).toEqual(session.evidence);
@@ -80,18 +81,20 @@ describe('S06 화면 조작과 재진입', () => {
 
   test('오래된 값은 진행을 차단하고 정상 재요청 뒤에만 완료 버튼을 활성화한다', async () => {
     const { screen, repository, session } = await setup();
-    await fireEvent.press(
-      screen.getByRole('button', { name: 'Mock 실행 시나리오: 정상 Mock 응답' }),
-    );
+    await fireEvent.press(screen.getByRole('button', { name: '더 보기' }));
+    await fireEvent.press(screen.getByRole('button', { name: '미리보기 설정' }));
+    await fireEvent.press(screen.getByRole('button', { name: '측정 응답 조건: 정상 응답' }));
     await fireEvent.press(screen.getByRole('radio', { name: '오래된 값 · 보류' }));
-    await fireEvent.press(screen.getByRole('button', { name: '현재 회차 Mock 응답 확인' }));
-    await waitFor(() => expect(screen.getAllByText(/오래된/).length).toBeGreaterThan(0));
+    await fireEvent.press(screen.getByRole('button', { name: '하단 시트 닫기' }));
+    await fireEvent.press(screen.getByRole('button', { name: '현재 회차 측정값 확인' }));
+    await waitFor(() => expect(screen.getAllByText(/이전 측정값/).length).toBeGreaterThan(0));
     expect(screen.getByRole('button', { name: '완료 요청' })).toBeDisabled();
-    await fireEvent.press(
-      screen.getByRole('button', { name: 'Mock 실행 시나리오: 오래된 값 · 보류' }),
-    );
-    await fireEvent.press(screen.getByRole('radio', { name: '정상 Mock 응답' }));
-    await fireEvent.press(screen.getByRole('button', { name: '현재 회차 Mock 응답 확인' }));
+    await fireEvent.press(screen.getByRole('button', { name: '더 보기' }));
+    await fireEvent.press(screen.getByRole('button', { name: '미리보기 설정' }));
+    await fireEvent.press(screen.getByRole('button', { name: '측정 응답 조건: 오래된 값 · 보류' }));
+    await fireEvent.press(screen.getByRole('radio', { name: '정상 응답' }));
+    await fireEvent.press(screen.getByRole('button', { name: '하단 시트 닫기' }));
+    await fireEvent.press(screen.getByRole('button', { name: '현재 회차 측정값 확인' }));
     await waitFor(() => expect(screen.getByRole('button', { name: '완료 요청' })).toBeEnabled());
     expect((await repository.getSession(session.sessionId)).execution?.attempts).toHaveLength(2);
   });
@@ -106,12 +109,12 @@ describe('S06 화면 조작과 재진입', () => {
       input = value;
       return gate;
     });
-    await fireEvent.press(screen.getByRole('button', { name: '현재 회차 Mock 응답 확인' }));
-    await screen.findByText('Mock 응답 확인 중');
+    await fireEvent.press(screen.getByRole('button', { name: '현재 회차 측정값 확인' }));
+    await screen.findByText('측정값 확인 중');
     expect(screen.getByRole('button', { name: '완료 요청' })).toBeDisabled();
     await screen.unmount();
     const reopened = await render(view());
-    await reopened.findByText('Mock 응답 확인 중');
+    await reopened.findByText('측정값 확인 중');
     await act(async () => resolve(buildMockExecutionReport(input)));
     await waitFor(() => expect(reopened.getByRole('button', { name: '완료 요청' })).toBeEnabled());
     expect(reopened.getByText('유효 측정 0 / 15회')).toBeTruthy();
@@ -119,10 +122,10 @@ describe('S06 화면 조작과 재진입', () => {
 
   test('모호한 음성 연결은 진행을 보존하고 명령 실행 없이 취소 복귀한다', async () => {
     const { screen, repository, session, onClarification, view } = await setup();
-    await fireEvent.press(screen.getByRole('button', { name: '현재 회차 Mock 응답 확인' }));
+    await fireEvent.press(screen.getByRole('button', { name: '현재 회차 측정값 확인' }));
     await waitFor(() => expect(screen.getByRole('button', { name: '완료 요청' })).toBeEnabled());
     const ready = await repository.getSession(session.sessionId);
-    await fireEvent.press(screen.getByRole('button', { name: /^음성 명령 시뮬레이션,/ }));
+    await fireEvent.press(screen.getByRole('button', { name: /^음성 명령 확인,/ }));
     await waitFor(() => expect(onClarification).toHaveBeenCalledTimes(1));
     expect(screen.getByRole('button', { name: '완료 요청' })).toBeDisabled();
     const onBack = jest.fn();
@@ -132,7 +135,7 @@ describe('S06 화면 조작과 재진입', () => {
       </WorkflowProvider>,
     );
     await screen.findByText('“다시 해줘”가\n어떤 뜻인가요?');
-    await fireEvent.press(screen.getByRole('button', { name: '선택하지 않고 취소' }));
+    await fireEvent.press(screen.getByRole('button', { name: '뒤로가기' }));
     await waitFor(() => expect(onBack).toHaveBeenCalledTimes(1));
     await screen.rerender(view());
     await waitFor(() => expect(screen.getByRole('button', { name: '완료 요청' })).toBeEnabled());
@@ -142,6 +145,58 @@ describe('S06 화면 조작과 재진입', () => {
     expect(restored.evidence.slice(0, ready.evidence.length)).toEqual(ready.evidence);
     expect(restored.evidence.at(-1)?.action).toBe('voiceClarificationCancelled');
     await fireEvent.press(screen.getByRole('button', { name: '안내 반복' }));
-    expect(screen.getByText(/안내 반복 시뮬레이션 · 실제 TTS 없음/)).toBeTruthy();
+    expect(screen.getByText(/안내: /)).toBeTruthy();
+  });
+
+  test('15/15 완료 후 마지막 유효 응답과 근거를 보존하고 측정을 다시 시작하지 않는다', async () => {
+    const { screen, repository, session, view } = await setup();
+    await act(async () => {
+      for (let count = 0; count < 15; count++) {
+        let current = await repository.getSession(session.sessionId);
+        const cursorId = current.execution!.cursor!.cursorId;
+        await repository.executeCommand(
+          current.sessionId,
+          { type: 'requestExecutionSample', cursorId },
+          { requestId: `finish-${current.revision}`, expectedRevision: current.revision },
+        );
+        await waitFor(async () =>
+          expect(
+            (await repository.getSession(session.sessionId)).execution!.attempts.at(-1)?.status,
+          ).toBe('ready'),
+        );
+        current = await repository.getSession(session.sessionId);
+        await repository.executeCommand(
+          current.sessionId,
+          {
+            type: 'completeExecutionStep',
+            cursorId,
+            sampleAttemptId: current.execution!.attempts.at(-1)!.attemptId,
+          },
+          { requestId: `accept-${current.revision}`, expectedRevision: current.revision },
+        );
+      }
+    });
+    await screen.findByText('유효 측정 15 / 15회');
+    expect(screen.getByRole('progressbar').props.accessibilityValue.now).toBe(100);
+    expect(screen.getByText('마지막 유효 측정값 · 100% 조건 3회차')).toBeTruthy();
+    expect(screen.getByLabelText(/BH1750 조도, 810, lx/)).toBeTruthy();
+    expect(screen.queryByText('현재 회차 응답 없음')).toBeNull();
+    expect(screen.getByRole('button', { name: '완료 요청' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '현재 회차 측정값 확인' })).toBeDisabled();
+    const completed = await repository.getSession(session.sessionId);
+    expect(completed.execution?.cursor).toBeNull();
+    expect(
+      completed.execution?.attempts.filter((attempt) => attempt.status === 'valid'),
+    ).toHaveLength(15);
+    const last = completed.execution!.attempts.at(-1)!;
+    expect(
+      completed.events.find(
+        (event) => event.type === 'measurementAccepted' && event.attemptId === last.attemptId,
+      )?.cursor,
+    ).toEqual(last.cursor);
+    await screen.unmount();
+    const reopened = await render(view());
+    await reopened.findByText('마지막 유효 측정값 · 100% 조건 3회차');
+    expect(await repository.getSession(session.sessionId)).toEqual(completed);
   });
 });

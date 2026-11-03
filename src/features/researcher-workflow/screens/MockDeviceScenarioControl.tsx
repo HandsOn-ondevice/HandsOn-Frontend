@@ -4,17 +4,18 @@ import {
   mockDeviceScenarios,
   type MockDeviceScenario,
 } from '../infrastructure/mock/device-check-scenarios';
-import { useMockDeviceCheckControls } from '../state/WorkflowProvider';
+import type { MockWorkflowRepository } from '../infrastructure/mock/MockWorkflowRepository';
 import { workflowErrorMessage } from '../state/useWorkflowSession';
 
 export function MockDeviceScenarioControl({
   sessionId,
   disabled,
+  controls,
 }: {
   sessionId: string;
   disabled: boolean;
+  controls: MockWorkflowRepository | null;
 }) {
-  const controls = useMockDeviceCheckControls();
   const [value, setValue] = useState<MockDeviceScenario>(
     () => controls?.getDeviceCheckScenario(sessionId) ?? 'normal',
   );
@@ -23,7 +24,7 @@ export function MockDeviceScenarioControl({
   return (
     <>
       <SelectField
-        label="Mock 점검 시나리오"
+        label="점검 응답 조건"
         value={value}
         options={mockDeviceScenarios}
         disabled={disabled}
@@ -39,9 +40,7 @@ export function MockDeviceScenarioControl({
           }
         }}
       />
-      <AppText variant="caption">
-        선택한 시나리오는 다음 점검에 적용됩니다. 실제 장비에는 연결하지 않습니다.
-      </AppText>
+      <AppText variant="caption">선택한 조건은 다음 점검에 적용됩니다.</AppText>
       {error ? <AppText accessibilityLiveRegion="polite">{error}</AppText> : null}
     </>
   );

@@ -4,17 +4,18 @@ import {
   mockExecutionScenarios,
   type MockExecutionScenario,
 } from '../infrastructure/mock/execution-scenarios';
-import { useMockDeviceCheckControls } from '../state/WorkflowProvider';
+import type { MockWorkflowRepository } from '../infrastructure/mock/MockWorkflowRepository';
 import { workflowErrorMessage } from '../state/useWorkflowSession';
 
 export function MockExecutionScenarioControl({
   sessionId,
   disabled,
+  controls,
 }: {
   sessionId: string;
   disabled: boolean;
+  controls: MockWorkflowRepository | null;
 }) {
-  const controls = useMockDeviceCheckControls();
   const [value, setValue] = useState<MockExecutionScenario>(
     () => controls?.getExecutionScenario(sessionId) ?? 'normal',
   );
@@ -23,7 +24,7 @@ export function MockExecutionScenarioControl({
   return (
     <>
       <SelectField
-        label="Mock 실행 시나리오"
+        label="측정 응답 조건"
         value={value}
         options={mockExecutionScenarios}
         disabled={disabled}
@@ -39,9 +40,7 @@ export function MockExecutionScenarioControl({
           }
         }}
       />
-      <AppText variant="caption">
-        다음 Mock 응답 요청에 적용됩니다. 실제 출력 제어·안전 타이머는 실행하지 않습니다.
-      </AppText>
+      <AppText variant="caption">선택한 조건은 다음 응답 요청에 적용됩니다.</AppText>
       {error ? <AppText accessibilityLiveRegion="polite">{error}</AppText> : null}
     </>
   );

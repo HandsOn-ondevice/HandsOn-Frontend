@@ -7,7 +7,7 @@ import type {
 import { buildMockDiagnostics } from './device-check-scenarios';
 
 export const mockExecutionScenarios = [
-  { value: 'normal', label: '정상 Mock 응답' },
+  { value: 'normal', label: '정상 응답' },
   { value: 'waiting', label: '안정화 대기' },
   { value: 'stale', label: '오래된 값 · 보류' },
   { value: 'noResponse', label: '응답 없음' },
@@ -50,7 +50,7 @@ export function buildMockExecutionReport(input: MockExecutionInput): ExecutionSa
     stability: input.scenario === 'waiting' ? 'waiting' : 'stable',
     holdReason:
       input.scenario === 'held'
-        ? '작업 보류 시뮬레이션입니다. 현재 회차는 완료되지 않았습니다. 새 Mock 응답을 명시적으로 요청하기 전까지 보류를 유지합니다.'
+        ? '현재 작업을 보류했습니다. 이 회차는 완료되지 않았습니다. 상태를 확인한 후 측정값을 다시 요청해 주세요.'
         : undefined,
     diagnostics: {
       ...diagnostics,

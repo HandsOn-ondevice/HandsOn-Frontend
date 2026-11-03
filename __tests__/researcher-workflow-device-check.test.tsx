@@ -260,6 +260,23 @@ describe('S05 점검 Repository와 상태 전환', () => {
     const failed = await terminal(repo, ready.sessionId, 'failed');
     expect(selectDeviceCheck(failed).canStart).toBe(false);
     expect(selectPreparation(failed).completed).toBe(5);
+    if (variant === 'wrongSource') {
+      expect(failed.deviceChecks[0].report?.source).toBe('api');
+      expect(failed.evidence.filter((item) => item.kind === 'sensor')).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            source: 'mock',
+            action: 'deviceCheckFailed',
+            diagnosticValidation: {
+              sensorId: 'bh1750',
+              valid: false,
+              status: 'error',
+              issue: { code: 'INVALID_SOURCE', message: expect.any(String) },
+            },
+          }),
+        ]),
+      );
+    }
   });
 
   test('점검 정의가 없는 기존 절차는 S04까지 유지하되 S05 진행은 차단한다', async () => {
@@ -283,5 +300,81 @@ describe('S05 점검 Repository와 상태 전환', () => {
     await expect(send(repo, session, { type: 'startDeviceCheck' })).rejects.toMatchObject({
       code: 'INVALID_STATE',
     });
+  });
+
+  test('새 점검에 과거 정상 보고서가 돌아오면 현재 시도의 성공으로 인정하지 않는다', async () => {
+    let previous!: DeviceDiagnosticsReport;
+    const repo = repoWith(async (input) => {
+      previous ??= buildMockDiagnostics(input);
+      return previous;
+    });
+    const ready = await prepared(repo);
+    await send(repo, ready, { type: 'startDeviceCheck' });
+    const passed = await terminal(repo, ready.sessionId, 'passed');
+    await send(repo, passed, { type: 'startDeviceCheck' }, 'new-inspection');
+    const rejected = await terminal(repo, ready.sessionId, 'failed');
+    expect(rejected.deviceChecks[0]).toEqual(passed.deviceChecks[0]);
+    expect(rejected.deviceChecks[1].report).toEqual(previous);
+    expect(rejected.deviceChecks[1].issue?.code).toBe('ATTEMPT_MISMATCH');
+    expect(selectDeviceCheck(rejected).canStart).toBe(false);
+    expect(selectPreparation(rejected).completed).toBe(5);
+    expect(
+      rejected.evidence.filter((item) => item.attemptId === rejected.deviceChecks[1].attemptId),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'sensor', action: 'deviceCheckFailed' }),
+      ]),
+    );
+    await expect(
+      send(repo, rejected, { type: 'startExecution' }, 'reject-old-success'),
+    ).rejects.toMatchObject({ code: 'INVALID_STATE' });
+  });
+
+  test.each([
+    ['missingId', 'ATTEMPT_MISMATCH'],
+    ['pastReport', 'INVALID_REPORT_TIME'],
+    ['futureReport', 'INVALID_REPORT_TIME'],
+    ['pastSensor', 'STALE_READING'],
+    ['pastReading', 'STALE_READING'],
+    ['futureSensor', 'INVALID_READING'],
+    ['futureReading', 'INVALID_READING'],
+  ])('현재 ID라도 %s 응답은 인과 순서를 검증해 거절한다', async (variant, code) => {
+    const past = '2026-11-02T00:59:59.000Z';
+    const future = '2026-11-02T01:00:01.000Z';
+    const repo = repoWith(async (input) => {
+      const raw = JSON.parse(JSON.stringify(buildMockDiagnostics(input)));
+      if (variant === 'missingId') delete raw.attemptId;
+      if (variant === 'pastReport') raw.checkedAt = past;
+      if (variant === 'futureReport') raw.checkedAt = future;
+      if (variant === 'pastSensor') {
+        raw.sensors[0].checkedAt = past;
+        raw.sensors[0].readings[0].observedAt = past;
+      }
+      if (variant === 'pastReading') raw.sensors[0].readings[0].observedAt = past;
+      if (variant === 'futureSensor') raw.sensors[0].checkedAt = future;
+      if (variant === 'futureReading') raw.sensors[0].readings[0].observedAt = future;
+      return raw;
+    });
+    const ready = await prepared(repo);
+    await send(repo, ready, { type: 'startDeviceCheck' });
+    const failed = await terminal(repo, ready.sessionId, 'failed');
+    expect(failed.deviceChecks[0].issue?.code).toBe(code);
+    expect(selectDeviceCheck(failed).canStart).toBe(false);
+    expect(failed.procedure).toEqual(ready.procedure);
+  });
+
+  test('현재 시도의 응답은 시간이 오래 걸려도 임의 TTL 없이 허용한다', async () => {
+    let time = '2026-11-02T01:00:00.000Z';
+    const repo = new MockWorkflowRepository({
+      now: () => time,
+      inspect: async (input) => {
+        time = '2026-11-03T01:00:00.000Z';
+        return buildMockDiagnostics(input);
+      },
+    });
+    const ready = await prepared(repo);
+    await send(repo, ready, { type: 'startDeviceCheck' });
+    const passed = await terminal(repo, ready.sessionId, 'passed');
+    expect(selectDeviceCheck(passed).canStart).toBe(true);
   });
 });

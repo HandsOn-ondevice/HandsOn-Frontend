@@ -8,13 +8,13 @@
 - sessionId와 고정 ProcedureSnapshot을 URL·화면 간 연결의 기준으로 사용한다. URL에 센서값이나 절차 JSON을 넣지 않는다.
 - 준비 확인 5개 → completePreparation → awaitingDeviceCheck → startDeviceCheck → readyToExecute → startExecution → running 순서다. S06은 현재 조건·회차의 Mock 응답과 작업자 완료 요청을 처리한다.
 - 기존 `/researcher-workflow/[sessionId]/device-check-pending`은 세션을 보존하는 Redirect로 새 `device-check` 경로에 연결한다. S04 복귀는 back/replace, S06에서 S05 복귀는 dismissTo를 사용한다.
-- S04 확인 완료 후에는 작업자 항목을 잠그는 기존 규칙을 유지한다. S05 성공은 communication 항목만 갱신한다. S04로 돌아가면 6/6과 `Mock 시스템 근거`를 표시한다.
+- S04 확인 완료 후에는 작업자 항목을 잠그는 기존 규칙을 유지한다. S05 성공은 communication 항목만 갱신한다. S04로 돌아가면 6/6과 `통신 확인 기록`를 표시한다.
 - `ProcedureSnapshot.deviceCheck`는 장치·필수 센서·측정 종류·단위를 담는 기능 내부 확장이다. 기존 절차에 정의가 없으면 S04는 사용할 수 있지만 S05 점검을 시작하지 못한다. 팀원 데이터에 암묵적으로 LED 센서를 붙이지 않는다.
 
 ## Repository 교체 지점
 
 1. 실제 API용 WorkflowRepository 구현체를 만든다. createSession/getSession/executeCommand/subscribe의 서명은 유지한다.
-2. feature WorkflowProvider의 repository 주입을 합의한 앱 조립 지점에 연결한다. 현재 기본값은 메모리 MockWorkflowRepository이며 전역 Provider를 새로 만들지 않는다.
+2. feature WorkflowProvider의 repository 주입을 합의한 앱 조립 지점에 연결한다. 현재 기본값은 개발 환경(**DEV**)의 메모리 MockWorkflowRepository다. 배포 환경에서는 기본 공급/Mock 직접 주입을 차단한다. API 구현체를 명시적으로 주입해야 하며 전역 Provider를 새로 만들지 않는다.
 3. API DTO를 내부 ExperimentSession·DeviceDiagnosticsReport로 변환한다. `deviceChecks`는 빈 목록부터 시작하고 세션의 revision·고정 절차·근거·이벤트도 일관되게 반환해야 한다.
 4. startDeviceCheck는 checking 상태를 접수 응답으로 반환한다. 최종 결과는 subscribe(서버 이벤트 또는 polling)와 getSession으로 전달한다. 실제 장비 작업의 수명은 서버/Repository가 소유하며 화면 unmount가 성공·취소를 뜻하지 않는다.
 5. 실제 판정·안전 범위·장치 명령은 권위 있는 서버/장치 서비스가 수행한다. Mock 전환 로직을 실제 승인 엔진으로 사용하지 않는다.
@@ -125,3 +125,12 @@ E01~E07 라우트를 비상 화면으로 가정하거나 새로 구현하지 않
 - 신선도 TTL·시계 오차·요청 무효화 정책, 이미 유효 처리된 과거 회차 재측정/무효화는 아직 정의하지 않았다. 현재 S07은 진행 중인 현재 회차만 대상으로 한다.
 - S08 이후에는 sessionId·고정 절차 버전·cursor·commandId·attemptId·선택 결과·오류 코드·evidenceId를 재사용할 수 있다. 특정 E 화면을 비상 화면으로 가정하지 않았다. 숙련자 검토/오류 보고 연결 대상과 권한은 E01~E07 담당자와 합의해야 한다.
 - 이번 작업은 feature 내부 모델/Repository/화면·researcher-workflow 라우트와 회귀 기대값만 확장한다. 공통 디자인 시스템·루트 갤러리/Provider·설정·팀원 화면은 변경하지 않았다.
+
+## 2026-11-03 품질 보완 계약
+
+- S05 `DeviceDiagnosticsReport.attemptId`는 현재 checking 시도 ID를 되돌려줘야 한다. 공유 진단 타입에서는 S06 스냅샷 호환성을 위해 선택 필드지만 S05 검증은 누락/불일치를 거절한다.
+- 점검 시작 <= 보고 시각 <= 수신 시각, 시작 <= 필수 측정 관측 시각 <= 센서 확인 시각 <= 보고 시각을 요구한다. 임의 TTL이나 시계 오차 허용값을 두지 않았다. 실제 API에서 시각의 권위/동기화/오차 처리를 먼저 합의해야 한다.
+- 원본 report와 별도 validation을 보관한다. 센서 카드 상태와 sensor Evidence의 action/diagnosticValidation은 같은 검증 결과를 사용한다. 원본 passed가 프론트엔드 형식/상관관계 검증 성공을 뜻하지 않는다.
+- API adapter도 원본 보고서와 검증 결과를 구분하고 동일한 도메인 검증을 적용해야 한다. Mock 전환 함수가 실제 안전 승인 주체가 되지는 않는다.
+- 미리보기 제어기는 개발 환경의 Mock에만 노출한다. 일반 화면이 아니라 정보 시트 안에서 명시적으로 열며, 포털 내부에서는 Repository Context를 다시 조회하지 않고 화면에서 전달받는다.
+- 사용자 문구와 검증/위험/전체 변경 목록은 `docs/validation/researcher-workflow-quality-20261103.md`에 기록한다. 내부 source=mock 및 실제 서비스 미연결 상태는 유지한다.

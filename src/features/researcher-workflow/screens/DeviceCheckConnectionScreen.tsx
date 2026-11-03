@@ -12,10 +12,14 @@ import {
   colors,
   spacing,
 } from '@/design-system';
+import { selectDeviceConnection } from '../domain/device-connection';
+import { DeviceConnectionCard } from './DeviceConnectionCard';
 import { selectDeviceCheck } from '../domain/device-check';
 import { useWorkflowSession } from '../state/useWorkflowSession';
 import { DeviceCheckResults } from './DeviceCheckResults';
 import { MockDeviceScenarioControl } from './MockDeviceScenarioControl';
+import { PreviewTools } from './PreviewTools';
+import { useMockDeviceCheckControls } from '../state/WorkflowProvider';
 
 /** 기존 임시 화면의 export 이름을 유지한 실제 S05 조합 화면. 통신은 Repository 책임이다. */
 export function DeviceCheckConnectionScreen({
@@ -27,29 +31,17 @@ export function DeviceCheckConnectionScreen({
   onBack: () => void;
   onExecution: () => void;
 }) {
+  const previewControls = useMockDeviceCheckControls();
   const { session, loading, pending, error, refresh, execute } = useWorkflowSession(sessionId);
   const [details, setDetails] = useState(false);
   const state = session ? selectDeviceCheck(session) : null;
   const attempt = state?.latest;
   const definition = session?.procedure.deviceCheck;
   const locked = pending || loading || state?.checking === true;
-  const sourceLabel = session?.source === 'api' ? '' : 'Mock ';
   const subtitle =
     session?.source === 'mock'
-      ? 'Mock 환경 · 실제 장비 연결·측정 아님'
+      ? '실험에 사용할 장치와 센서의 상태를 확인해 주세요.'
       : '장치 서비스 응답 · 점검 시점의 기록';
-  const title =
-    !state || session?.phase === 'preparing'
-      ? 'S04 준비 확인이 필요합니다'
-      : state.checking
-        ? '장치·센서 점검 중입니다'
-        : state.executionStarted
-          ? `${sourceLabel}실험 시작 상태입니다`
-          : state.canStart
-            ? `${definition?.title ?? '장치'} 연결됨 · ${sourceLabel}점검 성공`
-            : attempt?.status === 'failed'
-              ? '장치·센서 점검에 실패했습니다'
-              : '장치·센서 점검을 시작해 주세요';
   const startExecution = async () => {
     if (state?.executionStarted) {
       onExecution();
@@ -65,9 +57,6 @@ export function DeviceCheckConnectionScreen({
       <ScrollView contentContainerStyle={styles.content}>
         <AppText variant="heading" accessibilityRole="header">
           실험 시작 전 점검
-        </AppText>
-        <AppText variant="caption" color={colors.text.secondary}>
-          {subtitle}
         </AppText>
         {loading ? (
           <AppText accessibilityLiveRegion="polite">장치 점검 상태를 불러오고 있습니다.</AppText>
@@ -90,22 +79,17 @@ export function DeviceCheckConnectionScreen({
         ) : null}
         {session && state ? (
           <>
-            <AppText variant="caption">
-              세션 {session.sessionId} · 절차 v{session.procedure.version}
-            </AppText>
-            <FeedbackPanel
-              title={title}
-              subtitle={
-                attempt?.issue?.message ??
-                (state.canStart || state.executionStarted
-                  ? `필수 센서의 ${sourceLabel}응답을 확인했습니다. 장비의 안전 범위를 별도로 승인한 결과는 아닙니다.`
-                  : state.checking
-                    ? '점검 응답을 기다려 주세요. 화면을 나가도 점검은 유지됩니다.'
-                    : 'S04 필수 확인 후 장치·센서 점검을 요청해 주세요.')
-              }
-              tone={attempt?.status === 'failed' ? 'danger' : state.canStart ? 'success' : 'info'}
-              icon={attempt?.status === 'failed' ? 'alert' : state.canStart ? 'check' : 'device'}
+            <DeviceConnectionCard
+              state={selectDeviceConnection(session, __DEV__ && !!previewControls)}
+              deviceName={definition?.title}
             />
+            {session.phase === 'preparing' ? (
+              <FeedbackPanel
+                title="준비 확인이 필요합니다"
+                subtitle="필수 준비 항목을 확인한 후 장치·센서 점검을 요청해 주세요."
+                tone="info"
+              />
+            ) : null}
             {definition ? (
               <DeviceCheckResults sensors={definition.sensors} attempt={attempt} />
             ) : (
@@ -123,11 +107,6 @@ export function DeviceCheckConnectionScreen({
                   : '응답 대기 중'}
               </AppText>
             ) : null}
-            <MockDeviceScenarioControl
-              key={sessionId}
-              sessionId={sessionId}
-              disabled={locked || state.executionStarted}
-            />
             <Button
               label={
                 state.checking
@@ -164,14 +143,28 @@ export function DeviceCheckConnectionScreen({
         title="장치 점검 정보"
         icon="device"
       >
+        {session && state ? (
+          <PreviewTools available={!!previewControls}>
+            <MockDeviceScenarioControl
+              controls={previewControls}
+              key={sessionId}
+              sessionId={sessionId}
+              disabled={locked || state.executionStarted}
+            />
+          </PreviewTools>
+        ) : null}
         <AppText>{subtitle}</AppText>
+        {session ? <AppText variant="caption">절차 v{session.procedure.version}</AppText> : null}
         <AppText>
           작업자 확인과 센서 응답은 별도 근거로 기록합니다. 통신 점검 성공 후에만 실험 시작 상태로
           전환할 수 있습니다.
         </AppText>
-        <AppText>
-          Mock 상태는 앱 재시작 시 초기화됩니다. 실제 API·장치 서비스는 연결하지 않았습니다.
-        </AppText>
+        {session?.source === 'mock' ? (
+          <AppText>
+            현재 표시값은 장치에서 수집한 실측값이 아닙니다. 장치 서비스 연결 후 실제 점검을 사용할
+            수 있습니다.
+          </AppText>
+        ) : null}
       </BottomSheet>
     </SafeAreaView>
   );

@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 async function openExecution(page: Page) {
   await page.goto('/researcher-workflow');
-  await page.getByRole('button', { name: '새 Mock 실험 준비 시작', exact: true }).click();
+  await page.getByRole('button', { name: '새 실험 준비 시작', exact: true }).click();
   for (const name of [
     '필수 준비물 7개 확인',
     '장치 ID LED-M03 확인',
@@ -16,11 +16,11 @@ async function openExecution(page: Page) {
   await page.getByRole('button', { name: '장치·센서 점검 시작', exact: true }).click();
   await expect(page.getByRole('button', { name: '실험 측정 시작', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: '실험 측정 시작', exact: true }).click();
-  await page.getByRole('button', { name: '현재 회차 Mock 응답 확인', exact: true }).click();
+  await page.getByRole('button', { name: '현재 회차 측정값 확인', exact: true }).click();
   await expect(page.getByRole('button', { name: '완료 요청', exact: true })).toBeEnabled();
 }
 async function openVoice(page: Page) {
-  await page.getByRole('button', { name: /^음성 명령 시뮬레이션,/ }).click();
+  await page.getByRole('button', { name: /^음성 명령 확인,/ }).click();
   await expect(page).toHaveURL(/\/voice-clarification$/);
   await expect(page.getByText('모호한 음성 확인', { exact: true })).toBeVisible();
 }
@@ -35,18 +35,20 @@ test('412px S07 선택·명시적 확인·같은 회차 재측정·복귀가 일
   const back = page.getByRole('button', { name: '현재 작업으로 돌아가기', exact: true });
   await expect(back).toBeDisabled();
   await page.getByRole('button', { name: '현재 안내를 다시 듣기', exact: true }).click();
-  await expect(page.getByText(/선택: 현재 안내를 다시 듣기/)).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: '현재 안내를 다시 듣기 · 선택됨', exact: true }),
+  ).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('s07-choice-412x920.png') });
   await back.click();
   await expect(page).toHaveURL(executionURL);
-  await expect(page.getByText(/S07 Mock 처리: 현재 안내를 다시 듣기/)).toBeVisible();
+  await expect(page.getByText(/선택한 명령: 현재 안내를 다시 듣기/)).toBeVisible();
   await expect(page.getByText('유효 측정 0 / 15회', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '완료 요청', exact: true })).toBeEnabled();
   await openVoice(page);
   await page.getByRole('button', { name: '0% 조건 1회차 다시 측정', exact: true }).click();
   await back.click();
   await expect(page).toHaveURL(executionURL);
-  await expect(page.getByText(/같은 회차 Mock 응답 요청, 자동 완료 없음/)).toBeVisible();
+  await expect(page.getByText(/같은 회차의 측정값 확인 요청/)).toBeVisible();
   await expect(page.getByRole('button', { name: '완료 요청', exact: true })).toBeEnabled();
   await expect(page.getByText('유효 측정 0 / 15회', { exact: true })).toBeVisible();
   await openVoice(page);
@@ -68,9 +70,10 @@ test('360px에서 선택 없이 취소·뒤로가기·재진입하고 하단 겹
   await openExecution(page);
   const executionURL = page.url();
   await openVoice(page);
-  const cancel = page.getByRole('button', { name: '선택하지 않고 취소', exact: true });
-  await cancel.scrollIntoViewIfNeeded();
-  const item = await cancel.boundingBox();
+  const cancel = page.getByRole('button', { name: '뒤로가기', exact: true });
+  const last = page.getByText('현재 단계와 측정 회차는 바꾸지 않았습니다.', { exact: true });
+  await last.scrollIntoViewIfNeeded();
+  const item = await last.boundingBox();
   const footer = await page
     .getByRole('button', { name: '현재 작업으로 돌아가기', exact: true })
     .boundingBox();
@@ -88,7 +91,7 @@ test('360px에서 선택 없이 취소·뒤로가기·재진입하고 하단 겹
   await page.goBack();
   await expect(page).toHaveURL(executionURL);
   await expect(page.getByRole('button', { name: '완료 요청', exact: true })).toBeDisabled();
-  await page.getByRole('button', { name: /^모호한 음성 확인 대기 · Mock,/ }).click();
+  await page.getByRole('button', { name: /^음성 명령 확인 대기,/ }).click();
   await expect(page).toHaveURL(/\/voice-clarification$/);
   await page.getByRole('button', { name: '뒤로가기', exact: true }).click();
   await expect(page).toHaveURL(executionURL);
@@ -101,7 +104,7 @@ test('없는 세션으로 직접 S07 진입하면 오류와 재조회만 제공�
 }, testInfo) => {
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto('/researcher-workflow/missing/voice-clarification');
-  await expect(page.getByText(/세션을 찾을 수 없습니다/)).toBeVisible();
+  await expect(page.getByText(/실험 기록을 찾을 수 없습니다/)).toBeVisible();
   await expect(page.getByRole('button', { name: '요청 다시 불러오기', exact: true })).toBeEnabled();
   await expect(page.getByRole('button', { name: /회차 다시 측정/ })).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath('s07-missing-360x800.png') });

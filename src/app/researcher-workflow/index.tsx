@@ -6,7 +6,7 @@ export default function WorkflowDevelopmentEntry() {
   if (!__DEV__)
     return (
       <Screen>
-        <AppText>개발용 Mock 세션 생성은 개발 빌드에서만 제공합니다.</AppText>
+        <AppText>실험 서비스를 준비하고 있습니다.</AppText>
       </Screen>
     );
   return (

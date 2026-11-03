@@ -4,6 +4,7 @@ import type {
   DeviceDiagnosticsReport,
   SensorReading,
   DiagnosticIssue,
+  SensorCheckValidation,
 } from './device-check';
 import type { ExecutionDefinition, ExecutionState, ExecutionCursor } from './execution';
 import type { VoiceChoice } from './voice-clarification';
@@ -63,6 +64,7 @@ export interface Evidence {
   readonly readings?: readonly SensorReading[];
   readonly issue?: DiagnosticIssue;
   readonly diagnostics?: DeviceDiagnosticsReport;
+  readonly diagnosticValidation?: SensorCheckValidation;
   readonly cursor?: ExecutionCursor;
   readonly commandId?: string;
   readonly voiceChoice?: VoiceChoice | 'cancel';

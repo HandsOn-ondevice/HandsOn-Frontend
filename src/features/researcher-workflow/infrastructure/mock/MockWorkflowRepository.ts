@@ -63,6 +63,7 @@ export class MockWorkflowRepository implements WorkflowRepository {
   }
 
   async createSession(input: CreateSessionInput): Promise<ExperimentSession> {
+    this.assertDevelopmentEnvironment();
     const signature = JSON.stringify([input.operatorId, input.procedure]);
     const previous = this.creationRequests.get(input.requestId);
     if (previous) {
@@ -91,7 +92,7 @@ export class MockWorkflowRepository implements WorkflowRepository {
     ) {
       throw new WorkflowError(
         'INVALID_PROCEDURE',
-        'S04 작업자 확인 5개와 S05 통신 점검을 가진 승인 절차가 필요합니다.',
+        '작업자 준비 확인 5개와 통신 점검을 가진 승인 절차가 필요합니다.',
       );
     }
     const now = this.now();
@@ -122,16 +123,18 @@ export class MockWorkflowRepository implements WorkflowRepository {
   }
 
   async getSession(sessionId: string): Promise<ExperimentSession> {
+    this.assertDevelopmentEnvironment();
     const session = this.sessions.get(sessionId);
     if (!session)
       throw new WorkflowError(
         'NOT_FOUND',
-        '세션을 찾을 수 없습니다. Mock 세션은 앱 재시작 시 초기화됩니다.',
+        '실험 기록을 찾을 수 없습니다. 새 실험을 시작해 주세요.',
       );
     return copy(session);
   }
 
   async executeCommand(sessionId: string, command: WorkflowCommand, context: CommandContext) {
+    this.assertDevelopmentEnvironment();
     // 한 JS 작업 안에서 조회·전환·저장한다. 같은 revision의 동시 명령은 하나만 적용된다.
     const session = this.sessions.get(sessionId);
     if (!session) throw new WorkflowError('NOT_FOUND', '세션을 찾을 수 없습니다.');
@@ -236,7 +239,7 @@ export class MockWorkflowRepository implements WorkflowRepository {
     ) {
       throw new WorkflowError(
         'INVALID_STATE',
-        '현재 상태에서 Mock 실행 시나리오를 변경할 수 없습니다.',
+        '현재 상태에서 측정 응답 조건를 변경할 수 없습니다.',
       );
     }
     this.executionScenarios.set(sessionId, scenario);
@@ -265,7 +268,7 @@ export class MockWorkflowRepository implements WorkflowRepository {
           sensors: [],
           issue: {
             code: 'MOCK_SAMPLE_ERROR',
-            message: 'Mock 응답 처리 중 오류가 발생했습니다. 현재 회차를 유지합니다.',
+            message: '측정 응답을 처리하지 못했습니다. 현재 회차를 유지합니다.',
           },
         },
       }))
@@ -291,11 +294,11 @@ export class MockWorkflowRepository implements WorkflowRepository {
     if (session.deviceChecks.at(-1)?.status === 'checking' || session.phase === 'running') {
       throw new WorkflowError(
         'INVALID_STATE',
-        '점검 진행 중이거나 실험 시작 뒤에는 시나리오를 변경할 수 없습니다.',
+        '점검 진행 중이거나 실험 시작 뒤에는 응답 조건을 변경할 수 없습니다.',
       );
     }
     if (!mockDeviceScenarios.some((item) => item.value === scenario))
-      throw new WorkflowError('INVALID_STATE', '지원하지 않는 Mock 시나리오입니다.');
+      throw new WorkflowError('INVALID_STATE', '지원하지 않는 응답 조건입니다.');
     this.scenarios.set(sessionId, scenario);
   }
 
@@ -317,6 +320,7 @@ export class MockWorkflowRepository implements WorkflowRepository {
     void Promise.resolve()
       .then(() => this.inspect({ definition, scenario, attemptId, now: this.now }))
       .catch(() => ({
+        attemptId,
         source: 'mock' as const,
         deviceId: definition.deviceId,
         connection: 'error' as const,
@@ -324,7 +328,7 @@ export class MockWorkflowRepository implements WorkflowRepository {
         sensors: [],
         issue: {
           code: 'MOCK_DIAGNOSTICS_ERROR',
-          message: 'Mock 점검 처리 중 오류가 발생했습니다. 다시 점검해 주세요.',
+          message: '점검 응답을 처리하지 못했습니다. 다시 점검해 주세요.',
         },
       }))
       .then((report) => {
@@ -344,6 +348,7 @@ export class MockWorkflowRepository implements WorkflowRepository {
   }
 
   subscribe(sessionId: string, listener: (session: ExperimentSession) => void) {
+    this.assertDevelopmentEnvironment();
     const listeners = this.listeners.get(sessionId) ?? new Set();
     listeners.add(listener);
     this.listeners.set(sessionId, listeners);
@@ -351,5 +356,13 @@ export class MockWorkflowRepository implements WorkflowRepository {
       listeners.delete(listener);
       if (listeners.size === 0) this.listeners.delete(sessionId);
     };
+  }
+
+  private assertDevelopmentEnvironment() {
+    if (!__DEV__)
+      throw new WorkflowError(
+        'INVALID_STATE',
+        '장치 서비스가 준비되지 않아 실험을 진행할 수 없습니다.',
+      );
   }
 }

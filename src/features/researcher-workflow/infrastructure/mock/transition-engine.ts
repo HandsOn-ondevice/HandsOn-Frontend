@@ -58,7 +58,7 @@ export function transitionPreparation(
   }
   const requirement = session.procedure.preparation.find((item) => item.id === command.checkId);
   if (!requirement || requirement.owner !== 'operator' || requirement.verifiedAt !== 'S04') {
-    throw new WorkflowError('CHECK_NOT_EDITABLE', '이 항목은 S05의 시스템 근거로 확인합니다.');
+    throw new WorkflowError('CHECK_NOT_EDITABLE', '이 항목은 장치 점검 결과로 확인합니다.');
   }
   const check = session.checks.find((item) => item.id === command.checkId);
   if (!check) throw new WorkflowError('NOT_FOUND', '준비 항목을 찾을 수 없습니다.');

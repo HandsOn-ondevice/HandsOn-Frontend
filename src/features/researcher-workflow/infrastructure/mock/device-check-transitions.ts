@@ -1,7 +1,7 @@
 import { WorkflowError, type ExperimentSession, type Evidence } from '../../domain/models';
 import {
   selectDeviceCheck,
-  validateDiagnostics,
+  validateDeviceCheckReport,
   type DeviceDiagnosticsReport,
 } from '../../domain/device-check';
 import type { TransitionMetadata } from './transition-engine';
@@ -15,7 +15,7 @@ export function beginDeviceCheck(
   if (!selectDeviceCheck(session).canInspect) {
     throw new WorkflowError(
       'INVALID_STATE',
-      'S04 확인 완료 후에만 점검할 수 있습니다. 진행 중이거나 실험을 시작한 뒤에는 다시 요청할 수 없습니다.',
+      '준비 확인을 완료한 후에만 점검할 수 있습니다. 진행 중이거나 실험을 시작한 뒤에는 다시 요청할 수 없습니다.',
     );
   }
   return {
@@ -56,23 +56,27 @@ export function finishDeviceCheck(
     session.phase !== 'awaitingDeviceCheck'
   )
     return session;
-  const issue =
-    report.source !== 'mock'
-      ? { code: 'INVALID_SOURCE', message: 'Mock 점검에 실제 데이터 출처를 사용할 수 없습니다.' }
-      : validateDiagnostics(session.procedure.deviceCheck, report);
+  const validation = validateDeviceCheckReport(session.procedure.deviceCheck, report, {
+    attemptId,
+    startedAt: latest.startedAt,
+    receivedAt: meta.now,
+    source: session.source,
+  });
+  const issue = validation.issue;
   const passed = !issue;
   const action = passed ? 'deviceCheckPassed' : 'deviceCheckFailed';
-  const sensorEvidence: Evidence[] = report.sensors.map((sensor, index) => ({
+  const sensorEvidence: Evidence[] = validation.sensors.map((sensor, index) => ({
     evidenceId: `${meta.evidenceId}:sensor:${index}`,
     sessionId: session.sessionId,
     attemptId,
     kind: 'sensor',
     actorId: 'mock-diagnostics',
-    action: sensor.status === 'passed' ? 'deviceCheckPassed' : 'deviceCheckFailed',
+    action: sensor.valid ? 'deviceCheckPassed' : 'deviceCheckFailed',
     source: 'mock',
     sensorId: sensor.sensorId,
-    readings: sensor.readings,
+    readings: report.sensors.find((raw) => raw.sensorId === sensor.sensorId)?.readings,
     issue: sensor.issue,
+    diagnosticValidation: sensor,
     recordedAt: meta.now,
   }));
   return {
@@ -98,6 +102,7 @@ export function finishDeviceCheck(
             completedAt: meta.now,
             report,
             issue,
+            validation,
           }
         : attempt,
     ),

@@ -19,11 +19,16 @@ export function DeviceCheckResults({
 }) {
   return sensors.map((sensor) => {
     const result = attempt?.report?.sensors.find((item) => item.sensorId === sensor.sensorId);
+    const validation = attempt?.validation?.sensors.find(
+      (item) => item.sensorId === sensor.sensorId,
+    );
     const checking = attempt?.status === 'checking';
     const label = checking
       ? '점검 중'
-      : result
-        ? statusLabels[result.status]
+      : validation
+        ? validation.status === 'error'
+          ? '확인 필요'
+          : statusLabels[validation.status]
         : attempt?.status === 'failed'
           ? '미완료'
           : '점검 전';
@@ -34,20 +39,20 @@ export function DeviceCheckResults({
     if (
       !checking &&
       result &&
-      (result.status === 'passed' || result.status === 'disconnected' || result.status === 'stale')
+      validation &&
+      (validation.valid || validation.status === 'disconnected' || validation.status === 'stale')
     ) {
       return (
         <SensorCard
           key={sensor.sensorId}
           title={sensor.title}
           subtitle={sensor.description}
-          state={result.status === 'passed' ? 'normal' : result.status}
+          state={
+            validation.valid ? 'normal' : validation.status === 'stale' ? 'stale' : 'disconnected'
+          }
           value={value}
           meta={`점검 시각 ${new Date(result.checkedAt).toLocaleTimeString('ko-KR', { hour12: false })}`}
-          detail={
-            result.issue?.message ??
-            `${attempt?.report?.source === 'mock' ? 'Mock 응답 확인' : '서비스 응답 확인'} · 안전 범위 판정 아님`
-          }
+          detail={validation.issue?.message ?? '응답 확인 완료 · 안전 범위 판정 아님'}
         />
       );
     }
@@ -60,7 +65,7 @@ export function DeviceCheckResults({
         <AppText color={colors.text.secondary}>
           {checking
             ? '센서 점검 응답을 기다리고 있습니다.'
-            : (result?.issue?.message ?? '아직 유효한 점검 응답이 없습니다.')}
+            : (validation?.issue?.message ?? '아직 유효한 점검 응답이 없습니다.')}
         </AppText>
       </SurfaceCard>
     );
