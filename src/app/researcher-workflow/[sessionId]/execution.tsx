@@ -13,6 +13,12 @@ export default function ExecutionRoute() {
           params: { sessionId },
         })
       }
+      onRecovery={() =>
+        router.push({
+          pathname: '/researcher-workflow/[sessionId]/recovery',
+          params: { sessionId },
+        })
+      }
       onClarification={() =>
         router.push({
           pathname: '/researcher-workflow/[sessionId]/voice-clarification',

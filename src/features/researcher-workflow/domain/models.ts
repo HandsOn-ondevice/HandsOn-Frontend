@@ -56,7 +56,9 @@ export interface Evidence {
     | 'measurementConfirmed'
     | 'measurementAccepted'
     | 'voiceClarificationConfirmed'
-    | 'voiceClarificationCancelled';
+    | 'voiceClarificationCancelled'
+    | 'recoveryRequested'
+    | 'recoveryChecked';
   readonly recordedAt: string;
   readonly source: 'mock' | 'api';
   readonly attemptId?: string;
@@ -88,7 +90,10 @@ export interface WorkflowEvent {
     | 'measurementAccepted'
     | 'voiceClarificationRequested'
     | 'voiceClarificationDismissed'
-    | 'voiceClarificationResolved';
+    | 'voiceClarificationResolved'
+    | 'recoveryRequested'
+    | 'recoveryFailed'
+    | 'recoverySucceeded';
   readonly occurredAt: string;
   readonly evidenceId?: string;
   readonly checkId?: PreparationCheckId;
@@ -124,6 +129,11 @@ export type WorkflowCommand =
   | { readonly type: 'startDeviceCheck' }
   | { readonly type: 'startExecution' }
   | { readonly type: 'requestExecutionSample'; readonly cursorId: string }
+  | {
+      readonly type: 'requestRecovery';
+      readonly cursorId: string;
+      readonly blockedAttemptId: string;
+    }
   | {
       readonly type: 'completeExecutionStep';
       readonly cursorId: string;

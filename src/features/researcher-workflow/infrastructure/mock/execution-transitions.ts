@@ -7,6 +7,7 @@ import {
   type ExecutionState,
   type ExecutionCursor,
 } from '../../domain/execution';
+import { recoverySampleIssue } from '../../domain/recovery';
 import type { TransitionMetadata } from './transition-engine';
 import { resolveVoiceClarification } from './voice-clarification-transitions';
 
@@ -37,9 +38,14 @@ export function beginExecutionSample(
   cursorId: string,
   attemptId: string,
   meta: TransitionMetadata,
+  recovery = false,
 ): ExperimentSession {
   const state = selectExecution(session);
-  if (!state.canSample || state.cursor?.cursorId !== cursorId || !session.execution)
+  if (
+    !(recovery ? state.canRecover : state.canSample) ||
+    state.cursor?.cursorId !== cursorId ||
+    !session.execution
+  )
     invalid('현재 회차의 응답을 확인할 수 없습니다.');
   return {
     ...session,
@@ -86,7 +92,12 @@ export function finishExecutionSample(
   )
     return session;
   const candidate = { ...latest, report };
-  const issue = executionSampleIssue(session, candidate);
+  const recovery = session.execution.recoveries?.find(
+    (item) => item.sampleAttemptId === attemptId && item.status === 'checking',
+  );
+  const issue = recovery
+    ? recoverySampleIssue(session, candidate, meta.now)
+    : executionSampleIssue(session, candidate);
   const status = !issue
     ? 'ready'
     : issue.code === 'WAITING'
@@ -103,18 +114,52 @@ export function finishExecutionSample(
     updatedAt: meta.now,
     execution: {
       ...session.execution,
+      recoveries: session.execution.recoveries?.map((item) =>
+        item === recovery
+          ? {
+              ...item,
+              status: issue ? ('failed' as const) : ('recovered' as const),
+              completedAt: meta.now,
+              issue,
+            }
+          : item,
+      ),
       attempts: session.execution.attempts.map((attempt) =>
         attempt.attemptId === attemptId
           ? { ...candidate, status, receivedAt: meta.now, issue }
           : attempt,
       ),
     },
+    evidence: recovery
+      ? [
+          ...session.evidence,
+          {
+            evidenceId: meta.evidenceId,
+            sessionId: session.sessionId,
+            kind: 'program',
+            actorId: 'mock-workflow',
+            action: 'recoveryChecked',
+            source: session.source,
+            recordedAt: meta.now,
+            attemptId,
+            cursor: latest.cursor,
+            issue,
+            diagnostics: report.diagnostics,
+          },
+        ]
+      : session.evidence,
     events: [
       ...session.events,
       {
         eventId: meta.eventId,
         requestId: meta.requestId,
-        type: issue ? 'executionSampleRejected' : 'executionSampleReceived',
+        type: recovery
+          ? issue
+            ? 'recoveryFailed'
+            : 'recoverySucceeded'
+          : issue
+            ? 'executionSampleRejected'
+            : 'executionSampleReceived',
         occurredAt: meta.now,
         attemptId,
         cursor: latest.cursor,

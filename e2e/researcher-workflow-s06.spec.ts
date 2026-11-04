@@ -86,8 +86,13 @@ test('360px에서 긴 보류 문구와 최하단 콘텐츠가 버튼 위로 스�
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
   expect(overflow).toBe(false);
   await page.screenshot({ path: testInfo.outputPath('s06-held-bottom-360x800.png') });
+  await page.getByRole('button', { name: '센서 오류와 작업 보류 확인', exact: true }).click();
+  await expect(page).toHaveURL(/\/recovery$/);
   await chooseResponse(page, '작업 보류', '정상 응답');
-  await sample.click();
+  await page.getByRole('button', { name: '센서 다시 확인', exact: true }).click();
+  await expect(page.getByText('새 센서값이 수신되었습니다', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '현재 작업으로 돌아가기', exact: true }).click();
+  await expect(page).toHaveURL(/\/execution$/);
   await expect(complete).toBeEnabled();
   await expect(page.getByText('유효 측정 0 / 15회', { exact: true })).toBeVisible();
 });

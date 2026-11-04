@@ -1,6 +1,7 @@
 import type { DeviceDiagnosticsReport, DiagnosticIssue } from './device-check';
 import { validateDiagnostics, selectDeviceCheck } from './device-check';
 import type { ExperimentSession } from './models';
+import type { RecoveryAttempt } from './recovery';
 import type { VoiceResolution } from './voice-clarification';
 
 /** Mock 초안. 팀의 승인된 전체 단계 번호·안전 기준·API DTO를 뜻하지 않는다. */
@@ -23,6 +24,7 @@ export interface ExecutionCursor {
 }
 
 export interface ExecutionSampleReport {
+  readonly attemptId?: string;
   readonly cursorId: string;
   readonly source: 'mock' | 'api';
   readonly stability: 'waiting' | 'stable';
@@ -51,6 +53,7 @@ export interface PendingVoiceCommand {
 }
 
 export interface ExecutionState {
+  readonly recoveries?: readonly RecoveryAttempt[];
   readonly cursor: ExecutionCursor | null;
   readonly attempts: readonly MeasurementAttempt[];
   readonly pendingVoice: PendingVoiceCommand | null;
@@ -78,6 +81,7 @@ export function executionSampleIssue(
   const report = attempt.report;
   if (
     !report ||
+    (report.attemptId !== undefined && report.attemptId !== attempt.attemptId) ||
     report.cursorId !== attempt.cursor.cursorId ||
     report.source !== session.source ||
     report.diagnostics.source !== session.source
@@ -124,6 +128,13 @@ export function selectExecution(session: ExperimentSession) {
   const completed = authorized && configured && !!execution && !cursor && valid.length === total;
   const sampling = latest?.status === 'sampling';
   const pendingVoice = execution?.pendingVoice ?? null;
+  const recovery = execution?.recoveries?.at(-1);
+  const requiresRecovery =
+    latest?.status === 'held' ||
+    latest?.status === 'error' ||
+    (!!recovery &&
+      recovery.cursor.cursorId === cursor?.cursorId &&
+      recovery.status !== 'recovered');
   const reason = !authorized
     ? '장치 점검을 완료하고 실험을 시작해 주세요.'
     : !configured || !execution
@@ -157,15 +168,22 @@ export function selectExecution(session: ExperimentSession) {
         value: `${valid.filter((attempt) => attempt.cursor.conditionId === item.id).length}/${item.repetitions}`,
       })) ?? [],
     currentIndex: definition?.conditions.findIndex((item) => item.id === cursor?.conditionId),
-    canSample: authorized && configured && !!cursor && !sampling && !pendingVoice,
+    requiresRecovery,
+    recovery,
+    canRecover:
+      authorized && configured && !!cursor && !sampling && !pendingVoice && requiresRecovery,
+    canSample:
+      authorized && configured && !!cursor && !sampling && !pendingVoice && !requiresRecovery,
     canComplete:
       authorized &&
       configured &&
       !!cursor &&
       !pendingVoice &&
+      !requiresRecovery &&
       latest?.status === 'ready' &&
       !executionSampleIssue(session, latest),
-    canClarify: authorized && configured && !!cursor && !sampling && !pendingVoice,
+    canClarify:
+      authorized && configured && !!cursor && !sampling && !pendingVoice && !requiresRecovery,
   };
 }
 

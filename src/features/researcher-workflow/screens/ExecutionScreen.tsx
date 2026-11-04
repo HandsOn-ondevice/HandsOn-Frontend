@@ -28,10 +28,12 @@ export function ExecutionScreen({
   sessionId,
   onBack,
   onClarification,
+  onRecovery,
 }: {
   sessionId: string;
   onBack: () => void;
   onClarification: () => void;
+  onRecovery?: () => void;
 }) {
   const previewControls = useMockDeviceCheckControls();
   const { session, loading, pending, error, refresh, execute } = useWorkflowSession(sessionId);
@@ -168,11 +170,24 @@ export function ExecutionScreen({
                   }
                 />
                 <Button
-                  label={state.sampling ? '측정값 확인 중' : '현재 회차 측정값 확인'}
+                  label={
+                    state.sampling
+                      ? '측정값 확인 중'
+                      : state.requiresRecovery
+                        ? '센서 오류와 작업 보류 확인'
+                        : '현재 회차 측정값 확인'
+                  }
                   variant="secondary"
                   loading={state.sampling}
-                  disabled={pending || !state.canSample}
+                  disabled={
+                    pending ||
+                    (state.requiresRecovery ? !onRecovery || state.sampling : !state.canSample)
+                  }
                   onPress={() => {
+                    if (state.requiresRecovery) {
+                      onRecovery?.();
+                      return;
+                    }
                     if (state.cursor)
                       void execute({
                         type: 'requestExecutionSample',
@@ -211,7 +226,7 @@ export function ExecutionScreen({
             />
           </PreviewTools>
         ) : null}
-        <AppText>일시정지·재개와 오류 복구, 종료 검토는 아직 제공하지 않습니다.</AppText>
+        <AppText>일시정지·재개와 종료 검토는 아직 제공하지 않습니다.</AppText>
         {session?.source === 'mock' ? (
           <AppText>현재 값은 장치에서 수집한 실측값이 아닙니다.</AppText>
         ) : null}

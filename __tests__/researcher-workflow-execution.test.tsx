@@ -12,6 +12,7 @@ import type {
   ExperimentSession,
   WorkflowCommand,
 } from '../src/features/researcher-workflow/domain/models';
+import { selectRecovery } from '../src/features/researcher-workflow/domain/recovery';
 import {
   selectExecution,
   type ExecutionSampleReport,
@@ -59,7 +60,18 @@ async function running(repo: MockWorkflowRepository) {
 }
 async function sampleReady(repo: MockWorkflowRepository, session: ExperimentSession) {
   const cursor = session.execution!.cursor!;
-  await send(repo, session, { type: 'requestExecutionSample', cursorId: cursor.cursorId });
+  const recovery = selectRecovery(session);
+  await send(
+    repo,
+    session,
+    recovery.canRecover
+      ? {
+          type: 'requestRecovery',
+          cursorId: cursor.cursorId,
+          blockedAttemptId: recovery.blocked!.attemptId,
+        }
+      : { type: 'requestExecutionSample', cursorId: cursor.cursorId },
+  );
   await waitFor(async () =>
     expect(selectExecution(await repo.getSession(session.sessionId)).latest?.status).not.toBe(
       'sampling',

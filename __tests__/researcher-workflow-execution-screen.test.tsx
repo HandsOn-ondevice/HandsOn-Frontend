@@ -10,6 +10,7 @@ import {
 import type { ExecutionSampleReport } from '../src/features/researcher-workflow/domain/execution';
 import type { WorkflowCommand } from '../src/features/researcher-workflow/domain/models';
 import { WorkflowProvider } from '../src/features/researcher-workflow/state/WorkflowProvider';
+import { RecoveryScreen } from '../src/features/researcher-workflow/screens/RecoveryScreen';
 import { ExecutionScreen } from '../src/features/researcher-workflow/screens/ExecutionScreen';
 import { VoiceClarificationConnectionScreen } from '../src/features/researcher-workflow/screens/VoiceClarificationConnectionScreen';
 
@@ -42,18 +43,20 @@ async function setup(
   session = await repository.getSession(session.sessionId);
   await send({ type: 'startExecution' });
   const onClarification = jest.fn();
+  const onRecovery = jest.fn();
   const view = () => (
     <WorkflowProvider repository={repository}>
       <ExecutionScreen
         sessionId={session.sessionId}
         onBack={() => {}}
         onClarification={onClarification}
+        onRecovery={onRecovery}
       />
     </WorkflowProvider>
   );
   const screen = await render(view());
   await screen.findByText('유효 측정 0 / 15회');
-  return { repository, session, screen, view, onClarification };
+  return { repository, session, screen, view, onClarification, onRecovery };
 }
 
 describe('S06 화면 조작과 재진입', () => {
@@ -80,7 +83,7 @@ describe('S06 화면 조작과 재진입', () => {
   });
 
   test('오래된 값은 진행을 차단하고 정상 재요청 뒤에만 완료 버튼을 활성화한다', async () => {
-    const { screen, repository, session } = await setup();
+    const { screen, repository, session, view, onRecovery } = await setup();
     await fireEvent.press(screen.getByRole('button', { name: '더 보기' }));
     await fireEvent.press(screen.getByRole('button', { name: '미리보기 설정' }));
     await fireEvent.press(screen.getByRole('button', { name: '측정 응답 조건: 정상 응답' }));
@@ -89,12 +92,25 @@ describe('S06 화면 조작과 재진입', () => {
     await fireEvent.press(screen.getByRole('button', { name: '현재 회차 측정값 확인' }));
     await waitFor(() => expect(screen.getAllByText(/이전 측정값/).length).toBeGreaterThan(0));
     expect(screen.getByRole('button', { name: '완료 요청' })).toBeDisabled();
+    await fireEvent.press(screen.getByRole('button', { name: '센서 오류와 작업 보류 확인' }));
+    expect(onRecovery).toHaveBeenCalledTimes(1);
+    const onBack = jest.fn();
+    await screen.rerender(
+      <WorkflowProvider repository={repository}>
+        <RecoveryScreen sessionId={session.sessionId} onBack={onBack} />
+      </WorkflowProvider>,
+    );
+    await screen.findByText('복구 순서');
     await fireEvent.press(screen.getByRole('button', { name: '더 보기' }));
     await fireEvent.press(screen.getByRole('button', { name: '미리보기 설정' }));
     await fireEvent.press(screen.getByRole('button', { name: '측정 응답 조건: 오래된 값 · 보류' }));
     await fireEvent.press(screen.getByRole('radio', { name: '정상 응답' }));
     await fireEvent.press(screen.getByRole('button', { name: '하단 시트 닫기' }));
-    await fireEvent.press(screen.getByRole('button', { name: '현재 회차 측정값 확인' }));
+    await fireEvent.press(screen.getByRole('button', { name: '센서 다시 확인' }));
+    await screen.findByText('새 센서값이 수신되었습니다');
+    await fireEvent.press(screen.getAllByRole('button', { name: '현재 작업으로 돌아가기' })[0]);
+    expect(onBack).toHaveBeenCalledTimes(1);
+    await screen.rerender(view());
     await waitFor(() => expect(screen.getByRole('button', { name: '완료 요청' })).toBeEnabled());
     expect((await repository.getSession(session.sessionId)).execution?.attempts).toHaveLength(2);
   });

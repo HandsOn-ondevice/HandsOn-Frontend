@@ -18,6 +18,7 @@ import {
   type MockDeviceScenario,
   type MockDiagnosticsRunner,
 } from './device-check-scenarios';
+import { beginRecovery } from './recovery-transitions';
 import { selectExecution } from '../../domain/execution';
 import { resolveVoiceClarification } from './voice-clarification-transitions';
 import {
@@ -54,6 +55,7 @@ export class MockWorkflowRepository implements WorkflowRepository {
   private readonly scenarios = new Map<string, MockDeviceScenario>();
   private readonly sample: MockExecutionRunner;
   private readonly executionScenarios = new Map<string, MockExecutionScenario>();
+  private readonly initialStaleReadings = new Map<string, string>();
 
   constructor(dependencies: MockDependencies = {}) {
     this.now = dependencies.now ?? (() => new Date().toISOString());
@@ -118,6 +120,11 @@ export class MockWorkflowRepository implements WorkflowRepository {
       ],
     };
     this.sessions.set(session.sessionId, session);
+    const createdAt = Date.parse(now);
+    if (Number.isFinite(createdAt)) {
+      // 새 세션의 합성 이전 샘플. 1ms는 시각 순서 구분용이며 최신성 임계값이 아니다.
+      this.initialStaleReadings.set(session.sessionId, new Date(createdAt - 1).toISOString());
+    }
     this.creationRequests.set(input.requestId, { signature, sessionId: session.sessionId });
     return copy(session);
   }
@@ -161,6 +168,7 @@ export class MockWorkflowRepository implements WorkflowRepository {
     const attemptId = command.type === 'startDeviceCheck' ? this.id() : undefined;
     const sampleId =
       command.type === 'requestExecutionSample' ||
+      command.type === 'requestRecovery' ||
       (command.type === 'resolveVoiceClarification' && command.choice === 'remeasure')
         ? this.id()
         : undefined;
@@ -169,35 +177,37 @@ export class MockWorkflowRepository implements WorkflowRepository {
         ? beginDeviceCheck(session, attemptId!, metadata)
         : command.type === 'startExecution'
           ? startMockExecution(session, metadata)
-          : command.type === 'requestExecutionSample'
-            ? beginExecutionSample(session, command.cursorId, sampleId!, metadata)
-            : command.type === 'completeExecutionStep'
-              ? completeExecutionStep(
-                  session,
-                  command.cursorId,
-                  command.sampleAttemptId,
-                  this.id(),
-                  metadata,
-                )
-              : command.type === 'requestVoiceClarification'
-                ? requestVoiceClarification(
+          : command.type === 'requestRecovery'
+            ? beginRecovery(session, command, sampleId!, metadata)
+            : command.type === 'requestExecutionSample'
+              ? beginExecutionSample(session, command.cursorId, sampleId!, metadata)
+              : command.type === 'completeExecutionStep'
+                ? completeExecutionStep(
                     session,
                     command.cursorId,
-                    command.utterance,
+                    command.sampleAttemptId,
                     this.id(),
                     metadata,
                   )
-                : command.type === 'dismissVoiceClarification'
-                  ? dismissVoiceClarification(session, command.commandId, metadata)
-                  : command.type === 'resolveVoiceClarification'
-                    ? resolveVoiceClarification(
-                        session,
-                        command.commandId,
-                        command.choice,
-                        sampleId,
-                        metadata,
-                      )
-                    : transitionPreparation(session, command, metadata);
+                : command.type === 'requestVoiceClarification'
+                  ? requestVoiceClarification(
+                      session,
+                      command.cursorId,
+                      command.utterance,
+                      this.id(),
+                      metadata,
+                    )
+                  : command.type === 'dismissVoiceClarification'
+                    ? dismissVoiceClarification(session, command.commandId, metadata)
+                    : command.type === 'resolveVoiceClarification'
+                      ? resolveVoiceClarification(
+                          session,
+                          command.commandId,
+                          command.choice,
+                          sampleId,
+                          metadata,
+                        )
+                      : transitionPreparation(session, command, metadata);
     // 의미 확인과 재측정 요청을 원자적으로 저장한다. 중복 확인은 새 요청을 만들지 않는다.
     const resolved =
       sampleId && command.type === 'resolveVoiceClarification' && next !== session
@@ -255,8 +265,19 @@ export class MockWorkflowRepository implements WorkflowRepository {
     const cursor = copy(session.execution!.cursor!);
     const scenario = this.getExecutionScenario(session.sessionId);
     void Promise.resolve()
-      .then(() => this.sample({ definition, executionDefinition, cursor, scenario, now: this.now }))
+      .then(() =>
+        this.sample({
+          definition,
+          executionDefinition,
+          cursor,
+          scenario,
+          sampleAttemptId: attemptId,
+          initialStaleObservedAt: this.initialStaleReadings.get(session.sessionId),
+          now: this.now,
+        }),
+      )
       .catch(() => ({
+        attemptId,
         cursorId: cursor.cursorId,
         source: 'mock' as const,
         stability: 'stable' as const,

@@ -134,3 +134,16 @@ E01~E07 라우트를 비상 화면으로 가정하거나 새로 구현하지 않
 - API adapter도 원본 보고서와 검증 결과를 구분하고 동일한 도메인 검증을 적용해야 한다. Mock 전환 함수가 실제 안전 승인 주체가 되지는 않는다.
 - 미리보기 제어기는 개발 환경의 Mock에만 노출한다. 일반 화면이 아니라 정보 시트 안에서 명시적으로 열며, 포털 내부에서는 Repository Context를 다시 조회하지 않고 화면에서 전달받는다.
 - 사용자 문구와 검증/위험/전체 변경 목록은 `docs/validation/researcher-workflow-quality-20261103.md`에 기록한다. 내부 source=mock 및 실제 서비스 미연결 상태는 유지한다.
+
+## S08 보류·복구 계약 (2026-11-04)
+
+- Figma 최종 섹션 `2126:4153`에서 S08 `2085:722`(412×920)를 Chrome 캔버스에서 선택·확대해 확인했다. S09는 별도의 복구 후 재측정 프레임이다. S09는 구현하지 않으며, 이번 범위의 성공 복귀는 같은 sessionId의 S06으로 연결한다.
+- `/researcher-workflow/[sessionId]/recovery`는 조회·구독으로 기존 상태를 복원한다. S06의 held/error 응답에서 연결한다. 단순 화면 이탈·뒤로가기·시스템 뒤로가기는 보류 해제나 작업 완료를 뜻하지 않는다.
+- `requestRecovery(cursorId, blockedAttemptId)`는 현재 보류 응답의 재확인 요청이다. 전원 차단·배선 연결·LED 출력 제어의 실행이나 확인을 뜻하지 않는다. 기존 Repository의 expectedRevision/requestId 검증을 사용하며 별도 API 라이브러리를 추가하지 않는다.
+- `execution.recoveries`는 복구 ID, 보류 응답 ID, 재확인 sampleAttemptId, 원래 cursor, 요청/완료 시각, checking/failed/recovered, 검증 issue를 보존한다. 기존 attempts·유효 측정·절차 버전·근거·이벤트를 삭제하거나 초기화하지 않는다.
+- held/error 이후에는 일반 측정과 S07 의미 확인을 통한 재측정 우회를 차단한다. 복구 실패에는 waiting/stale/noResponse/error/held도 포함하며, 새 재확인 요청이 성공해야 잠금을 해제한다.
+- 응답은 현재 sampling 작업에만 적용한다. S08은 report.attemptId와 sampleAttemptId 일치, 요청 시각 <= 센서 관측/확인/보고 시각 <= 수신 시각, 기존 source/device/cursor/단위/진단/안정화 검사를 요구한다. report.attemptId는 S06 과거 데이터 호환성을 위해 선택 필드지만 S08에서는 필수다. 실제 API adapter도 이 상관관계를 보장해야 한다.
+- `recoveryRequested` human 근거는 사용자의 새 응답 요청만 기록한다. `recoveryChecked` program 근거는 원본 diagnostics와 별도의 issue를 보존한다. recoveryRequested/Failed/Succeeded 이벤트에 requestId·cursor·attemptId를 기록한다. 센서 성공과 물리적 조치 확인을 혼동하지 않는다.
+- 복구 성공은 같은 커서의 ready 응답만 만든다. 자동 회차 완료·유효 측정 수 증가가 없으며, S06의 명시적 `completeExecutionStep` 이후에만 기존 측정 근거를 추가하고 진행한다.
+- Figma의 2초 최신성 기준을 승인된 안전 규칙으로 채택하지 않았다. 5초는 기존 mock-draft 절차의 표시값이고 실제 안정화 타이머가 아니다. 실제 임계값·시계 동기화·취소·재접속·네트워크 timeout·복구 승인·안전 조치 확인 주체를 서버/장비 담당자와 합의해야 한다.
+- 기본 Mock Repository의 개발 환경 제한과 메모리 수명, useWorkflowSession의 revision 역전 방지는 유지한다. 실제 API·장비·음성 서비스는 여전히 미연동이다. 실제 adapter가 영원히 응답하지 않는 경우의 timeout/취소 정책은 미구현이며, 현재 Mock의 noResponse는 실패 응답을 반환하는 시나리오다.

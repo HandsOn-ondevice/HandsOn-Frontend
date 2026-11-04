@@ -16,6 +16,9 @@ export const mockExecutionScenarios = [
 ] as const;
 export type MockExecutionScenario = (typeof mockExecutionScenarios)[number]['value'];
 export interface MockExecutionInput {
+  /** 새 Mock 세션 생성 시 고정한 합성 이전 측정 시각. 안전 판정 기준이 아니다. */
+  readonly initialStaleObservedAt?: string;
+  readonly sampleAttemptId: string;
   readonly definition: DeviceCheckDefinition;
   readonly executionDefinition: ExecutionDefinition;
   readonly cursor: ExecutionCursor;
@@ -36,7 +39,7 @@ export function buildMockExecutionReport(input: MockExecutionInput): ExecutionSa
   const diagnostics = buildMockDiagnostics({
     definition: input.definition,
     scenario,
-    attemptId: input.cursor.cursorId,
+    attemptId: input.sampleAttemptId,
     now: input.now,
   });
   const index = input.executionDefinition.conditions.findIndex(
@@ -45,6 +48,7 @@ export function buildMockExecutionReport(input: MockExecutionInput): ExecutionSa
   // Figma 대표 시나리오의 합성 수치. 출력 명령·센서 정상 범위를 뜻하지 않는다.
   const illuminance = [18.4, 210, 420, 610, 810][index] ?? 0;
   return {
+    attemptId: input.sampleAttemptId,
     cursorId: input.cursor.cursorId,
     source: 'mock',
     stability: input.scenario === 'waiting' ? 'waiting' : 'stable',
@@ -58,6 +62,10 @@ export function buildMockExecutionReport(input: MockExecutionInput): ExecutionSa
         ...sensor,
         readings: sensor.readings.map((reading) => ({
           ...reading,
+          observedAt:
+            sensor.status === 'stale' && input.initialStaleObservedAt
+              ? input.initialStaleObservedAt
+              : reading.observedAt,
           value:
             reading.metricId === 'illuminance'
               ? illuminance
