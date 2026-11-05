@@ -31,6 +31,6 @@ const demoEnvironments: readonly WorkEnvironment[] = [
 
 export const loadWorkEnvironments: LoadWorkEnvironments = async () => {
   // Replace this loader when the environment and device API contract is agreed.
-  if (__DEV__) return demoEnvironments;
+  if (__DEV__ || process.env.EXPO_PUBLIC_HANDSON_MAESTRO === '1') return demoEnvironments;
   throw new Error('작업 환경 조회가 아직 연결되지 않았습니다.');
 };
