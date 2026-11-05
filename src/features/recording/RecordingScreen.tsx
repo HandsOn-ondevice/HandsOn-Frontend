@@ -20,8 +20,9 @@ export function RecordingScreen({ environment }: { environment: WorkEnvironment 
 
   useEffect(() => {
     alive.current = true;
+    session.setAppForeground(AppState.currentState !== 'background');
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'background') void session.interrupt();
+      session.setAppForeground(state !== 'background');
     });
     return () => {
       alive.current = false;

@@ -78,6 +78,9 @@ export class RecordingSession {
   private cancellationVersion = 0;
   private uncommittedId: string | null = null;
   private timer: ReturnType<typeof setInterval> | undefined;
+  private foreground = true;
+  private awaitingPermission = false;
+  private wakeForegroundWait: (() => void) | undefined;
 
   constructor(
     private adapter: RecordingAdapter,
@@ -96,6 +99,12 @@ export class RecordingSession {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   };
+
+  setAppForeground(foreground: boolean) {
+    this.foreground = foreground;
+    if (foreground) this.wakeForegroundWait?.();
+    else if (!this.awaitingPermission) void this.interrupt();
+  }
 
   private update(snapshot: RecordingSnapshot) {
     this.snapshot = snapshot;
@@ -167,7 +176,21 @@ export class RecordingSession {
         await this.adapter.cleanup();
         await this.removeUncommitted();
         if (this.cancelled) return;
-        const permission = await this.adapter.requestPermission();
+        // Android's permission activity temporarily backgrounds the app. Its result
+        // can arrive before the recording screen returns to the foreground.
+        this.awaitingPermission = true;
+        let permission: Awaited<ReturnType<RecordingAdapter['requestPermission']>>;
+        try {
+          permission = await this.adapter.requestPermission();
+          while (permission.granted && !this.foreground && !this.cancelled) {
+            await new Promise<void>((resolve) => {
+              this.wakeForegroundWait = resolve;
+            });
+          }
+        } finally {
+          this.awaitingPermission = false;
+          this.wakeForegroundWait = undefined;
+        }
         if (this.cancelled) return;
         if (!permission.granted) {
           this.update({
@@ -265,6 +288,7 @@ export class RecordingSession {
 
   private cancel(status: 'idle' | 'interrupted'): Promise<void> {
     this.cancelled = true;
+    this.wakeForegroundWait?.();
     this.cancelling = true;
     const version = ++this.cancellationVersion;
     this.stopSampling();

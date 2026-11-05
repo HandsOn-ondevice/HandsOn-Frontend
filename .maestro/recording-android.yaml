@@ -4,7 +4,7 @@ name: Android 음성 녹음과 일시정지 및 원본 전달
 - launchApp:
     clearState: true
     permissions:
-      microphone: allow
+      microphone: unset
 - extendedWaitUntil:
     visible: '연구실: 연구실을 선택해 주세요'
     timeout: 30000
@@ -20,9 +20,11 @@ name: Android 음성 녹음과 일시정지 및 원본 전달
 - hideKeyboard
 - takeScreenshot: e02-ready
 
-# 권한만 미리 허용하고 실제 네이티브 녹음기를 사용합니다.
+# 첫 녹음에서 Android 권한 창을 열고 앱 사용 중 마이크 접근을 허용합니다.
 - tapOn:
     id: recording-start
+- tapOn:
+    id: '.*:id/permission_allow_foreground_only_button'
 - extendedWaitUntil:
     visible: 녹음 중이에요
     timeout: 15000

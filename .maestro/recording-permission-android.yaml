@@ -4,7 +4,7 @@ name: Android 마이크 권한 거부 복귀와 재시도 및 녹음 취소
 - launchApp:
     clearState: true
     permissions:
-      microphone: deny
+      microphone: unset
 - extendedWaitUntil:
     visible: '연구실: 연구실을 선택해 주세요'
     timeout: 30000
@@ -19,11 +19,9 @@ name: Android 마이크 권한 거부 복귀와 재시도 및 녹음 취소
 - hideKeyboard
 - tapOn:
     id: recording-start
-# Android는 deny로 시작해도 첫 요청에서 시스템 대화상자를 표시할 수 있습니다.
-# 번역된 버튼 문구 대신 Android 권한 컨트롤러의 리소스 ID를 선택합니다.
+# 첫 권한 요청을 Android 권한 창에서 직접 거부합니다.
 - tapOn:
     id: '.*:id/permission_deny_button'
-    optional: true
 - extendedWaitUntil:
     visible: 마이크 권한이 필요해요
     timeout: 15000

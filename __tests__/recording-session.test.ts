@@ -83,6 +83,50 @@ test('마이크 권한 거부는 녹음을 준비하거나 원본을 저장하�
   expect(storage.save).not.toHaveBeenCalled();
 });
 
+test('시스템 권한 창에서 앱이 잠시 백그라운드로 바뀌어도 거부 응답을 표시한다', async () => {
+  const { session, adapter } = setup();
+  jest.mocked(adapter.requestPermission).mockImplementation(async () => {
+    session.setAppForeground(false);
+    return { granted: false, canAskAgain: true };
+  });
+
+  await session.start();
+  session.setAppForeground(true);
+  expect(session.getSnapshot()).toMatchObject({ status: 'permissionDenied', canAskAgain: true });
+  expect(adapter.prepare).not.toHaveBeenCalled();
+});
+
+test.each(['복귀', '취소'] as const)(
+  '권한 허용 뒤 포그라운드를 기다리는 중 %s를 처리한다',
+  async (action) => {
+    const { session, adapter } = setup();
+    const requested = Promise.withResolvers<void>();
+    jest.mocked(adapter.requestPermission).mockImplementation(async () => {
+      session.setAppForeground(false);
+      requested.resolve();
+      return { granted: true, canAskAgain: true };
+    });
+
+    const starting = session.start();
+    await requested.promise;
+    await Promise.resolve();
+    expect(session.getSnapshot().status).toBe('requesting');
+    expect(adapter.prepare).not.toHaveBeenCalled();
+
+    if (action === '복귀') {
+      session.setAppForeground(true);
+      await starting;
+      expect(session.getSnapshot().status).toBe('recording');
+      expect(adapter.record).toHaveBeenCalledTimes(1);
+      await session.dispose();
+    } else {
+      await Promise.all([starting, session.discard()]);
+      expect(session.getSnapshot().status).toBe('idle');
+      expect(adapter.record).not.toHaveBeenCalled();
+    }
+  },
+);
+
 test('실제 녹음 시간과 입력 크기를 반영하고 일시정지 시간은 고정한다', async () => {
   const { session, adapter, change } = setup();
   await session.start();
