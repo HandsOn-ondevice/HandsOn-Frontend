@@ -54,7 +54,7 @@ export const loadStudentHome: LoadStudentHome = async (environment) => {
     deviceStatus: 'connected',
     ongoingSession: {
       id: 'demo-session-led-m03',
-      title: 'LED 출력 단계별 조도·소비전력 측정',
+      title: 'LED 출력 단계별\n조도·소비전력 측정',
       procedureVersion: 'v1.2',
       environmentId: environment.id,
       deviceId: 'demo-orange-pi-5-plus',
