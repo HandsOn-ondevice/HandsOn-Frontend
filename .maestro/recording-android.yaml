@@ -1,0 +1,55 @@
+appId: com.handson.frontend
+name: Android 음성 녹음과 일시정지 및 원본 전달
+---
+- launchApp:
+    clearState: true
+    permissions:
+      microphone: allow
+- extendedWaitUntil:
+    visible: '연구실: 연구실을 선택해 주세요'
+    timeout: 30000
+- tapOn: 숙련 연구생, 절차 생성·승인
+- tapOn: '연구실: 연구실을 선택해 주세요'
+- tapOn: 전자회로 실험실
+- tapOn: 설정하고 계속
+- tapOn: 새 절차 음성으로 만들기
+- assertVisible: 음성 설명 녹음
+- tapOn: 절차 이름
+# Android Maestro inputText는 유니코드 입력을 지원하지 않습니다.
+- inputText: LED output measurement
+- hideKeyboard
+- takeScreenshot: e02-ready
+
+# 권한만 미리 허용하고 실제 네이티브 녹음기를 사용합니다.
+- tapOn:
+    id: recording-start
+- extendedWaitUntil:
+    visible: 녹음 중이에요
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: recording-duration
+      text: '녹음 시간 00:(0[2-9]|[1-5][0-9])'
+    timeout: 15000
+- takeScreenshot: e02-recording
+- back
+- assertVisible: 녹음을 취소할까요\?
+- tapOn: 계속 녹음
+- assertVisible: 녹음 중이에요
+- tapOn:
+    id: recording-pause
+- assertVisible: 녹음을 일시정지했어요
+- assertVisible: 녹음 재개
+- takeScreenshot: e02-paused
+- tapOn:
+    id: recording-resume
+- assertVisible: 녹음 중이에요
+- tapOn:
+    id: recording-finish
+- extendedWaitUntil:
+    visible: STT 텍스트 확인
+    timeout: 20000
+- assertVisible: 음성 원본을 저장했어요
+- assertVisible: LED output measurement
+- assertVisible: '.*녹음 길이.*'
+- takeScreenshot: e03-audio-source
