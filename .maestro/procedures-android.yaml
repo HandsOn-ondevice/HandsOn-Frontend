@@ -1,0 +1,74 @@
+appId: com.handson.frontend
+name: Android 승인 절차 선택과 버전 고정 입력 확인
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: '연구실: 연구실을 선택해 주세요'
+    timeout: 30000
+
+- tapOn: 신규 연구생, 승인된 절차 실행
+- tapOn: '연구실: 연구실을 선택해 주세요'
+- tapOn: 지능형 임베디드·IoT 센서 연구실
+- tapOn: 설정하고 계속
+- assertVisible: 연구생 홈
+- tapOn: 승인 절차 선택
+- assertVisible: 승인된 절차 2개
+- assertNotVisible: '(?s).*LED 측정 초안.*'
+- assertNotVisible: '(?s).*승인 취소된 센서 점검.*'
+- assertVisible:
+    text: 선택한 절차 확인
+    enabled: false
+
+# 필터 전환은 이전 절차 선택을 해제합니다.
+- tapOn: 센서 점검
+- tapOn: '(?s)I2C 센서 주소 점검, 승인,.*'
+- assertVisible:
+    text: 선택한 절차 확인
+    enabled: true
+- tapOn: LED
+- assertVisible:
+    text: 선택한 절차 확인
+    enabled: false
+- assertNotVisible: '(?s)I2C 센서 주소 점검, 승인,.*'
+- tapOn: '(?s)LED 출력 단계별.*조도·소비전력 특성 측정, 승인,.*v1\.2.*'
+- assertVisible:
+    text: 선택한 절차 확인
+    enabled: true
+- takeScreenshot: s02-approved-procedures
+- tapOn: 선택한 절차 확인
+
+- assertVisible: 절차 상세와 버전 고정
+- assertVisible: 'LED-M03 · 승인 버전 v1\.2'
+- assertVisible: 출력 조건 · 회차
+- assertVisible: 0%
+- assertVisible: 100%
+- scrollUntilVisible:
+    element: BH1750
+    direction: DOWN
+- assertVisible: INA219
+- takeScreenshot: s03-approved-procedure-detail
+- scrollUntilVisible:
+    element: 단계 요약 · 총 16단계
+    direction: DOWN
+- assertVisible: 단계 요약 · 총 16단계
+- scrollUntilVisible:
+    element: 주의사항
+    direction: DOWN
+- assertVisible: 주의사항
+- takeScreenshot: s03-steps-precautions
+- tapOn: 이 버전으로 준비 시작
+
+# A의 실제 준비 화면 대신 개발 전용 전달 입력을 확인합니다.
+- assertVisible: 개발용 준비 입력 확인
+- assertVisible: 실험 준비 화면 연결 대기
+- assertVisible: demo-led-characteristics
+- assertVisible: 'v1\.2'
+- assertVisible: demo-embedded-iot
+- takeScreenshot: preparation-handoff-preview
+- back
+- assertVisible: 절차 상세와 버전 고정
+- assertVisible: 'LED-M03 · 승인 버전 v1\.2'
+- back
+- assertVisible: 승인 절차 선택
+- assertVisible: 승인된 절차 2개
