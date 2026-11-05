@@ -1,0 +1,63 @@
+appId: com.handson.frontend
+name: Android 연구생 홈의 작업 진입과 빈 상태
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: '연구실: 연구실을 선택해 주세요'
+    timeout: 30000
+- tapOn: 신규 연구생, 승인된 절차 실행
+- tapOn: '연구실: 연구실을 선택해 주세요'
+- tapOn: 지능형 임베디드·IoT 센서 연구실
+- tapOn: 설정하고 계속
+- extendedWaitUntil:
+    visible: 이어서 진행
+    timeout: 10000
+- takeScreenshot: s01-ongoing
+
+- tapOn: 이어서 진행
+- assertVisible: 저장된 작업을 이어가는 화면을 준비하고 있어요. 홈에서 다시 확인해 주세요.
+- back
+- assertVisible: 이어서 진행
+
+- tapOn: 전체 보기
+- assertVisible: 승인된 절차를 선택하는 화면을 준비하고 있어요.
+- back
+- tapOn: 실험
+- assertVisible: 승인된 절차를 선택하는 화면을 준비하고 있어요.
+- back
+
+- scrollUntilVisible:
+    element:
+      text: LED-M02 특성 측정, 결과 보기
+    direction: DOWN
+- tapOn: LED-M02 특성 측정, 결과 보기
+- assertVisible: 저장된 결과를 확인하는 화면을 준비하고 있어요.
+- back
+
+# 최근 기록의 이력 링크로 목록 진입을 확인합니다.
+- tapOn:
+    text: 이력
+    index: 0
+- assertVisible: 지난 작업 이력을 모아 보는 화면을 준비하고 있어요.
+- back
+- tapOn: 장치
+- assertVisible: 연결된 장치를 확인하는 화면을 준비하고 있어요.
+- tapOn: 연구생 홈으로
+- assertVisible:
+    id: student-home
+
+- tapOn: 프로필
+- tapOn: 뒤로가기
+- assertVisible: '연구실: 지능형 임베디드·IoT 센서 연구실'
+- tapOn: '연구실: 지능형 임베디드·IoT 센서 연구실'
+- tapOn: 전자회로 실험실
+- tapOn: 설정하고 계속
+- extendedWaitUntil:
+    visible: 승인된 절차가 없어요.
+    timeout: 10000
+- assertVisible: 아직 완료한 실험이 없어요.
+- assertNotVisible: 이어서 진행
+- takeScreenshot: s01-empty
+- tapOn: 승인 절차 선택
+- assertVisible: 승인된 절차를 선택하는 화면을 준비하고 있어요.
