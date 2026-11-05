@@ -21,6 +21,13 @@ export function RoleHome({ role }: { role: EntrySelection['role'] }) {
         {role === 'student' ? '연구생 홈' : '숙련자 홈'}
       </AppText>
       <SurfaceCard title="작업 환경" subtitle={selection.environment.name} />
+      {role === 'expert' ? (
+        <Button
+          label="새 절차 음성으로 만들기"
+          icon="mic"
+          onPress={() => router.push('/recording')}
+        />
+      ) : null}
       <Button label="뒤로가기" variant="secondary" icon="back" onPress={goBack} />
     </Screen>
   );
