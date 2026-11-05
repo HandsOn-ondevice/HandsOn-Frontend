@@ -12,14 +12,16 @@ name: Android 역할별 홈 진입과 시스템 뒤로 가기
 - tapOn: 전자회로 실험실
 - takeScreenshot: s00-student
 - tapOn: 설정하고 계속
-- assertVisible: 연구생 홈
+- assertVisible:
+    id: student-home
 - assertVisible: 전자회로 실험실
 
 # 다시 고르지 않고 계속해도 같은 역할과 연구실로 진입합니다.
 - back
 - assertVisible: '연구실: 전자회로 실험실'
 - tapOn: 설정하고 계속
-- assertVisible: 연구생 홈
+- assertVisible:
+    id: student-home
 - assertVisible: 전자회로 실험실
 
 - back
