@@ -1,11 +1,11 @@
 import { ScrollView, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   AppBar,
   AppText,
   Button,
   FeedbackPanel,
-  Screen,
   StatusBadge,
   StatusBar,
   SurfaceCard,
@@ -62,7 +62,7 @@ function recordingCopy(status: RecordingStatus): {
   state: VoiceState;
   title: string;
   subtitle: string;
-  icon: 'mic' | 'pause' | 'retry' | 'alert';
+  icon: 'mic' | 'pause' | 'retry';
 } {
   switch (status) {
     case 'recording':
@@ -100,14 +100,6 @@ function recordingCopy(status: RecordingStatus): {
         subtitle: '저장된 원본으로 다음 단계를 준비합니다.',
         icon: 'mic',
       };
-    case 'error':
-    case 'interrupted':
-      return {
-        state: 'error',
-        title: status === 'interrupted' ? '녹음이 중단되었어요' : '녹음을 마치지 못했어요',
-        subtitle: '아래 안내를 확인하고 새로 녹음해 주세요.',
-        icon: 'alert',
-      };
     default:
       return {
         state: 'idle',
@@ -140,15 +132,15 @@ export function RecordingView({
   const controlsVisible = hasRecording || status === 'saving';
   const titleMissing = !title.trim();
   const requiresSettings = status === 'permissionDenied' && canAskAgain === false;
-  const copy = recordingCopy(status);
+  const showFailure = status === 'error' || status === 'interrupted';
   const time = formatRecordingTime(durationMs);
   const samples = metering.slice(-waveformSamples);
   const bars = [...Array<number>(waveformSamples - samples.length).fill(-60), ...samples];
 
   return (
-    <Screen style={styles.screen}>
+    <View style={styles.screen}>
       <StatusBar />
-      <View style={styles.canvas}>
+      <SafeAreaView edges={['top', 'left', 'right']} style={styles.canvas}>
         <AppBar title="음성 설명 녹음" mode="back" onBack={onBack} onMore={onHelp} />
         <ScrollView
           style={styles.viewport}
@@ -158,7 +150,7 @@ export function RecordingView({
           <View style={styles.status} testID="recording-status">
             <StatusBadge
               label={status === 'recording' ? 'REC · 녹음 중' : statusLabels[status]}
-              tone={hasRecording ? 'danger' : status === 'error' ? 'warning' : 'info'}
+              tone={hasRecording ? 'danger' : showFailure ? 'warning' : 'info'}
             />
           </View>
           <AppText variant="heading" accessibilityRole="header">
@@ -224,26 +216,25 @@ export function RecordingView({
               tone="warning"
               icon="mic"
             />
-          ) : (
-            <VoicePanel {...copy} />
-          )}
-          {message && status !== 'permissionDenied' ? (
+          ) : showFailure ? (
             <FeedbackPanel
-              title={status === 'interrupted' ? '새로 녹음해 주세요' : '녹음 안내'}
-              subtitle={message}
-              tone={status === 'error' || status === 'interrupted' ? 'warning' : 'info'}
+              title={status === 'interrupted' ? '녹음이 중단되었어요' : '녹음을 마치지 못했어요'}
+              subtitle={message ?? '새로 녹음해 주세요.'}
+              tone="warning"
               icon="alert"
             />
-          ) : null}
+          ) : (
+            <VoicePanel {...recordingCopy(status)} />
+          )}
           <View style={styles.prompts} accessibilityLabel="설명에 포함할 내용">
             {prompts.map((prompt) => (
               <StatusBadge key={prompt} label={prompt} />
             ))}
           </View>
         </ScrollView>
-      </View>
+      </SafeAreaView>
 
-      <View style={styles.actions}>
+      <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.actions}>
         {controlsVisible ? (
           <>
             <Button
@@ -274,13 +265,13 @@ export function RecordingView({
             style={styles.singleAction}
           />
         )}
-      </View>
-    </Screen>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { backgroundColor: colors.surface.card },
+  screen: { flex: 1, backgroundColor: colors.surface.canvas },
   canvas: { flex: 1, backgroundColor: colors.surface.canvas },
   viewport: { flex: 1 },
   content: {
