@@ -31,6 +31,7 @@ export interface AppBarProps {
   onBack?: () => void;
   onMore?: () => void;
   onProfile?: () => void;
+  logoWidth?: number;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -42,6 +43,7 @@ export function AppBar({
   onBack,
   onMore,
   onProfile,
+  logoWidth,
   style,
 }: AppBarProps) {
   const inverse = tone === 'inverse';
@@ -51,12 +53,18 @@ export function AppBar({
       {mode === 'brand' ? (
         <>
           <View style={styles.brand}>
-            <BrandLogo />
+            <BrandLogo width={logoWidth} />
             <AppText variant="title" color={foreground} style={styles.flexText}>
               {title}
             </AppText>
           </View>
-          <IconButton icon="person" accessibilityLabel="프로필" onPress={onProfile} tone={tone} />
+          {onProfile ? (
+            <IconButton icon="person" accessibilityLabel="프로필" onPress={onProfile} tone={tone} />
+          ) : (
+            <View style={styles.profileMark}>
+              <Icon name="person" />
+            </View>
+          )}
         </>
       ) : (
         <>
@@ -483,6 +491,14 @@ const styles = StyleSheet.create({
   },
   inverseSurface: { backgroundColor: colors.surface.inverse },
   brand: { flexDirection: 'row', flex: 1, alignItems: 'center', gap: spacing[10], minHeight: 48 },
+  profileMark: {
+    width: spacing[48],
+    height: spacing[48],
+    borderRadius: radii[999],
+    backgroundColor: colors.surface.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   flexText: { flex: 1, flexShrink: 1 },
   appBarTitle: { flex: 1, textAlign: 'center' },
   navigation: {
