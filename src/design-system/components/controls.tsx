@@ -340,7 +340,7 @@ export function SelectField({
         ]}
       >
         <AppText style={styles.flexText}>{selectedLabel}</AppText>
-        <Icon name="arrow" size={18} />
+        <Icon name="arrow" size={16} />
       </Pressable>
       <Modal
         visible={open && !blocked}
@@ -371,10 +371,8 @@ export function SelectField({
                   key={option.value}
                   accessibilityRole="radio"
                   accessibilityLabel={option.label}
-                  accessibilityState={{
-                    checked: option.value === value,
-                    disabled: !!option.disabled,
-                  }}
+                  aria-checked={option.value === value}
+                  accessibilityState={{ disabled: !!option.disabled }}
                   disabled={option.disabled}
                   onPress={() => {
                     onChange(option.value);
@@ -612,6 +610,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border.default,
     padding: spacing[12],
+    paddingRight: spacing[24],
     backgroundColor: colors.surface.card,
   },
   selectOverlay: {
