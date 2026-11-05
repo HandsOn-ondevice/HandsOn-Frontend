@@ -112,12 +112,15 @@ export function RecordingScreen({ environment }: { environment: WorkEnvironment 
         }}
         onBack={goBack}
         onSettings={() => {
-          void Linking.openSettings().catch(() => {
-            Alert.alert(
-              '설정을 열지 못했어요',
-              '기기 설정에서 HandsOn의 마이크 권한을 허용해주세요.',
-            );
-          });
+          void Linking.openSettings()
+            // Returning from settings must allow a fresh permission check, not another settings-only button.
+            .then(() => session.discard())
+            .catch(() => {
+              Alert.alert(
+                '설정을 열지 못했어요',
+                '기기 설정에서 HandsOn의 마이크 권한을 허용해주세요.',
+              );
+            });
         }}
         onHelp={() => setHelp(true)}
       />
