@@ -21,6 +21,7 @@ test('선택한 환경으로 역할별 홈에 진입하고 뒤로 돌아와 설�
   await expect(page.getByRole('heading', { name: '연구생 홈' })).toBeVisible();
   await expect(environmentSummary).toBeVisible();
 
+  await page.getByRole('button', { name: '프로필' }).click();
   await page.getByRole('button', { name: '뒤로가기' }).click();
   await expect(page).toHaveURL('/');
   await expect(page.getByRole('radio', { name: studentRole })).toBeChecked();

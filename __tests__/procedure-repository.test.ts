@@ -124,17 +124,16 @@ test('새 버전이 함께 승인되어도 요청한 기존 승인 버전의 상
   expect(detail?.approvedVersion).toBe('v1.2');
 });
 
-test('기본 합성 카탈로그는 두 개발 환경에 승인 예시만 제공한다', async () => {
+test('기본 합성 카탈로그는 연구생 홈과 같은 환경에 승인 예시를 제공한다', async () => {
   const repository = createDemoProcedureRepository();
+  const procedures = await repository.list('demo-embedded-iot');
 
-  for (const environmentId of ['demo-embedded-iot', 'demo-circuits']) {
-    const procedures = await repository.list(environmentId);
-    expect(procedures.map(({ id }) => id)).toEqual([
-      'demo-led-characteristics',
-      'demo-i2c-address-check',
-    ]);
-    expect(procedures[0]).toMatchObject({ approvedVersion: 'v1.2', stepCount: 16 });
-  }
+  expect(procedures.map(({ id }) => id)).toEqual([
+    'demo-led-characteristics',
+    'demo-i2c-address-check',
+  ]);
+  expect(procedures[0]).toMatchObject({ approvedVersion: 'v1.2', stepCount: 16 });
+  expect(await repository.list('demo-circuits')).toEqual([]);
 });
 
 test('일반 배포 환경에서는 합성 목록과 상세를 반환하지 않고 미연동 오류를 알린다', async () => {

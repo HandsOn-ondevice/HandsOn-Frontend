@@ -21,9 +21,6 @@ export function RoleHome({ role }: { role: EntrySelection['role'] }) {
         {role === 'student' ? '연구생 홈' : '숙련자 홈'}
       </AppText>
       <SurfaceCard title="작업 환경" subtitle={selection.environment.name} />
-      {role === 'student' ? (
-        <Button label="승인 절차 선택" icon="flask" onPress={() => router.push('/procedures')} />
-      ) : null}
       <Button label="뒤로가기" variant="secondary" icon="back" onPress={goBack} />
     </Screen>
   );

@@ -11,8 +11,10 @@ name: Android 승인 절차 선택과 버전 고정 입력 확인
 - tapOn: '연구실: 연구실을 선택해 주세요'
 - tapOn: 지능형 임베디드·IoT 센서 연구실
 - tapOn: 설정하고 계속
-- assertVisible: 연구생 홈
-- tapOn: 승인 절차 선택
+- extendedWaitUntil:
+    visible: 이어서 진행
+    timeout: 10000
+- tapOn: 전체 보기
 - assertVisible: 승인된 절차 2개
 - assertNotVisible: '(?s).*LED 측정 초안.*'
 - assertNotVisible: '(?s).*승인 취소된 센서 점검.*'

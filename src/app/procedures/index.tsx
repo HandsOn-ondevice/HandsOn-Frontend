@@ -1,11 +1,15 @@
-import { Redirect, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEntrySelection } from '@/features/entry/EntrySelectionProvider';
 import { ProcedureListScreen } from '@/features/procedures/ProcedureListScreen';
 
 export default function Procedures() {
   const router = useRouter();
   const { selection } = useEntrySelection();
+  const { environmentId } = useLocalSearchParams<{ environmentId?: string | string[] }>();
   if (selection?.role !== 'student') return <Redirect href="/" />;
+  if (environmentId !== undefined && environmentId !== selection.environment.id) {
+    return <Redirect href="/student" />;
+  }
 
   return (
     <ProcedureListScreen

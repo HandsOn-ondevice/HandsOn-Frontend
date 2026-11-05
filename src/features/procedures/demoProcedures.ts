@@ -6,7 +6,7 @@ export interface DemoProcedureEntry {
   detail: ProcedureDetail;
 }
 
-const environmentIds = ['demo-embedded-iot', 'demo-circuits'];
+const environmentIds = ['demo-embedded-iot'];
 
 const led: ProcedureDetail = {
   id: 'demo-led-characteristics',
