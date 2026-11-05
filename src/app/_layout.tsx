@@ -5,6 +5,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { EntrySelectionProvider } from '@/features/entry/EntrySelectionProvider';
+import { PreparationHandoffProvider } from '@/features/procedures/PreparationHandoffProvider';
 import { useHandsOnFonts } from '../design-system/fonts';
 import { colors } from '../design-system/tokens';
 
@@ -22,12 +23,14 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <BottomSheetModalProvider>
           <EntrySelectionProvider>
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                contentStyle: { backgroundColor: colors.surface.canvas },
-              }}
-            />
+            <PreparationHandoffProvider>
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: colors.surface.canvas },
+                }}
+              />
+            </PreparationHandoffProvider>
           </EntrySelectionProvider>
         </BottomSheetModalProvider>
       </SafeAreaProvider>
