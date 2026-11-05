@@ -30,7 +30,9 @@ jobs:
 
       - run: npm ci
       - name: Install Android build SDK
-        run: sdkmanager 'platforms;android-37.0' 'build-tools;37.0.0' 'ndk;27.1.12297006' 'cmake;3.22.1'
+        run: >-
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          'platforms;android-37.0' 'build-tools;37.0.0' 'ndk;27.1.12297006' 'cmake;3.22.1'
       - name: Generate Android project
         run: npx expo prebuild --platform android --no-install
       - name: Build APK with fixtures
