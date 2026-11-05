@@ -23,7 +23,16 @@
         {
           "backgroundColor": "#F1F5FD"
         }
-      ]
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "절차 설명을 녹음하기 위해 마이크를 사용합니다.",
+          "enableBackgroundPlayback": false,
+          "enableBackgroundRecording": false
+        }
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true
