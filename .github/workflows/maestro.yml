@@ -41,6 +41,12 @@ jobs:
           EXPO_PUBLIC_HANDSON_MAESTRO: '1'
         run: ./gradlew --no-daemon --stacktrace assembleRelease -PreactNativeArchitectures=x86_64
 
+      - name: Preserve APK and free emulator disk space
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/handson-app-release.apk"
+          # The installed APK is self-contained; these build inputs are no longer needed.
+          rm -rf -- node_modules android
+          df -h .
       - name: Install Maestro CLI
         env:
           MAESTRO_VERSION: '2.12.1'
@@ -66,12 +72,13 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_7
+          disk-size: 2048M
           emulator-boot-timeout: 360
           emulator-options: -no-window -no-snapshot -gpu swiftshader -no-boot-anim -camera-back none
           script: >-
             mkdir -p artifacts/maestro &&
             trap 'adb logcat -d -t 1500 > artifacts/maestro/logcat.txt || true' EXIT &&
-            adb install android/app/build/outputs/apk/release/app-release.apk &&
+            adb install "$RUNNER_TEMP/handson-app-release.apk" &&
             timeout 8m maestro --device "$ANDROID_SERIAL" test --format junit --output artifacts/maestro/junit.xml
             --test-output-dir artifacts/maestro --debug-output artifacts/maestro .maestro
       - name: Upload Maestro report and logs
