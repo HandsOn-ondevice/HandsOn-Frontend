@@ -1,0 +1,74 @@
+appId: com.handson.frontend
+name: Android 숙련자 홈 작업 진입과 상태별 목록
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: '연구실: 연구실을 선택해 주세요'
+    timeout: 30000
+- tapOn: 숙련 연구생, 절차 생성·승인
+- tapOn: '연구실: 연구실을 선택해 주세요'
+- tapOn: 전자회로 실험실
+- tapOn: 설정하고 계속
+- extendedWaitUntil:
+    visible: 숙련자 홈
+    timeout: 10000
+- assertVisible: 전자회로 실험실
+- takeScreenshot: e01-home
+
+- tapOn: 새 절차 음성으로 만들기
+- assertVisible: 새 절차 작성
+- back
+- assertVisible: 숙련자 홈
+
+- scrollUntilVisible:
+    element:
+      text: 'LED 출력 특성 측정 초안.*'
+    direction: DOWN
+- tapOn: 'LED 출력 특성 측정 초안.*'
+- assertVisible: 절차 편집
+- tapOn: 숙련자 홈으로
+- scrollUntilVisible:
+    element:
+      text: 숙련자 홈
+    direction: UP
+- assertVisible: 숙련자 홈
+
+- scrollUntilVisible:
+    element:
+      text: '노준혁.*LED-M03.*'
+    direction: DOWN
+- tapOn: '노준혁.*LED-M03.*'
+- assertVisible: 결과 검토
+- tapOn: 숙련자 홈으로
+- scrollUntilVisible:
+    element:
+      text: 숙련자 홈
+    direction: UP
+- assertVisible: 숙련자 홈
+
+- tapOn: 절차
+- tapOn: 승인 절차
+- scrollUntilVisible:
+    element:
+      text: 'I2C 센서 수집 점검.*'
+    direction: DOWN
+- assertVisible: 'I2C 센서 수집 점검.*'
+- takeScreenshot: e01-approved-procedures
+
+- tapOn: 현황
+- tapOn: 검토 완료
+- scrollUntilVisible:
+    element:
+      text: '이서준.*LED-M01.*'
+    direction: DOWN
+- assertVisible: '이서준.*LED-M01.*'
+- takeScreenshot: e01-reviewed-results
+
+- tapOn: 내 정보
+- scrollUntilVisible:
+    element:
+      text: 역할·작업 환경 변경
+    direction: DOWN
+- tapOn: 역할·작업 환경 변경
+- assertVisible: '연구실: 연구실을 선택해 주세요'
