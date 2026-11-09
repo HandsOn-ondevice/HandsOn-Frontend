@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createRequestId } from '../application/request-id';
-import type { ExperimentSession, WorkflowCommand } from '../domain/models';
+import {
+  WorkflowError,
+  type ExperimentSession,
+  type WorkflowCommand,
+  type WorkflowErrorCode,
+} from '../domain/models';
 import { useWorkflowRepository } from './WorkflowProvider';
 
 export function workflowErrorMessage(error: unknown) {
@@ -12,6 +17,7 @@ interface SessionResource {
   session: ExperimentSession | null;
   loading: boolean;
   error: string | null;
+  errorCode: WorkflowErrorCode | null;
 }
 
 export function useWorkflowSession(sessionId: string) {
@@ -21,6 +27,7 @@ export function useWorkflowSession(sessionId: string) {
     session: null,
     loading: true,
     error: null,
+    errorCode: null,
   });
   const [pending, setPending] = useState(false);
   const [reload, setReload] = useState(0);
@@ -39,7 +46,7 @@ export function useWorkflowSession(sessionId: string) {
             previous.session.revision > next.revision
           )
             return previous;
-          return { sessionId, session: next, loading: false, error: null };
+          return { sessionId, session: next, loading: false, error: null, errorCode: null };
         });
     };
     const unsubscribe = repository.subscribe(sessionId, receive);
@@ -53,6 +60,7 @@ export function useWorkflowSession(sessionId: string) {
             session: null,
             loading: false,
             error: workflowErrorMessage(reason),
+            errorCode: reason instanceof WorkflowError ? reason.code : null,
           });
       });
     return () => {
@@ -67,7 +75,7 @@ export function useWorkflowSession(sessionId: string) {
       const scope = lifetime.current;
       busy.current = true;
       setPending(true);
-      setResource((previous) => ({ ...previous, error: null }));
+      setResource((previous) => ({ ...previous, error: null, errorCode: null }));
       try {
         const next = await repository.executeCommand(sessionId, command, {
           requestId: createRequestId(),
@@ -77,12 +85,16 @@ export function useWorkflowSession(sessionId: string) {
           setResource((previous) =>
             previous.session && previous.session.revision > next.revision
               ? previous
-              : { sessionId, session: next, loading: false, error: null },
+              : { sessionId, session: next, loading: false, error: null, errorCode: null },
           );
         return scope.active ? next : undefined;
       } catch (reason) {
         if (scope.active)
-          setResource((previous) => ({ ...previous, error: workflowErrorMessage(reason) }));
+          setResource((previous) => ({
+            ...previous,
+            error: workflowErrorMessage(reason),
+            errorCode: reason instanceof WorkflowError ? reason.code : null,
+          }));
       } finally {
         busy.current = false;
         if (scope.active) setPending(false);
@@ -96,10 +108,11 @@ export function useWorkflowSession(sessionId: string) {
     loading: resource.sessionId !== sessionId || resource.loading,
     pending,
     error: resource.sessionId === sessionId ? resource.error : null,
+    errorCode: resource.sessionId === sessionId ? resource.errorCode : null,
     execute,
     refresh: () => {
       if (busy.current) return;
-      setResource({ sessionId, session: null, loading: true, error: null });
+      setResource({ sessionId, session: null, loading: true, error: null, errorCode: null });
       setReload((value) => value + 1);
     },
   };

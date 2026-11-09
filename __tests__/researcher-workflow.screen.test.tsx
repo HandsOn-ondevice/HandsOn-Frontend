@@ -2,6 +2,7 @@ import { describe, expect, jest, test } from '@jest/globals';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { Gallery } from '../src/dev/Gallery';
 import type { WorkflowRepository } from '../src/features/researcher-workflow/application/WorkflowRepository';
+import { WorkflowError } from '../src/features/researcher-workflow/domain/models';
 import { MockWorkflowRepository } from '../src/features/researcher-workflow/infrastructure/mock/MockWorkflowRepository';
 import { mockProcedure } from '../src/features/researcher-workflow/infrastructure/mock/fixtures';
 import { DevelopmentEntryScreen } from '../src/features/researcher-workflow/screens/DevelopmentEntryScreen';
@@ -35,6 +36,7 @@ describe('S04 사용자 흐름', () => {
     const { screen, repository, session } = await setup();
     await fireEvent.press(screen.getByRole('checkbox', { name: '필수 준비물 7개 확인' }));
     await screen.findByText('준비 진행도 · 1 / 6 항목 완료');
+    const saved = await repository.getSession(session.sessionId);
     await screen.unmount();
     const reopened = await render(
       <WorkflowProvider repository={repository}>
@@ -47,6 +49,85 @@ describe('S04 사용자 흐름', () => {
     );
     await reopened.findByText('준비 진행도 · 1 / 6 항목 완료');
     expect(reopened.getByRole('checkbox', { name: '필수 준비물 7개 확인' })).toBeChecked();
+    expect(await repository.getSession(session.sessionId)).toEqual(saved);
+    expect(reopened.queryByText('실험 세션을 찾을 수 없습니다')).toBeNull();
+  });
+
+  test('없는 세션은 홈 복귀와 재조회만 제공하며 새 세션이나 점검 명령을 만들지 않는다', async () => {
+    const repository = new MockWorkflowRepository();
+    const createSession = jest.spyOn(repository, 'createSession');
+    const getSession = jest.spyOn(repository, 'getSession');
+    const executeCommand = jest.spyOn(repository, 'executeCommand');
+    const onHome = jest.fn();
+    const onDeviceCheck = jest.fn();
+    const screen = await render(
+      <WorkflowProvider repository={repository}>
+        <PreparationScreen
+          sessionId="demo-session-led-m03"
+          onBack={() => {}}
+          onHome={onHome}
+          onDeviceCheck={onDeviceCheck}
+        />
+      </WorkflowProvider>,
+    );
+
+    await screen.findByText('실험 세션을 찾을 수 없습니다');
+    expect(getSession).toHaveBeenCalledWith('demo-session-led-m03');
+    expect(
+      screen.getByText(
+        '저장된 실험 기록을 찾을 수 없습니다. 연구생 홈으로 돌아가 작업을 다시 확인해 주세요.',
+      ),
+    ).toBeVisible();
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+    expect(screen.getByRole('button', { name: '확인 완료' })).toBeDisabled();
+    await fireEvent.press(screen.getByRole('button', { name: '확인 완료' }));
+    await fireEvent.press(screen.getByRole('button', { name: '상태 다시 불러오기' }));
+    await waitFor(() => expect(getSession).toHaveBeenCalledTimes(2));
+    await screen.findByText('실험 세션을 찾을 수 없습니다');
+    await fireEvent.press(screen.getByRole('button', { name: '연구생 홈으로' }));
+    expect(onHome).toHaveBeenCalledTimes(1);
+    expect(onDeviceCheck).not.toHaveBeenCalled();
+    expect(createSession).not.toHaveBeenCalled();
+    expect(executeCommand).not.toHaveBeenCalled();
+  });
+
+  test('기존 Repository 재조회가 성공하면 미존재 안내를 지우고 기존 기록을 표시한다', async () => {
+    const underlying = new MockWorkflowRepository();
+    const session = await underlying.createSession({
+      requestId: 'existing-session',
+      operatorId: 'researcher',
+      procedure: mockProcedure,
+    });
+    const getSession = jest
+      .fn<WorkflowRepository['getSession']>()
+      .mockRejectedValueOnce(new WorkflowError('NOT_FOUND', '실험 기록을 찾을 수 없습니다.'))
+      .mockResolvedValue(session);
+    const createSession = jest.fn<WorkflowRepository['createSession']>();
+    const repository: WorkflowRepository = {
+      createSession,
+      getSession,
+      executeCommand: (id, command, context) => underlying.executeCommand(id, command, context),
+      subscribe: () => () => {},
+    };
+    const screen = await render(
+      <WorkflowProvider repository={repository}>
+        <PreparationScreen
+          sessionId={session.sessionId}
+          onBack={() => {}}
+          onDeviceCheck={() => {}}
+        />
+      </WorkflowProvider>,
+    );
+    await screen.findByText('실험 세션을 찾을 수 없습니다');
+    await fireEvent.press(screen.getByRole('button', { name: '상태 다시 불러오기' }));
+    await screen.findByText('준비 진행도 · 0 / 6 항목 완료');
+    expect(screen.queryByText('실험 세션을 찾을 수 없습니다')).toBeNull();
+    expect(screen.queryByRole('button', { name: '연구생 홈으로' })).toBeNull();
+    expect(getSession).toHaveBeenCalledTimes(2);
+    expect(getSession).toHaveBeenLastCalledWith(session.sessionId);
+    expect(createSession).not.toHaveBeenCalled();
+    expect(await underlying.getSession(session.sessionId)).toEqual(session);
   });
 
   test('명령 실패를 표시하고 재조회한 상태에서 다시 조작할 수 있다', async () => {
@@ -147,6 +228,7 @@ describe('S04 사용자 흐름', () => {
       </WorkflowProvider>,
     );
     await screen.findByText('조회 실패 시뮬레이션');
+    expect(screen.queryByText('실험 세션을 찾을 수 없습니다')).toBeNull();
     expect(screen.getByRole('button', { name: '확인 완료' })).toBeDisabled();
     await fireEvent.press(screen.getByRole('button', { name: '상태 다시 불러오기' }));
     await screen.findByText('준비 진행도 · 0 / 6 항목 완료');

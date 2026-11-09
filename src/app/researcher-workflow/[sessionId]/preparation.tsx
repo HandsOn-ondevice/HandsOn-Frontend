@@ -8,6 +8,7 @@ export default function PreparationRoute() {
       key={sessionId}
       sessionId={sessionId}
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/researcher-workflow'))}
+      onHome={() => router.dismissTo('/student')}
       onDeviceCheck={() =>
         router.push({
           pathname: '/researcher-workflow/[sessionId]/device-check',

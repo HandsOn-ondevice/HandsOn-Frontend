@@ -21,13 +21,17 @@ import { useWorkflowSession } from '../state/useWorkflowSession';
 export function PreparationScreen({
   sessionId,
   onBack,
+  onHome = onBack,
   onDeviceCheck,
 }: {
   sessionId: string;
   onBack: () => void;
+  onHome?: () => void;
   onDeviceCheck: () => void;
 }) {
-  const { session, loading, pending, error, execute, refresh } = useWorkflowSession(sessionId);
+  const { session, loading, pending, error, errorCode, execute, refresh } =
+    useWorkflowSession(sessionId);
+  const sessionNotFound = !session && errorCode === 'NOT_FOUND';
   const [notice, setNotice] = useState<string | null>(null);
   const [details, setDetails] = useState(false);
   const progress = session ? selectPreparation(session) : null;
@@ -62,12 +66,17 @@ export function PreparationScreen({
         ) : null}
         {error ? (
           <FeedbackPanel
-            title="준비 상태를 확인해 주세요"
-            subtitle={error}
+            title={sessionNotFound ? '실험 세션을 찾을 수 없습니다' : '준비 상태를 확인해 주세요'}
+            subtitle={
+              sessionNotFound
+                ? '저장된 실험 기록을 찾을 수 없습니다. 연구생 홈으로 돌아가 작업을 다시 확인해 주세요.'
+                : error
+            }
             tone="danger"
             icon="alert"
           />
         ) : null}
+        {!loading && sessionNotFound ? <Button label="연구생 홈으로" onPress={onHome} /> : null}
         {!loading && error ? (
           <Button
             label="상태 다시 불러오기"
@@ -161,7 +170,11 @@ export function PreparationScreen({
       >
         <AppText>Mock 세션 · 앱을 재시작하면 초기화됩니다.</AppText>
         <AppText>
-          {session ? `${session.procedure.title} · v${session.procedure.version}` : '세션 조회 중'}
+          {session
+            ? `${session.procedure.title} · v${session.procedure.version}`
+            : loading
+              ? '세션 조회 중'
+              : '실험 기록을 조회하지 못했습니다.'}
         </AppText>
         <AppText variant="caption">세션 {sessionId}</AppText>
         <AppText>통신 점검은 S05 담당이며 현재 화면에서 센서 확인을 대신하지 않습니다.</AppText>
