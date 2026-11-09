@@ -38,11 +38,15 @@ export function beginExecutionSample(
   cursorId: string,
   attemptId: string,
   meta: TransitionMetadata,
-  recovery = false,
+  purpose: 'measurement' | 'recoveryCheck' | 'remeasurement' = 'measurement',
 ): ExperimentSession {
   const state = selectExecution(session);
   if (
-    !(recovery ? state.canRecover : state.canSample) ||
+    !(purpose === 'recoveryCheck'
+      ? state.canRecover
+      : purpose === 'remeasurement'
+        ? state.canRemeasure
+        : state.canSample) ||
     state.cursor?.cursorId !== cursorId ||
     !session.execution
   )
@@ -59,7 +63,19 @@ export function beginExecutionSample(
             ? { ...attempt, status: 'superseded' as const }
             : attempt,
         ),
-        { attemptId, cursor: state.cursor, status: 'sampling', requestedAt: meta.now },
+        {
+          attemptId,
+          cursor: state.cursor,
+          status: 'sampling',
+          requestedAt: meta.now,
+          purpose:
+            purpose === 'measurement' && state.recovery?.cursor.cursorId === cursorId
+              ? 'remeasurement'
+              : purpose,
+          ...(purpose !== 'recoveryCheck' && state.recovery?.cursor.cursorId === cursorId
+            ? { recoveryId: state.recovery.recoveryId }
+            : {}),
+        },
       ],
     },
     events: [
@@ -95,9 +111,10 @@ export function finishExecutionSample(
   const recovery = session.execution.recoveries?.find(
     (item) => item.sampleAttemptId === attemptId && item.status === 'checking',
   );
-  const issue = recovery
-    ? recoverySampleIssue(session, candidate, meta.now)
-    : executionSampleIssue(session, candidate);
+  const issue =
+    recovery || latest.purpose === 'remeasurement'
+      ? recoverySampleIssue(session, candidate, meta.now)
+      : executionSampleIssue(session, candidate);
   const status = !issue
     ? 'ready'
     : issue.code === 'WAITING'

@@ -29,11 +29,13 @@ export function ExecutionScreen({
   onBack,
   onClarification,
   onRecovery,
+  onRemeasurement,
 }: {
   sessionId: string;
   onBack: () => void;
   onClarification: () => void;
   onRecovery?: () => void;
+  onRemeasurement?: () => void;
 }) {
   const previewControls = useMockDeviceCheckControls();
   const { session, loading, pending, error, refresh, execute } = useWorkflowSession(sessionId);
@@ -65,7 +67,7 @@ export function ExecutionScreen({
     });
   };
   return (
-    <SafeAreaView style={styles.root} edges={['top']}>
+    <SafeAreaView style={styles.root} edges={['top']} testID="execution-screen">
       <StatusBar tone="light" />
       <AppBar title="핵심 실행 화면" mode="back" onBack={onBack} onMore={() => setMenu(true)} />
       <ScrollView contentContainerStyle={styles.content}>
@@ -175,15 +177,25 @@ export function ExecutionScreen({
                       ? '측정값 확인 중'
                       : state.requiresRecovery
                         ? '센서 오류와 작업 보류 확인'
-                        : '현재 회차 측정값 확인'
+                        : state.requiresRemeasurement
+                          ? '복구 후 재측정 안내'
+                          : '현재 회차 측정값 확인'
                   }
                   variant="secondary"
                   loading={state.sampling}
                   disabled={
                     pending ||
-                    (state.requiresRecovery ? !onRecovery || state.sampling : !state.canSample)
+                    (state.requiresRecovery
+                      ? !onRecovery || state.sampling
+                      : state.requiresRemeasurement
+                        ? !onRemeasurement
+                        : !state.canSample)
                   }
                   onPress={() => {
+                    if (state.requiresRemeasurement) {
+                      onRemeasurement?.();
+                      return;
+                    }
                     if (state.requiresRecovery) {
                       onRecovery?.();
                       return;

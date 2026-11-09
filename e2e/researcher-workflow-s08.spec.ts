@@ -65,13 +65,39 @@ test('S08 보류·재진입·실패·복구 후 같은 회차를 명시적으로
   const failed = page.getByText('센서 상태를 다시 확인해 주세요', { exact: true });
   await failed.scrollIntoViewIfNeeded();
   await expect(failed).toBeVisible();
-  await response(page, '오래된 값 · 보류', '정상 응답');
+  await response(page, '오래된 값 · 보류', '통신 오류');
   await page.getByRole('button', { name: '센서 다시 확인', exact: true }).click();
-  const success = page.getByText('새 센서값이 수신되었습니다', { exact: true });
+  const s08 = page.getByTestId('recovery-screen');
+  const communicationError = s08.getByText('통신 오류', { exact: true });
+  await expect(communicationError).toBeVisible();
+  await expect(s08.getByText(/^연결 끊김/)).toHaveCount(0);
+  await expect(s08.getByText('연결 확인 불가', { exact: true })).toHaveCount(0);
+  await expect(s08.getByText(/^정상 ·/)).toHaveCount(0);
+  const issue = s08.getByTestId('recovery-sensor-issue');
+  await expect(issue).toContainText('BH1750 통신 응답을 확인하지 못했습니다');
+  await issue.scrollIntoViewIfNeeded();
+  const issueBox = await issue.boundingBox();
+  const recheckBox = await page
+    .getByRole('button', { name: '센서 다시 확인', exact: true })
+    .boundingBox();
+  expect(issueBox!.y + issueBox!.height).toBeLessThan(recheckBox!.y);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+  await page.screenshot({ path: testInfo.outputPath('s08-validation-360x800.png') });
+  await page.setViewportSize({ width: 412, height: 920 });
+  await communicationError.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('s08-validation-412x920.png') });
+  await response(page, '통신 오류', '정상 응답');
+  await page.getByRole('button', { name: '센서 다시 확인', exact: true }).click();
+  await expect(page).toHaveURL(/\/remeasurement$/);
+  const success = page
+    .getByTestId('remeasurement-screen')
+    .getByText('새 조도값이 수신되었습니다', { exact: true });
   await success.scrollIntoViewIfNeeded();
   await expect(success).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('s08-recovered-360x800.png') });
-  await page.getByRole('button', { name: '현재 작업으로 돌아가기', exact: true }).click();
+  await page.setViewportSize({ width: 412, height: 920 });
+  await page.screenshot({ path: testInfo.outputPath('s09-50-percent-second-trial-412x920.png') });
+  await page.getByRole('button', { name: '2회차 다시 측정', exact: true }).click();
   await expect(page).toHaveURL(/\/execution$/);
   await expect(page.getByText('유효 측정 7 / 15회', { exact: true })).toBeAttached();
   await expect(complete).toBeEnabled();

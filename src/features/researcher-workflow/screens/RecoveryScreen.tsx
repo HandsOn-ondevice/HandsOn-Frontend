@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -12,6 +12,7 @@ import {
   SensorCard,
   StatusBadge,
   StatusBar,
+  SurfaceCard,
   TimelineItem,
   colors,
   spacing,
@@ -23,16 +24,73 @@ import { MockExecutionScenarioControl } from './MockExecutionScenarioControl';
 import { PreviewTools } from './PreviewTools';
 import { useMeasurementAge } from './useMeasurementAge';
 
-export function RecoveryScreen({ sessionId, onBack }: { sessionId: string; onBack: () => void }) {
+export function RecoveryScreen({
+  sessionId,
+  onBack,
+  onRemeasurement,
+}: {
+  sessionId: string;
+  onBack: () => void;
+  onRemeasurement: () => void;
+}) {
   const { session, loading, pending, error, refresh, execute } = useWorkflowSession(sessionId);
   const controls = useMockDeviceCheckControls();
   const state = session ? selectRecovery(session) : null;
   const [menu, setMenu] = useState(false);
   const [notice, setNotice] = useState(false);
+  const [requestedRecoveryId, setRequestedRecoveryId] = useState<string | null>(null);
+  const navigatedRecovery = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      state?.recovered &&
+      requestedRecoveryId &&
+      state.recovery?.recoveryId === requestedRecoveryId &&
+      navigatedRecovery.current !== requestedRecoveryId
+    ) {
+      navigatedRecovery.current = requestedRecoveryId;
+      onRemeasurement();
+    }
+  }, [state?.recovered, state?.recovery?.recoveryId, requestedRecoveryId, onRemeasurement]);
+  const recheck = async () => {
+    if (state?.recovered) {
+      onRemeasurement();
+      return;
+    }
+    if (!state?.canRecover || !state.cursor || !state.blocked) return;
+    const next = await execute({
+      type: 'requestRecovery',
+      cursorId: state.cursor.cursorId,
+      blockedAttemptId: state.blocked.attemptId,
+    });
+    if (next) setRequestedRecoveryId(next.execution?.recoveries?.at(-1)?.recoveryId ?? null);
+  };
   const reading = state?.sensor?.readings[0];
   const measurementAge = useMeasurementAge(state?.checking ? undefined : reading?.observedAt);
   const usable =
     reading && Number.isFinite(reading.value) && Number.isFinite(Date.parse(reading.observedAt));
+  // SensorCard에 없는 대기·검증 실패 상태를 연결 끊김으로 대신 표시하지 않는다.
+  const sensorState = state?.checking
+    ? undefined
+    : state?.recovered
+      ? 'normal'
+      : state?.sensor?.status === 'stale'
+        ? 'stale'
+        : state?.sensor?.status === 'disconnected'
+          ? 'disconnected'
+          : undefined;
+  const sensorStatus = state?.checking
+    ? '재확인 중'
+    : state?.sensor?.status === 'error'
+      ? '통신 오류'
+      : state?.sensor?.status === 'timeout'
+        ? '응답 없음'
+        : state?.attempt?.issue?.code === 'WAITING'
+          ? '안정화 대기'
+          : state?.sensor && state.attempt?.issue?.code === 'HELD'
+            ? '작업 보류'
+            : state?.failed
+              ? '검증 실패'
+              : '상태 미확인';
   const steps = [
     { title: '1  LED 출력을 0%로 유지', subtitle: '안전한 상태에서 케이블 확인' },
     { title: '2  I2C 케이블 연결 확인', subtitle: '전원을 끈 뒤 작업' },
@@ -42,7 +100,7 @@ export function RecoveryScreen({ sessionId, onBack }: { sessionId: string; onBac
     },
   ];
   return (
-    <SafeAreaView style={styles.root} edges={['top']}>
+    <SafeAreaView style={styles.root} edges={['top']} testID="recovery-screen">
       <StatusBar tone="light" />
       <AppBar
         title="센서 오류와 작업 보류"
@@ -87,40 +145,52 @@ export function RecoveryScreen({ sessionId, onBack }: { sessionId: string; onBac
               tone={state.recovered ? 'success' : 'danger'}
               subtitle={
                 state.recovered
-                  ? '복구 후 자동 완료하지 않습니다. 현재 회차의 작업을 확인해 주세요.'
+                  ? '복구 후 자동 완료하지 않습니다. 같은 회차를 별도로 다시 측정해 주세요.'
                   : state.failed
                     ? state.attempt?.issue?.message
                     : '현재 회차는 저장되지 않았고 다음 단계로 이동하지 않습니다.'
               }
             />
-            <SensorCard
-              title={state.requirement?.title ?? '센서 응답'}
-              subtitle={
-                state.checking
-                  ? '새 응답 확인 중'
-                  : state.recovered
-                    ? '센서 재확인 · 연결됨'
-                    : `문제 센서${state.requirement?.description ? ` · ${state.requirement.description}` : ''}`
-              }
-              value={!state.checking && usable ? `${reading.value} ${reading.unit}` : undefined}
-              meta={state.checking ? undefined : measurementAge}
-              state={
-                state.recovered
-                  ? 'normal'
-                  : state.sensor?.status === 'stale'
-                    ? 'stale'
-                    : 'disconnected'
-              }
-              detail={
-                state.recovered
-                  ? '새 응답 확인 · 작업자 완료 요청 필요'
-                  : state.checking
-                    ? '응답을 기다리는 동안 진행할 수 없습니다.'
-                    : state.sensor?.status === 'stale'
-                      ? '마지막 값 · 회차 무효'
-                      : (state.attempt?.issue?.message ?? '마지막 응답 · 회차 무효')
-              }
-            />
+            {sensorState ? (
+              <SensorCard
+                title={state.requirement?.title ?? '센서 응답'}
+                subtitle={
+                  state.checking
+                    ? '새 응답 확인 중'
+                    : state.recovered
+                      ? '센서 재확인 · 연결됨'
+                      : `문제 센서${state.requirement?.description ? ` · ${state.requirement.description}` : ''}`
+                }
+                value={!state.checking && usable ? `${reading.value} ${reading.unit}` : undefined}
+                meta={state.checking ? undefined : measurementAge}
+                state={sensorState}
+                detail={
+                  state.recovered
+                    ? '새 응답 확인 · 작업자 완료 요청 필요'
+                    : state.checking
+                      ? '응답을 기다리는 동안 진행할 수 없습니다.'
+                      : state.sensor?.status === 'stale'
+                        ? '마지막 값 · 회차 무효'
+                        : (state.attempt?.issue?.message ?? '마지막 응답 · 회차 무효')
+                }
+              />
+            ) : (
+              <SurfaceCard
+                title={state.requirement?.title ?? '센서 응답'}
+                subtitle={state.requirement?.description}
+              >
+                <StatusBadge
+                  label={sensorStatus}
+                  tone={state.checking ? 'info' : state.failed ? 'danger' : 'neutral'}
+                />
+                <AppText accessibilityLiveRegion="polite" testID="recovery-sensor-issue">
+                  {state.checking
+                    ? '새 센서 응답을 기다리고 있습니다. 확인 중에는 진행할 수 없습니다.'
+                    : (state.attempt?.issue?.message ??
+                      '센서 상태를 확인할 수 없습니다. 센서를 다시 확인해 주세요.')}
+                </AppText>
+              </SurfaceCard>
+            )}
             <AppText variant="label" accessibilityRole="header">
               복구 순서
             </AppText>
@@ -153,21 +223,12 @@ export function RecoveryScreen({ sessionId, onBack }: { sessionId: string; onBac
         safeArea
         layout="dual"
         secondary="조치 듣기"
-        primary={state?.recovered ? '현재 작업으로 돌아가기' : '센서 다시 확인'}
+        primary={state?.recovered ? '복구 후 재측정 안내' : '센서 다시 확인'}
         loading={pending || !!state?.checking}
         disabled={loading || (!state?.recovered && !state?.canRecover)}
         onSecondary={() => setNotice(true)}
         onPrimary={() => {
-          if (state?.recovered) {
-            onBack();
-            return;
-          }
-          if (state?.canRecover && state.cursor && state.blocked)
-            void execute({
-              type: 'requestRecovery',
-              cursorId: state.cursor.cursorId,
-              blockedAttemptId: state.blocked.attemptId,
-            });
+          void recheck();
         }}
       />
       <BottomSheet open={menu} title="현재 작업 정보" onClose={() => setMenu(false)}>

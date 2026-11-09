@@ -17,7 +17,13 @@ export function beginRecovery(
     !session.execution
   )
     throw new WorkflowError('INVALID_STATE', '현재 보류된 회차에서 센서를 다시 확인해 주세요.');
-  const next = beginExecutionSample(session, command.cursorId, sampleAttemptId, meta, true);
+  const next = beginExecutionSample(
+    session,
+    command.cursorId,
+    sampleAttemptId,
+    meta,
+    'recoveryCheck',
+  );
   return {
     ...next,
     execution: {

@@ -7,6 +7,12 @@ export default function RecoveryRoute() {
     <RecoveryScreen
       key={sessionId}
       sessionId={sessionId}
+      onRemeasurement={() =>
+        router.push({
+          pathname: '/researcher-workflow/[sessionId]/remeasurement',
+          params: { sessionId },
+        })
+      }
       onBack={() =>
         router.dismissTo({
           pathname: '/researcher-workflow/[sessionId]/execution',

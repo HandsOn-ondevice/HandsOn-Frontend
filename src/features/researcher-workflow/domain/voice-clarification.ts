@@ -34,6 +34,7 @@ export function selectVoiceClarification(session: ExperimentSession) {
     cursor &&
     !state.sampling &&
     !state.requiresRecovery &&
+    !state.requiresRemeasurement &&
     request.source === session.source &&
     request.cursor.cursorId === cursor.cursorId &&
     request.cursor.stepId === cursor.stepId &&

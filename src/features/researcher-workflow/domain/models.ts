@@ -135,6 +135,11 @@ export type WorkflowCommand =
       readonly blockedAttemptId: string;
     }
   | {
+      readonly type: 'requestRecoveryRemeasurement';
+      readonly cursorId: string;
+      readonly recoveryId: string;
+    }
+  | {
       readonly type: 'completeExecutionStep';
       readonly cursorId: string;
       readonly sampleAttemptId: string;

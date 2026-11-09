@@ -90,8 +90,13 @@ test('360px에서 긴 보류 문구와 최하단 콘텐츠가 버튼 위로 스�
   await expect(page).toHaveURL(/\/recovery$/);
   await chooseResponse(page, '작업 보류', '정상 응답');
   await page.getByRole('button', { name: '센서 다시 확인', exact: true }).click();
-  await expect(page.getByText('새 센서값이 수신되었습니다', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '현재 작업으로 돌아가기', exact: true }).click();
+  await expect(page).toHaveURL(/\/remeasurement$/);
+  await expect(
+    page
+      .getByTestId('remeasurement-screen')
+      .getByText('새 조도값이 수신되었습니다', { exact: true }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: '1회차 다시 측정', exact: true }).click();
   await expect(page).toHaveURL(/\/execution$/);
   await expect(complete).toBeEnabled();
   await expect(page.getByText('유효 측정 0 / 15회', { exact: true })).toBeVisible();

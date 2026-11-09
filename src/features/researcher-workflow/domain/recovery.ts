@@ -66,7 +66,7 @@ export function selectRecovery(session: ExperimentSession) {
   const recovered =
     latestRecovery?.status === 'recovered' &&
     state.latest?.attemptId === latestRecovery.sampleAttemptId &&
-    state.canComplete;
+    state.canRemeasure;
   const attempt = latestRecovery ? state.latest : blocked;
   const sensor =
     attempt?.report?.diagnostics.sensors.find((item) => item.status !== 'passed' || item.issue) ??

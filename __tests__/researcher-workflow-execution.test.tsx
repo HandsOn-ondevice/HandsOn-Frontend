@@ -163,7 +163,7 @@ describe('S06 Mock 회차 실행과 근거', () => {
   });
 
   test.each<MockExecutionScenario>(['waiting', 'stale', 'noResponse', 'error', 'held'])(
-    '%s 응답은 완료되지 않고 명시적 정상 재요청 후에만 완료 가능하다',
+    '%s 응답은 완료되지 않고 필요한 복구 확인과 별도 측정 후에만 완료 가능하다',
     async (scenario) => {
       const repo = repoWith();
       const started = await running(repo);
@@ -176,9 +176,28 @@ describe('S06 Mock 회차 실행과 근거', () => {
         send(repo, rejected, completeCommand(rejected), 'bad-complete'),
       ).rejects.toMatchObject({ code: 'INVALID_STATE' });
       repo.setExecutionScenario(started.sessionId, 'normal');
-      const ready = await sampleReady(repo, rejected);
+      const needsRecovery = selectRecovery(rejected).canRecover;
+      let ready = await sampleReady(repo, rejected);
+      if (needsRecovery) {
+        expect(selectExecution(ready)).toMatchObject({
+          canComplete: false,
+          requiresRemeasurement: true,
+        });
+        await expect(
+          send(repo, ready, completeCommand(ready), 'probe-complete'),
+        ).rejects.toMatchObject({ code: 'INVALID_STATE' });
+        await send(repo, ready, {
+          type: 'requestRecoveryRemeasurement',
+          cursorId: ready.execution!.cursor!.cursorId,
+          recoveryId: ready.execution!.recoveries!.at(-1)!.recoveryId,
+        });
+        await waitFor(async () =>
+          expect(selectExecution(await repo.getSession(ready.sessionId)).sampling).toBe(false),
+        );
+        ready = await repo.getSession(ready.sessionId);
+      }
       expect(selectExecution(ready).canComplete).toBe(true);
-      expect(ready.execution?.attempts).toHaveLength(2);
+      expect(ready.execution?.attempts).toHaveLength(needsRecovery ? 3 : 2);
       expect(ready.execution?.attempts[0]).toEqual(rejected.execution?.attempts[0]);
       const accepted = await send(repo, ready, completeCommand(ready));
       expect(selectExecution(accepted).completedCount).toBe(1);

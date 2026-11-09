@@ -34,6 +34,9 @@ export interface ExecutionSampleReport {
 
 export interface MeasurementAttempt {
   readonly attemptId: string;
+  /** 생략된 기존 기록은 일반 측정이다. 복구 확인은 회차 완료 근거로 사용할 수 없다. */
+  readonly purpose?: 'measurement' | 'recoveryCheck' | 'remeasurement';
+  readonly recoveryId?: string;
   readonly cursor: ExecutionCursor;
   readonly status: 'sampling' | 'waiting' | 'ready' | 'held' | 'error' | 'superseded' | 'valid';
   readonly requestedAt: string;
@@ -129,6 +132,18 @@ export function selectExecution(session: ExperimentSession) {
   const sampling = latest?.status === 'sampling';
   const pendingVoice = execution?.pendingVoice ?? null;
   const recovery = execution?.recoveries?.at(-1);
+  const currentRecovery = recovery?.cursor.cursorId === cursor?.cursorId ? recovery : undefined;
+  const recoveryCheck =
+    latest?.purpose === 'recoveryCheck' ||
+    (!!latest &&
+      !!execution?.recoveries?.some((item) => item.sampleAttemptId === latest.attemptId));
+  const linkedRemeasurement =
+    !!currentRecovery &&
+    currentRecovery.status === 'recovered' &&
+    latest?.purpose === 'remeasurement' &&
+    latest.recoveryId === currentRecovery.recoveryId &&
+    latest.attemptId !== currentRecovery.sampleAttemptId;
+  const requiresRemeasurement = currentRecovery?.status === 'recovered' && !linkedRemeasurement;
   const requiresRecovery =
     latest?.status === 'held' ||
     latest?.status === 'error' ||
@@ -145,10 +160,12 @@ export function selectExecution(session: ExperimentSession) {
           ? '모호한 음성은 실행하지 않았습니다. 뜻을 확인하거나 취소해 주세요.'
           : sampling
             ? '측정 응답을 기다리고 있습니다. 완료 요청은 아직 할 수 없습니다.'
-            : (latest?.issue?.message ??
-              (latest?.status === 'ready'
-                ? '측정 응답을 확인했습니다. 작업을 확인한 뒤 완료를 요청하세요.'
-                : '현재 회차의 측정값을 먼저 확인해 주세요.'));
+            : requiresRemeasurement
+              ? '센서 재확인은 완료되었습니다. 복구 후 재측정 안내에서 같은 회차를 다시 측정해 주세요.'
+              : (latest?.issue?.message ??
+                (latest?.status === 'ready'
+                  ? '측정 응답을 확인했습니다. 작업을 확인한 뒤 완료를 요청하세요.'
+                  : '현재 회차의 측정값을 먼저 확인해 주세요.'));
   return {
     authorized,
     configured,
@@ -169,21 +186,47 @@ export function selectExecution(session: ExperimentSession) {
       })) ?? [],
     currentIndex: definition?.conditions.findIndex((item) => item.id === cursor?.conditionId),
     requiresRecovery,
+    requiresRemeasurement,
     recovery,
+    canRemeasure:
+      authorized &&
+      configured &&
+      !!cursor &&
+      !sampling &&
+      !pendingVoice &&
+      !requiresRecovery &&
+      requiresRemeasurement &&
+      latest?.attemptId === currentRecovery?.sampleAttemptId &&
+      latest?.status === 'ready' &&
+      !executionSampleIssue(session, latest),
     canRecover:
       authorized && configured && !!cursor && !sampling && !pendingVoice && requiresRecovery,
     canSample:
-      authorized && configured && !!cursor && !sampling && !pendingVoice && !requiresRecovery,
+      authorized &&
+      configured &&
+      !!cursor &&
+      !sampling &&
+      !pendingVoice &&
+      !requiresRecovery &&
+      !requiresRemeasurement,
     canComplete:
       authorized &&
       configured &&
       !!cursor &&
       !pendingVoice &&
       !requiresRecovery &&
+      !requiresRemeasurement &&
+      !recoveryCheck &&
       latest?.status === 'ready' &&
       !executionSampleIssue(session, latest),
     canClarify:
-      authorized && configured && !!cursor && !sampling && !pendingVoice && !requiresRecovery,
+      authorized &&
+      configured &&
+      !!cursor &&
+      !sampling &&
+      !pendingVoice &&
+      !requiresRecovery &&
+      !requiresRemeasurement,
   };
 }
 

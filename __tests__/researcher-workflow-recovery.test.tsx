@@ -135,7 +135,8 @@ describe('S08 보류와 복구 계약', () => {
     const recovered = await settled(repo, session);
     expect(selectRecovery(recovered)).toMatchObject({
       recovered: true,
-      canComplete: true,
+      canComplete: false,
+      requiresRemeasurement: true,
       completedCount: 1,
     });
     expect(recovered.execution!.cursor).toEqual(session.execution!.cursor);
@@ -149,10 +150,28 @@ describe('S08 보류와 복구 계약', () => {
       action: 'recoveryChecked',
       diagnostics: recovered.execution!.attempts.at(-1)!.report!.diagnostics,
     });
-    const accepted = await send(repo, recovered, {
+    await expect(
+      send(
+        repo,
+        recovered,
+        {
+          type: 'completeExecutionStep',
+          cursorId: state.cursor!.cursorId,
+          sampleAttemptId: selectExecution(recovered).latest!.attemptId,
+        },
+        'probe-completion',
+      ),
+    ).rejects.toMatchObject({ code: 'INVALID_STATE' });
+    await send(repo, recovered, {
+      type: 'requestRecoveryRemeasurement',
+      cursorId: state.cursor!.cursorId,
+      recoveryId: recovered.execution!.recoveries!.at(-1)!.recoveryId,
+    });
+    const measured = await settled(repo, recovered);
+    const accepted = await send(repo, measured, {
       type: 'completeExecutionStep',
       cursorId: state.cursor!.cursorId,
-      sampleAttemptId: selectExecution(recovered).latest!.attemptId,
+      sampleAttemptId: selectExecution(measured).latest!.attemptId,
     });
     expect(selectExecution(accepted).completedCount).toBe(2);
     expect(accepted.execution!.recoveries).toEqual(recovered.execution!.recoveries);
@@ -203,6 +222,23 @@ describe('S08 보류와 복구 계약', () => {
       expect(selectRecovery(failed)).toMatchObject({ failed: true, canComplete: false });
       expect(failed.execution!.attempts.at(-1)!.report).toBeDefined();
       expect(failed.evidence.at(-1)?.issue).toEqual(failed.execution!.attempts.at(-1)!.issue);
+      const screen = await render(
+        <WorkflowProvider repository={repo}>
+          <RecoveryScreen
+            sessionId={session.sessionId}
+            onBack={jest.fn()}
+            onRemeasurement={jest.fn()}
+          />
+        </WorkflowProvider>,
+      );
+      await screen.findByText('검증 실패');
+      expect(screen.queryByText(/^연결 끊김/)).toBeNull();
+      expect(screen.queryByText('연결 확인 불가')).toBeNull();
+      expect(screen.queryByText(/^정상 ·/)).toBeNull();
+      expect(
+        screen.getAllByText(failed.execution!.attempts.at(-1)!.issue!.message).length,
+      ).toBeGreaterThan(0);
+      expect(await repo.getSession(session.sessionId)).toEqual(failed);
     },
   );
 
@@ -267,9 +303,14 @@ describe('S08 보류와 복구 계약', () => {
       return buildMockExecutionReport(value);
     });
     const onBack = jest.fn();
+    const onRemeasurement = jest.fn();
     const view = () => (
       <WorkflowProvider repository={repo}>
-        <RecoveryScreen sessionId={session.sessionId} onBack={onBack} />
+        <RecoveryScreen
+          sessionId={session.sessionId}
+          onBack={onBack}
+          onRemeasurement={onRemeasurement}
+        />
       </WorkflowProvider>
     );
     let screen = await render(view());
@@ -282,15 +323,108 @@ describe('S08 보류와 복구 계약', () => {
     repo.setExecutionScenario(session.sessionId, 'normal');
     await fireEvent.press(screen.getByRole('button', { name: '센서 다시 확인' }));
     await screen.findByText('새 센서 응답을 확인하고 있습니다');
+    expect(screen.getByText('재확인 중')).toBeTruthy();
+    expect(screen.queryByText(/^연결 끊김/)).toBeNull();
+    expect(screen.queryByText('연결 확인 불가')).toBeNull();
     expect(screen.getByRole('button', { name: '센서 다시 확인' })).toBeDisabled();
     await screen.unmount();
     screen = await render(view());
     await screen.findByText('새 센서 응답을 확인하고 있습니다');
     await act(async () => resolve(buildMockExecutionReport(input)));
     await screen.findByText('새 센서값이 수신되었습니다');
+    expect(screen.getByText(/^정상 ·/)).toBeTruthy();
+    expect(screen.queryByText('재확인 중')).toBeNull();
     expect(selectRecovery(await repo.getSession(session.sessionId)).completedCount).toBe(1);
-    await fireEvent.press(screen.getByRole('button', { name: '현재 작업으로 돌아가기' }));
-    expect(onBack).toHaveBeenCalledTimes(2);
+    await fireEvent.press(screen.getByRole('button', { name: '복구 후 재측정 안내' }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+    expect(onRemeasurement).toHaveBeenCalledTimes(1);
+  });
+
+  test.each<{ scenario: MockExecutionScenario; label: string }>([
+    { scenario: 'stale', label: '오래된 값' },
+    { scenario: 'waiting', label: '안정화 대기' },
+    { scenario: 'noResponse', label: '응답 없음' },
+    { scenario: 'error', label: '통신 오류' },
+    { scenario: 'held', label: '작업 보류' },
+  ])(
+    '$scenario 복구 실패를 연결 끊김으로 표시하지 않고 상태와 원인을 보존한다',
+    async ({ scenario, label }) => {
+      const { repo, session } = await setup();
+      repo.setExecutionScenario(session.sessionId, scenario);
+      await send(repo, session, recoveryCommand(session));
+      const failed = await settled(repo, session);
+      const screen = await render(
+        <WorkflowProvider repository={repo}>
+          <RecoveryScreen
+            sessionId={session.sessionId}
+            onBack={jest.fn()}
+            onRemeasurement={jest.fn()}
+          />
+        </WorkflowProvider>,
+      );
+      await screen.findByText(label === '오래된 값' ? /^오래된 값 ·/ : label);
+      expect(screen.queryByText(/^연결 끊김/)).toBeNull();
+      expect(screen.queryByText('연결 확인 불가')).toBeNull();
+      expect(screen.queryByText(/^정상 ·/)).toBeNull();
+      expect(selectRecovery(await repo.getSession(session.sessionId)).canComplete).toBe(false);
+      expect(await repo.getSession(session.sessionId)).toEqual(failed);
+    },
+  );
+
+  test('연결 끊김 진단이 있는 응답만 연결 끊김으로 표시한다', async () => {
+    const { repo, session } = await setup(async (input) => {
+      const report = buildMockExecutionReport(input);
+      return input.scenario === 'stale'
+        ? {
+            ...report,
+            diagnostics: buildMockDiagnostics({
+              definition: input.definition,
+              attemptId: input.sampleAttemptId,
+              now: input.now,
+              scenario: 'disconnected',
+            }),
+          }
+        : report;
+    });
+    const screen = await render(
+      <WorkflowProvider repository={repo}>
+        <RecoveryScreen
+          sessionId={session.sessionId}
+          onBack={jest.fn()}
+          onRemeasurement={jest.fn()}
+        />
+      </WorkflowProvider>,
+    );
+    await screen.findByText(/^연결 끊김 ·/);
+    expect(screen.getByText('연결 확인 불가')).toBeTruthy();
+    expect(screen.queryByText('검증 실패')).toBeNull();
+    expect(await repo.getSession(session.sessionId)).toEqual(session);
+  });
+
+  test('센서 진단이 없는 보류는 상태 미확인으로 표시하고 연결 끊김을 추정하지 않는다', async () => {
+    const { repo, session } = await setup(async (input) => {
+      const report = buildMockExecutionReport(input);
+      return input.scenario === 'stale'
+        ? {
+            ...report,
+            holdReason: '센서 상태 확인이 필요합니다.',
+            diagnostics: { ...report.diagnostics, sensors: [] },
+          }
+        : report;
+    });
+    const screen = await render(
+      <WorkflowProvider repository={repo}>
+        <RecoveryScreen
+          sessionId={session.sessionId}
+          onBack={jest.fn()}
+          onRemeasurement={jest.fn()}
+        />
+      </WorkflowProvider>,
+    );
+    await screen.findByText('상태 미확인');
+    expect(screen.queryByText(/^연결 끊김/)).toBeNull();
+    expect(screen.queryByText('연결 확인 불가')).toBeNull();
+    expect(await repo.getSession(session.sessionId)).toEqual(session);
   });
 
   test('같은 회차에서 다시 오류가 나면 새로운 보류 응답을 대상으로 복구한다', async () => {
@@ -301,8 +435,9 @@ describe('S08 보류와 복구 계약', () => {
     let current = await settled(repo, session);
     repo.setExecutionScenario(session.sessionId, 'error');
     await send(repo, current, {
-      type: 'requestExecutionSample',
+      type: 'requestRecoveryRemeasurement',
       cursorId: current.execution!.cursor!.cursorId,
+      recoveryId: current.execution!.recoveries!.at(-1)!.recoveryId,
     });
     current = await settled(repo, current);
     expect(selectRecovery(current).blocked?.attemptId).toBe(

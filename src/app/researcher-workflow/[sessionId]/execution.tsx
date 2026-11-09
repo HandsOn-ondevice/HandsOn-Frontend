@@ -19,6 +19,12 @@ export default function ExecutionRoute() {
           params: { sessionId },
         })
       }
+      onRemeasurement={() =>
+        router.push({
+          pathname: '/researcher-workflow/[sessionId]/remeasurement',
+          params: { sessionId },
+        })
+      }
       onClarification={() =>
         router.push({
           pathname: '/researcher-workflow/[sessionId]/voice-clarification',

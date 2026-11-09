@@ -1,4 +1,18 @@
-# S04~S07 통합 메모
+# S04~S09 통합 메모
+
+## 현재 연결: S09 복구 후 별도 재측정 (2026-11-08)
+
+아래 과거 S08 범위의 S06 직접 복귀·복구 응답 완료 계약은 이번 승인으로 대체한다.
+
+- S06 오류 → S08 재확인 성공 → S09 `/researcher-workflow/[sessionId]/remeasurement` → 새 측정 요청 → S06 명시적 완료 순서다. S10 자동 연결은 없다.
+- `MeasurementAttempt.purpose`는 measurement / recoveryCheck / remeasurement다. 기존 purpose 없는 일반 기록은 계속 읽을 수 있고, 복구 확인 기록은 recoveries의 sampleAttemptId로도 식별해 완료를 차단한다.
+- `requestRecoveryRemeasurement(cursorId, recoveryId)`는 현재 복구 성공 기록·커서·원본 응답을 재검증한 뒤 새 attemptId를 만든다. 재측정 attempt의 recoveryId는 원래 복구 기록을 가리킨다. RecoveryAttempt.sampleAttemptId는 확인용 응답 ID로 유지한다.
+- 복구 확인만 끝난 상태에서는 일반 측정·음성 의미 확인·회차 완료를 도메인과 Repository에서 차단한다. 정상 S06 흐름은 유지한다. S09 요청과 응답만으로 유효 회차 수는 증가하지 않는다.
+- 재측정도 요청과 응답 ID·커서·단위·출처 및 요청~수신 시각 관계를 검사한다. 임의 TTL·안정화 카운트다운·안전 임계값을 추가하지 않는다.
+- 정상 응답 뒤에도 완료는 completeExecutionStep만 수행한다. 재실패는 S06의 보류/오류를 거쳐 S08로 연결하며 과거 recoveries/attempts/evidence/events/voiceResolutions를 보존한다. 이전 준비 응답은 기존 superseded 상태 전이를 따르되 원본 report와 근거는 유지한다.
+- S08에서 이 화면의 명시적 재확인 요청이 성공하면 S09로 이동한다. 이탈 후 재진입하거나 S09에서 뒤로 가기로 돌아온 경우에는 자동 이동하지 않고 재측정 안내 버튼으로 이동한다. S09 진입/조회/뒤로 가기는 명령을 실행하지 않는다.
+- S09 이력의 사람 기록은 '센서 재확인 요청'이다. 물리적 I2C 재연결·전원 복구를 확인한 기록으로 바꾸지 않는다. 안정화는 응답의 waiting/stable 표시이며 실제 경과 타이머가 아니다.
+- 실제 API adapter는 purpose/recoveryId와 서버가 보관한 원래 복구·측정 ID의 관계, requestId 멱등 처리 및 revision 충돌을 같은 의미로 제공해야 한다. Mock 전환 함수를 장비 안전 승인 로직으로 사용하지 않는다.
 
 이 문서는 researcher-workflow 기능 내부 구현 계약이다. 팀 전체의 확정 API 명세가 아니다.
 
