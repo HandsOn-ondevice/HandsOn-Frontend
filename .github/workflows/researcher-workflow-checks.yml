@@ -1,0 +1,27 @@
+# 임시 브랜치 검증용. 기능 PR 정리 시 별도 정리 커밋으로 제거한다.
+name: 연구자 워크플로 검사
+on:
+  push:
+    branches: [feat/researcher-workflow]
+permissions:
+  contents: read
+concurrency:
+  group: researcher-workflow-checks-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run test:ci
+      - run: npm run doctor
+      - run: npm run export:android
