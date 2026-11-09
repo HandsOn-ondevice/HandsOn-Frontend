@@ -1,20 +1,22 @@
-import { useLocalSearchParams } from 'expo-router';
-import { AppText, Screen } from '../design-system/primitives';
-import { Gallery } from '../dev/Gallery';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+import { EntryScreen } from '@/features/entry/EntryScreen';
+import { useEntrySelection } from '@/features/entry/EntrySelectionProvider';
+
 export default function Index() {
+  const router = useRouter();
+  const { setSelection } = useEntrySelection();
   const { component, example } = useLocalSearchParams<{ component?: string; example?: string }>();
-  if (__DEV__)
-    return (
-      <Gallery
-        key={`${component}-${example}`}
-        initialComponent={component}
-        initialExample={example}
-      />
-    );
+
+  if (__DEV__ && (component || example)) {
+    return <Redirect href={{ pathname: '/dev', params: { component, example } }} />;
+  }
+
   return (
-    <Screen>
-      <AppText variant="heading">HandsOn</AppText>
-      <AppText>앱을 준비하고 있습니다.</AppText>
-    </Screen>
+    <EntryScreen
+      onContinue={(selection) => {
+        setSelection(selection);
+        router.navigate(selection.role === 'student' ? '/student' : '/expert');
+      }}
+    />
   );
 }

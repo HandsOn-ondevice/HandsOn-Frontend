@@ -1,0 +1,91 @@
+name: Maestro Android
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: maestro-android-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  android-e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+
+      - run: npm ci
+      - name: Install Android build SDK
+        run: >-
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          'platforms;android-37.0' 'build-tools;37.0.0' 'ndk;27.1.12297006' 'cmake;3.22.1'
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --no-install
+      - name: Build APK with fixtures
+        working-directory: android
+        env:
+          EXPO_PUBLIC_HANDSON_MAESTRO: '1'
+        run: ./gradlew --no-daemon --stacktrace assembleRelease -PreactNativeArchitectures=x86_64
+
+      - name: Preserve APK and free emulator disk space
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/handson-app-release.apk"
+          # The installed APK is self-contained; these build inputs are no longer needed.
+          rm -rf -- node_modules android
+          df -h .
+      - name: Install Maestro CLI
+        env:
+          MAESTRO_VERSION: '2.12.1'
+          MAESTRO_SHA256: 54dbb0716425626604973cbb374c585ca30272375d9ce15177a1152765ddd9d7
+        run: |
+          archive="$RUNNER_TEMP/maestro.zip"
+          curl --fail --silent --show-error --location --retry 3 \
+            "https://github.com/mobile-dev-inc/Maestro/releases/download/cli-$MAESTRO_VERSION/maestro.zip" \
+            --output "$archive"
+          echo "$MAESTRO_SHA256  $archive" | sha256sum --check
+          unzip -q "$archive" -d "$RUNNER_TEMP"
+          "$RUNNER_TEMP/maestro/bin/maestro" --version
+          echo "$RUNNER_TEMP/maestro/bin" >> "$GITHUB_PATH"
+      - name: Enable KVM for Android emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Run Maestro on Android emulator
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7
+          disk-size: 2048M
+          emulator-boot-timeout: 360
+          emulator-options: -no-window -no-snapshot -gpu swiftshader -noaudio -no-boot-anim -camera-back none
+          script: >-
+            mkdir -p artifacts/maestro &&
+            trap 'adb logcat -d -t 1500 > artifacts/maestro/logcat.txt || true' EXIT &&
+            adb install "$RUNNER_TEMP/handson-app-release.apk" &&
+            timeout 8m maestro --device "$ANDROID_SERIAL" test --format junit --output artifacts/maestro/junit.xml
+            --test-output-dir artifacts/maestro --debug-output artifacts/maestro .maestro
+      - name: Upload Maestro report and logs
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: maestro-android
+          path: artifacts/maestro
+          if-no-files-found: ignore
+          retention-days: 7

@@ -681,7 +681,8 @@ export function RoleCard({
   return (
     <Pressable
       accessibilityRole="radio"
-      accessibilityState={{ checked: selected, disabled: !onPress }}
+      aria-checked={selected}
+      accessibilityState={{ disabled: !onPress }}
       accessibilityLabel={`${heading}, ${support}`}
       disabled={!onPress}
       onPress={onPress}

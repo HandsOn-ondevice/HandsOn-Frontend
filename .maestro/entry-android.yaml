@@ -1,0 +1,38 @@
+appId: com.handson.frontend
+name: Android 역할별 홈 진입과 시스템 뒤로 가기
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: '연구실: 연구실을 선택해 주세요'
+    timeout: 30000
+
+- tapOn: 신규 연구생, 승인된 절차 실행
+- tapOn: '연구실: 연구실을 선택해 주세요'
+- tapOn: 전자회로 실험실
+- takeScreenshot: s00-student
+- tapOn: 설정하고 계속
+- assertVisible:
+    id: student-home
+- assertVisible: 전자회로 실험실
+
+# 다시 고르지 않고 계속해도 같은 역할과 연구실로 진입합니다.
+- back
+- assertVisible: '연구실: 전자회로 실험실'
+- tapOn: 설정하고 계속
+- assertVisible:
+    id: student-home
+- assertVisible: 전자회로 실험실
+
+- back
+- tapOn: 숙련 연구생, 절차 생성·승인
+- takeScreenshot: s00-expert
+- tapOn: 설정하고 계속
+- assertVisible: 숙련자 홈
+- assertVisible: 전자회로 실험실
+
+- back
+- assertVisible: '연구실: 전자회로 실험실'
+- tapOn: 설정하고 계속
+- assertVisible: 숙련자 홈
+- assertVisible: 전자회로 실험실

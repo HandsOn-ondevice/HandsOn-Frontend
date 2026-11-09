@@ -40,4 +40,4 @@ Light 테마만 제공합니다. 글꼴 7종, 간격·곡률·테두리·그림�
 
 ## 개발용 진입
 
-기본 진입점은 갤러리입니다. 개발 빌드에서 `handson://?component=SensorCard`, `handson://?example=execution` 형태로 특정 예제를 재현할 수 있습니다. 이 진입은 업무 상태를 저장하거나 서버에 요청하지 않습니다.
+개발 빌드에서 `handson://dev`로 갤러리를 엽니다. `handson://dev?component=SensorCard`, `handson://dev?example=execution`으로 특정 예제를 열 수 있습니다. 기존의 `handson://?component=SensorCard`, `handson://?example=execution` 링크도 같은 예제를 엽니다. 이 진입은 업무 상태를 저장하거나 서버에 요청하지 않습니다.

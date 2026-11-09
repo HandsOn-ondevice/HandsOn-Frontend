@@ -1,6 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
-const baseURL = 'http://localhost:8081';
+const port = process.env.EXPO_E2E_PORT ?? '8081';
+const baseURL = `http://localhost:${port}`;
 
 export default defineConfig({
   testDir: './e2e',
@@ -11,7 +12,7 @@ export default defineConfig({
     browserName: 'chromium',
   },
   webServer: {
-    command: 'npm run web -- --localhost --port 8081',
+    command: `npm run web -- --localhost --port ${port}`,
     url: baseURL,
     reuseExistingServer: true,
     timeout: 120_000,
