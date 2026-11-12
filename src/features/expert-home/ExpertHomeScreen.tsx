@@ -21,6 +21,7 @@ import {
   type NavigationItem,
 } from '@/design-system';
 import type { WorkEnvironment } from '@/features/entry/entryEnvironment';
+import { reviewStatusLabels } from '@/features/expert-review/reviewData';
 import type {
   ExpertHomeData,
   ExpertProcedure,
@@ -55,6 +56,7 @@ export function ExpertHomeScreen({
   const drafts = data?.procedures.filter((item) => item.status === 'draft') ?? [];
   const approved = data?.procedures.filter((item) => item.status === 'approved') ?? [];
   const pending = data?.results.filter((item) => item.status === 'pending') ?? [];
+  const filteredResults = data?.results.filter((item) => item.status === resultFilter) ?? [];
   const count = drafts.length + pending.length;
 
   function showProcedures(filter: string) {
@@ -181,25 +183,29 @@ export function ExpertHomeScreen({
                   value={resultFilter}
                   onChange={setResultFilter}
                   options={[
-                    { value: 'pending', label: '검토 대기' },
-                    { value: 'reviewed', label: '검토 완료' },
+                    { value: 'pending', label: reviewStatusLabels.pending },
+                    { value: 'reviewed', label: reviewStatusLabels.reviewed },
+                    {
+                      value: 'remeasurementRequested',
+                      label: reviewStatusLabels.remeasurementRequested,
+                    },
                   ]}
                 />
-                {state.data.results.filter((item) => item.status === resultFilter).length === 0 ? (
+                {filteredResults.length === 0 ? (
                   <FeedbackPanel
                     title={
                       resultFilter === 'pending'
                         ? '검토할 결과가 없어요.'
-                        : '검토 완료한 결과가 없어요.'
+                        : resultFilter === 'reviewed'
+                          ? '검토 완료한 결과가 없어요.'
+                          : '재측정을 요청한 결과가 없어요.'
                     }
                     subtitle="연구생이 제출한 결과가 여기에 표시됩니다."
                   />
                 ) : (
-                  state.data.results
-                    .filter((item) => item.status === resultFilter)
-                    .map((item) => (
-                      <HomeResult key={item.id} result={item} onOpenTask={onOpenTask} />
-                    ))
+                  filteredResults.map((item) => (
+                    <HomeResult key={item.id} result={item} onOpenTask={onOpenTask} />
+                  ))
                 )}
               </>
             )}
@@ -298,8 +304,7 @@ function HomeResult({
   result: ExpertResult;
   onOpenTask: (task: ExpertTask) => void;
 }) {
-  const pending = result.status === 'pending';
-  const label = pending ? '검토 대기' : '검토 완료';
+  const label = reviewStatusLabels[result.status];
   return (
     <Pressable
       accessibilityRole="button"
@@ -321,7 +326,7 @@ function HomeResult({
             {result.summary}
           </AppText>
         </View>
-        <StatusBadge label={label} tone={pending ? 'warning' : 'success'} />
+        <StatusBadge label={label} tone={result.status === 'reviewed' ? 'success' : 'warning'} />
       </SurfaceCard>
     </Pressable>
   );
