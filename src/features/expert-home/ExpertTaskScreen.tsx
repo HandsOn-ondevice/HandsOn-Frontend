@@ -77,8 +77,15 @@ function ExistingTask({
       />
     );
 
-  const title =
-    kind === 'result' ? '결과 검토' : procedure.status === 'draft' ? '절차 편집' : '승인 절차';
+  if (kind === 'procedure' && procedure.status === 'draft') {
+    return (
+      <Redirect
+        href={{ pathname: '/expert/drafts/[draftId]', params: { draftId: procedure.id } }}
+      />
+    );
+  }
+
+  const title = kind === 'result' ? '결과 검토' : '승인 절차';
   return (
     <>
       <AppText variant="heading" accessibilityRole="header">
