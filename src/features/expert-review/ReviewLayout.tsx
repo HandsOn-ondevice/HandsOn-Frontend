@@ -1,5 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
+import { useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
+import { Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
 import {
   AppBar,
   AppText,
@@ -77,6 +77,7 @@ export function ReviewLayout({
   footer?: ReactNode;
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
   return (
     <Screen>
       <StatusBar />
@@ -88,13 +89,21 @@ export function ReviewLayout({
       />
       <KeyboardAvoidingView
         style={styles.viewport}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'web' ? undefined : 'padding'}
       >
         <ScrollView
           key={title}
+          ref={scroll}
           style={styles.viewport}
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
+          onLayout={() => {
+            // The opinion is at the end of the scroll view. Android can focus it before the
+            // keyboard has resized the viewport, so bring it into view after that layout.
+            if (Platform.OS === 'android' && Keyboard.isVisible()) {
+              scroll.current?.scrollToEnd({ animated: false });
+            }
+          }}
         >
           {children}
         </ScrollView>
