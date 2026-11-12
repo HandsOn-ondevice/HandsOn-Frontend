@@ -44,7 +44,7 @@ S03의 **이 버전으로 준비 시작**은 선택한 절차·승인 버전의 
 
 숙련자 홈에서 결과를 선택하면 `/expert/results/[resultId]?procedureId=...`(E07)에서 제출된 버전, 조건별 차트와 근거를 확인할 수 있습니다. 검토 의견과 함께 결과를 완료하거나 재측정을 요청하면 숙련자 홈에도 처리 상태가 반영됩니다. 개발용 모의 저장소의 변경은 앱 실행 중에만 유지됩니다. [E07 확인 방법과 연동 범위](docs/validation/e07-expert-review.md)를 참고하세요.
 
-숙련자 홈의 **새 절차 음성으로 만들기**에서 `/expert/procedures/new`(E02)로 이동합니다. 절차 이름을 입력하고 녹음 시작 → 일시정지 → 녹음 재개 → 녹음 종료를 조작합니다. 유효한 원본을 저장한 뒤 `/transcription?recordingId=...`에서 같은 파일을 다시 읽습니다. STT 요청·텍스트 편집은 #9에서 연결하며 현재는 원본 확인 화면입니다. 음성 저장·정리 규칙은 [E02 계약과 검증 기록](docs/validation/e02-recording.md)에 있습니다.
+숙련자 홈의 **새 절차 음성으로 만들기**에서 `/expert/procedures/new`(E02)로 이동합니다. 녹음을 종료하면 유효한 원본을 저장하고 `/transcription?recordingId=...`(E03)에서 다시 읽습니다. E03은 변환 텍스트와 편집본을 녹음 ID로 보관하고, 마지막으로 확인한 텍스트로 요청한 초안을 저장한 뒤 E04로 이동합니다. 변환과 생성에는 개발용 모의 응답을 사용합니다. 자세한 범위는 [E02 녹음](docs/validation/e02-recording.md)과 [E03 변환·생성](docs/validation/e03-transcription.md)에 정리했습니다.
 
 ## 구조
 

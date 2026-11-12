@@ -3,6 +3,11 @@ import { Alert, AppState, Linking, Platform } from 'react-native';
 import { useFocusEffect, usePreventRemove, useRouter } from 'expo-router';
 import { BottomSheet, AppText, Button } from '@/design-system';
 import type { WorkEnvironment } from '@/features/entry/entryEnvironment';
+import {
+  demoTranscriptionEnvironmentId,
+  demoTranscriptionRecordingId,
+  transcriptionService,
+} from '@/features/transcription/transcriptionService';
 import { createRecordingSession } from './nativeRecording';
 import { RecordingView } from './RecordingView';
 
@@ -15,6 +20,10 @@ export function RecordingScreen({ environment }: { environment: WorkEnvironment 
   const [help, setHelp] = useState(false);
   const setupError =
     Platform.OS !== 'android' ? '음성 녹음은 Android 앱에서 사용할 수 있어요.' : undefined;
+  const canPreviewTranscription =
+    Platform.OS === 'web' &&
+    transcriptionService &&
+    environment.id === demoTranscriptionEnvironmentId;
   const alive = useRef(false);
   const exitPromptOpen = useRef(false);
 
@@ -124,6 +133,15 @@ export function RecordingScreen({ environment }: { environment: WorkEnvironment 
             });
         }}
         onHelp={() => setHelp(true)}
+        onPreviewTranscription={
+          canPreviewTranscription
+            ? () =>
+                router.push({
+                  pathname: '/transcription',
+                  params: { recordingId: demoTranscriptionRecordingId },
+                })
+            : undefined
+        }
       />
       <BottomSheet open={help} onClose={() => setHelp(false)} title="녹음 안내" icon="mic">
         <AppText>
