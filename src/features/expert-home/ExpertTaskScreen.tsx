@@ -3,9 +3,9 @@ import { AppText, Button, FeedbackPanel, Screen, StatusBadge, SurfaceCard } from
 import { useEntrySelection } from '@/features/entry/EntrySelectionProvider';
 import { useExpertHome } from './useExpertHome';
 
-type TaskKind = 'create' | 'procedure' | 'result';
+type TaskKind = 'procedure' | 'result';
 
-/** E01 navigation boundary. Authoring, approval and review actions belong to E02–E07. */
+/** Shows the selected procedure or result summary reached from E01. */
 export function ExpertTaskScreen({ kind }: { kind: TaskKind }) {
   const { selection } = useEntrySelection();
   const router = useRouter();
@@ -19,25 +19,12 @@ export function ExpertTaskScreen({ kind }: { kind: TaskKind }) {
 
   return (
     <Screen scroll>
-      {kind === 'create' ? (
-        <>
-          <AppText variant="heading" accessibilityRole="header">
-            새 절차 작성
-          </AppText>
-          <SurfaceCard title="작업 환경" subtitle={selection.environment.name} />
-          <FeedbackPanel
-            title="절차 작성 기능을 준비하고 있어요."
-            subtitle="음성 녹음과 초안 저장은 작성 기능이 연결된 후 사용할 수 있어요."
-          />
-        </>
-      ) : (
-        <ExistingTask
-          kind={kind}
-          environmentId={selection.environment.id}
-          procedureId={params.procedureId}
-          resultId={params.resultId}
-        />
-      )}
+      <ExistingTask
+        kind={kind}
+        environmentId={selection.environment.id}
+        procedureId={params.procedureId}
+        resultId={params.resultId}
+      />
       <Button label="숙련자 홈으로" variant="secondary" icon="back" onPress={goHome} />
     </Screen>
   );
@@ -49,7 +36,7 @@ function ExistingTask({
   procedureId,
   resultId,
 }: {
-  kind: Exclude<TaskKind, 'create'>;
+  kind: TaskKind;
   environmentId: string;
   procedureId?: string;
   resultId?: string;

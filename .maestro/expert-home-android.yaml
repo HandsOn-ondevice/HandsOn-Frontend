@@ -17,7 +17,7 @@ name: Android 숙련자 홈 작업 진입과 상태별 목록
 - takeScreenshot: e01-home
 
 - tapOn: 새 절차 음성으로 만들기
-- assertVisible: 새 절차 작성
+- assertVisible: 음성 설명 녹음
 - back
 - assertVisible: 숙련자 홈
 
@@ -28,6 +28,7 @@ name: Android 숙련자 홈 작업 진입과 상태별 목록
 - tapOn: 'LED 출력 특성 측정 초안.*'
 - assertVisible: 절차 편집
 - tapOn: 숙련자 홈으로
+- assertVisible: 내 정보
 - scrollUntilVisible:
     element:
       text: 숙련자 홈
@@ -41,6 +42,7 @@ name: Android 숙련자 홈 작업 진입과 상태별 목록
 - tapOn: '노준혁.*LED-M03.*'
 - assertVisible: 결과 검토
 - tapOn: 숙련자 홈으로
+- assertVisible: 내 정보
 - scrollUntilVisible:
     element:
       text: 숙련자 홈
