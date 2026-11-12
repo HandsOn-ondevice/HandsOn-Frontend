@@ -1,5 +1,5 @@
 appId: com.handson.frontend
-name: Android 음성 녹음과 일시정지 및 원본 전달
+name: Android 음성 녹음과 일시정지 및 초안 생성
 ---
 - launchApp:
     clearState: true
@@ -51,7 +51,18 @@ name: Android 음성 녹음과 일시정지 및 원본 전달
 - extendedWaitUntil:
     visible: STT 텍스트 확인
     timeout: 20000
-- assertVisible: 음성 원본을 저장했어요
+- extendedWaitUntil:
+    visible: STT 변환이 완료되었습니다
+    timeout: 15000
 - assertVisible: LED output measurement
 - assertVisible: '.*녹음 길이.*'
-- takeScreenshot: e03-audio-source
+- takeScreenshot: e03-transcription
+- scrollUntilVisible:
+    element: AI 절차 초안 생성
+    direction: DOWN
+- tapOn: AI 절차 초안 생성
+- extendedWaitUntil:
+    visible: AI 절차 초안
+    timeout: 15000
+- assertVisible: LED output measurement
+- takeScreenshot: e04-generated-draft
