@@ -41,8 +41,11 @@ for (const viewport of [
 
     await page.getByRole('button', { name: '새 절차 음성으로 만들기' }).click();
     await expect(page).toHaveURL('/expert/procedures/new');
-    await expect(page.getByRole('heading', { name: '새 절차 작성' })).toBeVisible();
-    await returnHome(page);
+    await expect(page.getByText('음성 설명 녹음', { exact: true })).toBeVisible();
+    await expect(
+      page.getByText('음성 녹음은 Android 앱에서 사용할 수 있어요.', { exact: true }),
+    ).toBeVisible();
+    await returnHome(page, '뒤로가기');
 
     await page
       .getByRole('button', { name: /LED 출력 특성 측정 초안/ })
