@@ -1,21 +1,23 @@
 import { useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
-import { AppText, BottomSheet, Button, TextField, spacing } from '@/design-system';
+import { AppText, Button, TextField, spacing } from '@/design-system';
 import type { ProcedureDraft, ProcedureDraftStep } from './procedureDraftRepository';
 
 export type DraftEditor = { kind: 'step'; stepId: string } | { kind: 'materials' | 'precautions' };
 
 export const editorLabels = { materials: '준비물', precautions: '주의사항' } as const;
+export const draftEditorLabel = (editor: DraftEditor) =>
+  editor.kind === 'step' ? '절차 단계' : editorLabels[editor.kind];
 const useNativeKeyboardIntegration = Platform.OS !== 'web';
 
-interface DraftEditSheetProps {
+interface DraftEditFormProps {
   editor: DraftEditor;
   draft: ProcedureDraft;
   onClose: () => void;
   onApply: (update: (draft: ProcedureDraft) => ProcedureDraft) => void;
 }
 
-export function DraftEditSheet({ editor, draft, onClose, onApply }: DraftEditSheetProps) {
+export function DraftEditForm({ editor, draft, onClose, onApply }: DraftEditFormProps) {
   const position =
     editor.kind === 'step' ? draft.steps.findIndex((s) => s.id === editor.stepId) : -1;
   const step = draft.steps[position];
@@ -25,7 +27,7 @@ export function DraftEditSheet({ editor, draft, onClose, onApply }: DraftEditShe
   );
   const [destination, setDestination] = useState(position);
 
-  const label = editor.kind === 'step' ? '절차 단계' : editorLabels[editor.kind];
+  const label = draftEditorLabel(editor);
 
   function apply() {
     if (editor.kind === 'step') {
@@ -51,7 +53,7 @@ export function DraftEditSheet({ editor, draft, onClose, onApply }: DraftEditShe
   }
 
   return (
-    <BottomSheet open onClose={onClose} title={`${label} 편집`} icon="edit">
+    <>
       {editor.kind === 'step' ? (
         <>
           <TextField
@@ -94,7 +96,7 @@ export function DraftEditSheet({ editor, draft, onClose, onApply }: DraftEditShe
         disabled={editor.kind === 'step' && (!step || !title.trim())}
         onPress={apply}
       />
-    </BottomSheet>
+    </>
   );
 }
 

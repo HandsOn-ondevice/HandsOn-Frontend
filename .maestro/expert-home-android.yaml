@@ -26,8 +26,10 @@ name: Android 숙련자 홈 작업 진입과 상태별 목록
       text: 'LED 출력 특성 측정 초안.*'
     direction: DOWN
 - tapOn: 'LED 출력 특성 측정 초안.*'
-- assertVisible: 절차 편집
-- tapOn: 숙련자 홈으로
+- extendedWaitUntil:
+    visible: AI 절차 초안
+    timeout: 10000
+- tapOn: 뒤로가기
 - scrollUntilVisible:
     element:
       text: 숙련자 홈

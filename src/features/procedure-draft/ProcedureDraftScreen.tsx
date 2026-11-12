@@ -16,7 +16,7 @@ import {
   radii,
   spacing,
 } from '@/design-system';
-import { DraftEditSheet, editorLabels, type DraftEditor } from './DraftEditSheet';
+import { DraftEditForm, draftEditorLabel, editorLabels, type DraftEditor } from './DraftEditForm';
 import type { ProcedureDraftStep } from './procedureDraftRepository';
 import { useProcedureDraft } from './useProcedureDraft';
 
@@ -49,10 +49,10 @@ export function ProcedureDraftScreen({
   onReview,
 }: ProcedureDraftScreenProps) {
   const { state, retryLoad, updateDraft, saveDraft } = useProcedureDraft(environmentId, draftId);
-  const [editor, setEditor] = useState<DraftEditor | null>(null);
+  const [panel, setPanel] = useState<DraftEditor | { kind: 'menu' } | null>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string>();
   const [expandedId, setExpandedId] = useState<string>();
-  const [showMenu, setShowMenu] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
   const [leave, setLeave] = useState<{ proceed: () => void } | null>(null);
   const [discarding, setDiscarding] = useState(false);
@@ -65,10 +65,14 @@ export function ProcedureDraftScreen({
     draft?.steps.find(({ needsReview }) => needsReview) ??
     draft?.steps[0];
 
-  usePreventRemove(!discarding && (dirty || saving || showSaved), ({ repeat }) => {
-    if (showSaved) setShowSaved(false);
-    else if (!saving) setLeave({ proceed: repeat });
-  });
+  usePreventRemove(
+    !discarding && (dirty || saving || showSaved || panel !== null),
+    ({ repeat }) => {
+      if (panel) setPanelOpen(false);
+      else if (showSaved) setShowSaved(false);
+      else if (!saving) setLeave({ proceed: repeat });
+    },
+  );
 
   async function review() {
     if (saving || !draft || !selected) return;
@@ -81,9 +85,14 @@ export function ProcedureDraftScreen({
   }
 
   function openEditor(next: DraftEditor) {
-    setShowMenu(false);
     setShowSaved(false);
-    setEditor(next);
+    setPanel(next);
+    setPanelOpen(true);
+  }
+
+  function openMenu() {
+    setPanel({ kind: 'menu' });
+    setPanelOpen(true);
   }
 
   function close() {
@@ -104,7 +113,7 @@ export function ProcedureDraftScreen({
         <IconButton
           icon="more"
           accessibilityLabel="더 보기"
-          onPress={() => setShowMenu(true)}
+          onPress={openMenu}
           disabled={!draft || saving}
         />
       </View>
@@ -140,7 +149,7 @@ export function ProcedureDraftScreen({
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={`미확정 항목 ${pendingCount}개 보기`}
-                    onPress={() => setShowMenu(true)}
+                    onPress={openMenu}
                     disabled={saving}
                   >
                     <StatusBadge label={`${pendingCount}개 미확정`} tone="warning" />
@@ -315,36 +324,48 @@ export function ProcedureDraftScreen({
         </View>
       ) : null}
 
-      {showMenu && draft ? (
-        <BottomSheet open title="초안 정보" icon="guidance" onClose={() => setShowMenu(false)}>
-          {draft.pendingItems.length ? (
-            <SurfaceCard title={`미확정 항목 ${pendingCount}개`} tone="subtle">
-              {draft.pendingItems.map(({ id, label }) => (
-                <AppText key={id}>{label}</AppText>
+      {panel && draft ? (
+        <BottomSheet
+          open={panelOpen}
+          title={panel.kind === 'menu' ? '초안 정보' : `${draftEditorLabel(panel)} 편집`}
+          icon={panel.kind === 'menu' ? 'guidance' : 'edit'}
+          onClose={() => {
+            setPanelOpen(false);
+            setPanel(null);
+          }}
+        >
+          {panel.kind === 'menu' ? (
+            <>
+              {pendingCount ? (
+                <SurfaceCard title={`미확정 항목 ${pendingCount}개`} tone="subtle">
+                  {draft.pendingItems.map(({ id, label }) => (
+                    <AppText key={id}>{label}</AppText>
+                  ))}
+                </SurfaceCard>
+              ) : null}
+              {(['materials', 'precautions'] as const).map((kind) => (
+                <SurfaceCard key={kind} title={editorLabels[kind]} tone="subtle">
+                  <AppText color={colors.text.secondary}>
+                    {draft[kind].join('\n') || '등록된 항목이 없어요.'}
+                  </AppText>
+                  <Button
+                    label={`${editorLabels[kind]} 편집`}
+                    variant="secondary"
+                    onPress={() => openEditor({ kind })}
+                  />
+                </SurfaceCard>
               ))}
-            </SurfaceCard>
-          ) : null}
-          {(['materials', 'precautions'] as const).map((kind) => (
-            <SurfaceCard key={kind} title={editorLabels[kind]} tone="subtle">
-              <AppText color={colors.text.secondary}>
-                {draft[kind].join('\n') || '등록된 항목이 없어요.'}
-              </AppText>
-              <Button
-                label={`${editorLabels[kind]} 편집`}
-                variant="secondary"
-                onPress={() => openEditor({ kind })}
-              />
-            </SurfaceCard>
-          ))}
+            </>
+          ) : (
+            <DraftEditForm
+              key={panel.kind === 'step' ? panel.stepId : panel.kind}
+              editor={panel}
+              draft={draft}
+              onClose={() => setPanelOpen(false)}
+              onApply={updateDraft}
+            />
+          )}
         </BottomSheet>
-      ) : null}
-      {editor && draft ? (
-        <DraftEditSheet
-          editor={editor}
-          draft={draft}
-          onClose={() => setEditor(null)}
-          onApply={updateDraft}
-        />
       ) : null}
       {leave ? (
         <BottomSheet
