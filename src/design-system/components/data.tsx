@@ -582,6 +582,7 @@ export interface ResultChartProps {
   items: readonly ResultChartItem[];
   unit?: string;
   highlightedIndex?: number;
+  onItemPress?: (index: number) => void;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -592,6 +593,7 @@ export function ResultChart({
   items,
   unit = '',
   highlightedIndex = 2,
+  onItemPress,
   style,
 }: ResultChartProps) {
   const validValues = items.flatMap((item) =>
@@ -608,7 +610,7 @@ export function ResultChart({
           {meta ?? (state === 'reviewed' ? '검토 완료' : '미리보기')}
         </AppText>
       </View>
-      {validValues.length === 0 ? (
+      {validValues.length === 0 && (!onItemPress || items.length === 0) ? (
         <View style={styles.chartEmpty}>
           <AppText color={colors.text.secondary}>표시할 측정값이 없습니다.</AppText>
         </View>
@@ -618,10 +620,10 @@ export function ResultChart({
             const valid = item.value !== null && Number.isFinite(item.value) && item.value >= 0;
             const value = valid ? (item.value as number) : null;
             return (
-              <View
+              <Card
                 key={`${item.label}-${index}`}
-                accessible
-                accessibilityLabel={`${item.label}, ${value === null ? '측정값 없음' : `${value}${unit ? ` ${unit}` : ''}`}`}
+                accessibilityLabel={`${item.label}${onItemPress ? ' 조건' : ''}, ${value === null ? '측정값 없음' : `${value}${unit ? ` ${unit}` : ''}`}`}
+                onPress={onItemPress ? () => onItemPress(index) : undefined}
                 style={styles.chartColumn}
               >
                 <View style={styles.chartPlot}>
@@ -647,7 +649,7 @@ export function ResultChart({
                 <AppText variant="caption" color={colors.text.secondary} style={styles.centerText}>
                   {item.label}
                 </AppText>
-              </View>
+              </Card>
             );
           })}
         </View>

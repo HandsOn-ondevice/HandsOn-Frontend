@@ -62,8 +62,8 @@ for (const viewport of [
       .poll(() => decodeURIComponent(new URL(page.url()).pathname))
       .toBe(`/expert/results/${resultId}`);
     expect(new URL(page.url()).searchParams.get('procedureId')).toBe(procedureId);
-    await expect(page.getByRole('heading', { name: '결과 검토', exact: true })).toBeVisible();
-    await returnHome(page);
+    await expect(page.getByText('연구생 결과 검토', { exact: true })).toBeVisible();
+    await returnHome(page, '뒤로가기');
 
     await page.getByRole('tab', { name: '절차', exact: true }).click();
     await page.getByRole('radio', { name: '승인 절차' }).click();

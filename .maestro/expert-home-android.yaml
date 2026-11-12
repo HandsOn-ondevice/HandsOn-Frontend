@@ -40,8 +40,8 @@ name: Android 숙련자 홈 작업 진입과 상태별 목록
       text: '노준혁.*LED-M03.*'
     direction: DOWN
 - tapOn: '노준혁.*LED-M03.*'
-- assertVisible: 결과 검토
-- tapOn: 숙련자 홈으로
+- assertVisible: 연구생 결과 검토
+- tapOn: 뒤로가기
 - assertVisible: 내 정보
 - scrollUntilVisible:
     element:

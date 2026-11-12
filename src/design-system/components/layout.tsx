@@ -72,7 +72,11 @@ export function AppBar({
           <AppText variant="label" color={foreground} style={styles.appBarTitle}>
             {title}
           </AppText>
-          <IconButton icon="more" accessibilityLabel="더 보기" onPress={onMore} tone={tone} />
+          {onMore ? (
+            <IconButton icon="more" accessibilityLabel="더 보기" onPress={onMore} tone={tone} />
+          ) : (
+            <View style={styles.appBarSpacer} />
+          )}
         </>
       )}
     </View>
@@ -259,6 +263,8 @@ export interface ActionShelfProps {
   layout?: ActionShelfLayout;
   disabled?: boolean;
   loading?: boolean;
+  secondaryDisabled?: boolean;
+  secondaryLoading?: boolean;
   safeArea?: boolean;
   style?: StyleProp<ViewStyle>;
 }
@@ -272,6 +278,8 @@ export function ActionShelf({
   layout,
   disabled = false,
   loading = false,
+  secondaryDisabled = false,
+  secondaryLoading = false,
   safeArea = false,
   style,
 }: ActionShelfProps) {
@@ -292,6 +300,8 @@ export function ActionShelf({
         <Button
           label={secondary ?? '안내 다시 듣기'}
           onPress={onSecondary}
+          disabled={secondaryDisabled}
+          loading={secondaryLoading}
           variant="secondary"
           style={styles.secondaryAction}
         />
@@ -501,6 +511,7 @@ const styles = StyleSheet.create({
   },
   flexText: { flex: 1, flexShrink: 1 },
   appBarTitle: { flex: 1, textAlign: 'center' },
+  appBarSpacer: { width: spacing[48] },
   navigation: {
     backgroundColor: colors.surface.inverse,
     padding: spacing[6],
