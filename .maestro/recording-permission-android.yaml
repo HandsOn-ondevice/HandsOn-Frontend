@@ -1,0 +1,53 @@
+appId: com.handson.frontend
+name: Android 마이크 권한 거부 복귀와 재시도 및 녹음 취소
+---
+- launchApp:
+    clearState: true
+    permissions:
+      microphone: unset
+- extendedWaitUntil:
+    visible: '연구실: 연구실을 선택해 주세요'
+    timeout: 30000
+- tapOn: 숙련 연구생, 절차 생성·승인
+- tapOn: '연구실: 연구실을 선택해 주세요'
+- tapOn: 전자회로 실험실
+- tapOn: 설정하고 계속
+- tapOn: 새 절차 음성으로 만들기
+- assertVisible: 음성 설명 녹음
+- tapOn: 절차 이름
+- inputText: LED permission test
+- hideKeyboard
+- tapOn:
+    id: recording-start
+# 첫 권한 요청을 Android 권한 창에서 직접 거부합니다.
+- tapOn:
+    id: '.*:id/permission_deny_button'
+- extendedWaitUntil:
+    visible: 마이크 권한이 필요해요
+    timeout: 15000
+- assertNotVisible: 녹음 중이에요
+- assertNotVisible: STT 텍스트 확인
+- takeScreenshot: e02-permission-denied
+- tapOn: 뒤로가기
+- assertVisible: 숙련자 홈
+- assertVisible: 전자회로 실험실
+
+# 권한을 다시 허용한 뒤 새 화면에서 녹음할 수 있고, 취소하면 STT로 이동하지 않습니다.
+- setPermissions:
+    permissions:
+      microphone: allow
+- tapOn: 새 절차 음성으로 만들기
+- tapOn: 절차 이름
+- inputText: LED permission retry
+- hideKeyboard
+- tapOn:
+    id: recording-start
+- extendedWaitUntil:
+    visible: 녹음 중이에요
+    timeout: 15000
+- back
+- assertVisible: 녹음을 취소할까요\?
+- tapOn: 녹음 삭제
+- assertVisible: 숙련자 홈
+- assertNotVisible: STT 텍스트 확인
+- takeScreenshot: e02-recording-discarded
