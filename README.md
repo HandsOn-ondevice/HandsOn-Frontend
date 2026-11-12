@@ -42,7 +42,7 @@ S03의 **이 버전으로 준비 시작**은 선택한 절차·승인 버전의 
 
 숙련자 홈은 합성 데이터로 초안·승인 절차, 검토 대기·완료 결과와 최근 작업을 표시합니다. 하단 절차·현황에서 상태별 목록을 확인하고, 작업에서 돌아오거나 새로고침하면 현황을 다시 조회합니다. 기존 절차는 `/expert/procedures/[procedureId]`, 결과는 `/expert/results/[resultId]?procedureId=...`로 연결합니다. 두 화면은 선택한 작업의 요약을 제공하며, 편집·승인·결과 검토 처리는 후속 범위입니다. [E01 검증 기록](docs/validation/e01-expert-home.md)에 구현 범위와 확인 방법을 정리했습니다.
 
-숙련자 홈의 **새 절차 음성으로 만들기**에서 `/expert/procedures/new`(E02)로 이동합니다. 절차 이름을 입력하고 녹음 시작 → 일시정지 → 녹음 재개 → 녹음 종료를 조작합니다. 유효한 원본을 저장한 뒤 `/transcription?recordingId=...`에서 같은 파일을 다시 읽습니다. STT 요청·텍스트 편집은 #9에서 연결하며 현재는 원본 확인 화면입니다. 음성 저장·정리 규칙은 [E02 계약과 검증 기록](docs/validation/e02-recording.md)에 있습니다.
+숙련자 홈의 **새 절차 음성으로 만들기**에서 `/expert/procedures/new`(E02)로 이동합니다. 녹음을 종료하면 유효한 원본을 저장하고 `/transcription?recordingId=...`(E03)에서 다시 읽습니다. E03은 변환 텍스트와 편집본을 녹음 ID로 보관하고, 마지막으로 확인한 텍스트로 요청한 초안을 저장한 뒤 E04로 이동합니다. 변환과 생성에는 개발용 모의 응답을 사용합니다. 자세한 범위는 [E02 녹음](docs/validation/e02-recording.md)과 [E03 변환·생성](docs/validation/e03-transcription.md)에 정리했습니다.
 
 ## 구조
 
