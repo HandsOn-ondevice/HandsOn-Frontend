@@ -34,6 +34,7 @@ export interface RecordingViewProps {
   onBack: () => void;
   onSettings: () => void;
   onHelp: () => void;
+  onPreviewTranscription?: () => void;
 }
 
 const prompts = ['준비물', '작업 순서', '주의사항', '완료 기준'];
@@ -126,6 +127,7 @@ export function RecordingView({
   onBack,
   onSettings,
   onHelp,
+  onPreviewTranscription,
 }: RecordingViewProps) {
   const busy = status === 'requesting' || status === 'saving';
   const hasRecording = status === 'recording' || status === 'paused';
@@ -231,6 +233,13 @@ export function RecordingView({
               <StatusBadge key={prompt} label={prompt} />
             ))}
           </View>
+          {onPreviewTranscription ? (
+            <Button
+              label="STT 확인 화면 미리보기"
+              variant="secondary"
+              onPress={onPreviewTranscription}
+            />
+          ) : null}
         </ScrollView>
       </SafeAreaView>
 
