@@ -62,3 +62,21 @@
 - fetch 후 origin/main은 `0cac8fa`로 2개 커밋 앞섰다: `23af889` 기여 가이드·Expo 정합성 수정, `0cac8fa` Playwright 환경 추가.
 - main의 AGENTS.md도 읽었으나 현재 브랜치에는 해당 파일이 없다. main 변경은 가져오지 않았으며 브랜치 전환·merge·commit·push·PR은 수행하지 않았다.
 - 이번 테스트는 현재 브랜치의 Jest·설정 기준이다. main의 Playwright 환경은 병합하지 않아 사용하지 않았다.
+
+## S01 → S04 Mock 이어하기 연결 — 2026-11-12
+
+- 기준은 `feat/researcher-preparation`의 `603339d`다. 위 2026-11-02 기록과 별도 검증이다.
+- MockWorkflowRepository 생성 시 `demo-session-led-m03`를 등록한다. S01 화면·데이터·라우팅과 기존 createSession/getSession 명령 처리는 변경하지 않았다. 초기 등록은 주입된 시각·ID 생성기를 소비하지 않는다.
+- 세션의 절차 제목·v1.2·실험 장치 LED-M03·게이트웨이 `demo-orange-pi-5-plus`·한국 시각 09:34를 S01 예시와 맞췄다. 기존 타입에는 `paused`·측정 조건/회차 필드가 없어, S04에서 준비를 재확인하는 `preparing`·0/6으로 시작한다. S01의 50% 조건·2/3회차를 준비 진행률로 변환하거나 측정 완료 근거를 만들지 않았다.
+- 같은 인스턴스에서는 체크·revision·근거가 재조회와 화면 왕복 뒤에도 유지된다. 새 Repository나 앱 재시작·새로고침은 초기 fixture를 다시 만들며 사용자 변경을 영구 복원하지 않는다.
+- Repository 테스트에 초기 조회·홈 데이터 대조·S05 제출·스냅샷 및 인스턴스 격리를 추가했다. 새 세션은 기존처럼 고유 ID와 0/6으로 생성된다. 없는 세션 테스트는 `missing-session`을 사용해 오류·홈 복귀·자동 생성 금지를 계속 검증한다.
+- Jest의 실제 S01 버튼 조작 → ID 전달 → S04 체크 → 같은 ID로 S05 이동과, 웹의 S01 → S04 → 홈 → S04 재진입·체크 해제/재선택을 검증했다. Maestro는 과거 임시 안내 단언 한 줄만 정상 준비 진행도 단언으로 바꿨다. 오류 화면을 성공으로 취급하지 않는다.
+
+검증 환경과 결과:
+
+- Node 24.3.0. 원본에 보존 중인 미추적 파일 중 S09 사본과 오래된 `.expo/types/router.d.ts` 때문에 원본 TypeScript·ESLint 전체 검사는 실패한다. 해당 파일·설정은 수정하거나 제외하지 않았다. 원본 전체 Jest는 최종 15 suites, 127/127 통과했다.
+- 추적 파일의 현재 내용을 `/private/tmp/handson-s01-s04-20261112-woDlFA/project`로 복사하고 그 폴더에서 기존 npm 캐시로 `npm ci --offline --no-audit --no-fund`를 실행했다. 원본 폴더에 재설치하지 않았다. 임시 복사본은 미추적 파일과 생성 캐시를 포함하지 않는다.
+- 임시 복사본의 TypeScript·ESLint·포맷 검사와 전체 Jest 15 suites, 127/127 통과. S01 홈 및 기존 S04~S05 Playwright는 별도 포트 8097에서 직렬 실행해 최종 4/4 통과했다. 웹 실행으로 라우트 타입이 생성된 뒤 TypeScript·ESLint도 재검사했다. ESLint는 오류 0개·기존 생성 타입의 경고 1개다. Android JavaScript/Hermes 번들 생성도 통과했다. 기존 8081 서버는 조작하지 않았다.
+- 첫 Jest의 기존 오류 화면 테스트 1건은 새로 등록된 홈 ID를 없는 ID로 가정해 실패했다. 실제 없는 ID로 바꿨다. 첫 웹 검사 1건은 공통 체크박스 웹 출력에 `aria-checked`가 없어 신규 `toBeChecked()` 단언이 실패했다. 공통 컴포넌트는 수정하지 않고 저장 근거 문구·진행도·체크 해제/재선택으로 상태 보존을 검증했다. 이 웹 접근성 표현의 한계는 남아 있다.
+- 로그·trace·캡처는 `/private/tmp/handson-s01-s04-20261112-woDlFA/`에 있다. 최초 실패는 `workspace-test-ci.log`·`web.log`·`web-results/`, 최종 결과는 `workspace-jest-final.log`·`snapshot-*.log`·`web-final.log`·`web-final-results/`로 구분했다. 최종 `s01-s04-resume.png`를 직접 열어 정상 준비 화면과 보존된 체크를 확인했다.
+- Android 실기기·Maestro 재실행·GitHub CI는 이번 수정 후 미실행이다. 커밋·push·PR 수정·스테이징은 하지 않았다. 미추적 15개 파일과 main·workflow 브랜치의 기존 커밋을 보존했다.

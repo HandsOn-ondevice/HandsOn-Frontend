@@ -7,6 +7,7 @@ import {
   type WorkflowCommand,
 } from '../../domain/models';
 import { transitionPreparation } from './transition-engine';
+import { mockProcedure } from './fixtures';
 import {
   beginDeviceCheck,
   finishDeviceCheck,
@@ -41,6 +42,44 @@ export class MockWorkflowRepository implements WorkflowRepository {
     this.now = dependencies.now ?? (() => new Date().toISOString());
     this.id = dependencies.id ?? createRequestId;
     this.inspect = dependencies.inspect ?? runMockDiagnostics;
+
+    // S01의 합성 목록과 같은 ID를 가진 S04 재확인용 세션이다.
+    // 현재 모델에는 paused·측정 조건/회차가 없으므로 준비 확인과 측정 진행률을 혼용하지 않는다.
+    // 고정 fixture는 주입된 now/id를 소비하지 않아 새 세션 생성 계약을 유지한다.
+    const savedAt = '2026-11-12T00:34:00.000Z';
+    const session: ExperimentSession = {
+      sessionId: 'demo-session-led-m03',
+      operatorId: 'mock-researcher',
+      source: 'mock',
+      procedure: {
+        ...copy(mockProcedure),
+        procedureId: 'demo-procedure-led-output',
+        deviceCheck: mockProcedure.deviceCheck
+          ? { ...copy(mockProcedure.deviceCheck), deviceId: 'demo-orange-pi-5-plus' }
+          : undefined,
+      },
+      phase: 'preparing',
+      revision: 0,
+      createdAt: savedAt,
+      updatedAt: savedAt,
+      checks: mockProcedure.preparation.map((item) => ({
+        id: item.id,
+        checked: false,
+        confirmedAt: null,
+        evidenceId: null,
+      })),
+      evidence: [],
+      deviceChecks: [],
+      events: [
+        {
+          eventId: 'demo-session-led-m03-created',
+          requestId: 'demo-session-led-m03-initial',
+          type: 'sessionCreated',
+          occurredAt: savedAt,
+        },
+      ],
+    };
+    this.sessions.set(session.sessionId, session);
   }
 
   async createSession(input: CreateSessionInput): Promise<ExperimentSession> {

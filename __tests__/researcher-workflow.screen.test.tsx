@@ -63,7 +63,7 @@ describe('S04 사용자 흐름', () => {
     const screen = await render(
       <WorkflowProvider repository={repository}>
         <PreparationScreen
-          sessionId="demo-session-led-m03"
+          sessionId="missing-session"
           onBack={() => {}}
           onHome={onHome}
           onDeviceCheck={onDeviceCheck}
@@ -72,7 +72,7 @@ describe('S04 사용자 흐름', () => {
     );
 
     await screen.findByText('실험 세션을 찾을 수 없습니다');
-    expect(getSession).toHaveBeenCalledWith('demo-session-led-m03');
+    expect(getSession).toHaveBeenCalledWith('missing-session');
     expect(
       screen.getByText(
         '저장된 실험 기록을 찾을 수 없습니다. 연구생 홈으로 돌아가 작업을 다시 확인해 주세요.',
