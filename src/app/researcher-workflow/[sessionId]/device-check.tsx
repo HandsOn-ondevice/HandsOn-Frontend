@@ -17,7 +17,7 @@ export default function DeviceCheckRoute() {
       }
       onExecution={() =>
         router.push({
-          pathname: '/researcher-workflow/[sessionId]/execution-pending',
+          pathname: '/researcher-workflow/[sessionId]/execution',
           params: { sessionId },
         })
       }

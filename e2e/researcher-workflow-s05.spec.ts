@@ -38,17 +38,15 @@ test('S04와 동일 세션으로 점검하고 6/6 복귀·S06 시작·재진입�
   await page.getByRole('button', { name: '확인 완료', exact: true }).click();
   await expect(page).toHaveURL(deviceURL);
   await page.getByRole('button', { name: '실험 측정 시작', exact: true }).click();
-  await expect(page).toHaveURL(deviceURL.replace('/device-check', '/execution-pending'));
-  await expect(
-    page.getByText('S05 Mock 점검과 시작 요청이 완료되었습니다', { exact: true }),
-  ).toBeVisible();
-  await page.getByRole('button', { name: 'S05 장치 점검으로 돌아가기', exact: true }).click();
+  await expect(page).toHaveURL(deviceURL.replace('/device-check', '/execution'));
+  await expect(page.getByText('유효 측정 0 / 15회', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '뒤로가기', exact: true }).click();
   await expect(page).toHaveURL(deviceURL);
   await expect(
     page.getByRole('button', { name: '장치·센서 다시 점검', exact: true }),
   ).toBeDisabled();
   await expect(
-    page.getByRole('button', { name: 'S06 연결 안내로 돌아가기', exact: true }),
+    page.getByRole('button', { name: '실험 진행으로 돌아가기', exact: true }),
   ).toBeEnabled();
 });
 
