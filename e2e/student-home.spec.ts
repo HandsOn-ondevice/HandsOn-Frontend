@@ -45,11 +45,12 @@ test('기존 세션과 최근 결과 식별자를 유지하며 홈의 작업 경
 
   await page.getByRole('button', { name: '전체 보기' }).click();
   await expect(page).toHaveURL('/procedures?environmentId=demo-embedded-iot');
-  await expect(page.getByText('승인된 절차를 선택하는 화면을 준비하고 있어요.')).toBeVisible();
+  await expect(page.getByText('승인된 절차 2개')).toBeVisible();
   await returnHome(page);
 
   await page.getByRole('tab', { name: '실험', exact: true }).click();
   await expect(page).toHaveURL('/procedures?environmentId=demo-embedded-iot');
+  await expect(page.getByText('승인된 절차 2개')).toBeVisible();
   await returnHome(page);
 
   await page.getByRole('button', { name: 'LED-M02 특성 측정, 결과 보기' }).click();
@@ -101,4 +102,5 @@ test('환경을 다시 선택하면 이전 작업을 숨기고 진행 중 작업
 
   await page.getByRole('button', { name: '승인 절차 선택', exact: true }).click();
   await expect(page).toHaveURL('/procedures?environmentId=demo-circuits');
+  await expect(page.getByText('이 작업 환경에 승인된 절차가 없어요.')).toBeVisible();
 });
