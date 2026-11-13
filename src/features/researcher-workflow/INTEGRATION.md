@@ -6,7 +6,7 @@
 
 - 기존 Expo Router·루트 Provider·디자인 시스템·갤러리를 유지한다. 상태는 기존 WorkflowProvider·useWorkflowSession과 동일한 Repository 인스턴스에서 조회·구독한다.
 - sessionId와 고정 ProcedureSnapshot을 URL·화면 간 연결의 기준으로 사용한다. URL에 센서값이나 절차 JSON을 넣지 않는다.
-- 준비 확인 5개 → completePreparation → awaitingDeviceCheck → startDeviceCheck → readyToExecute → startExecution → running 순서다. S06 실행 UI는 아직 미구현이다.
+- 준비 확인 5개 → completePreparation → awaitingDeviceCheck → startDeviceCheck → readyToExecute → startExecution → running 순서다. S05는 같은 세션의 `/execution`으로 이동하며, 시작 시 절차의 실행 정의로 첫 측정 커서를 만든다.
 - 기존 `/researcher-workflow/[sessionId]/device-check-pending`은 세션을 보존하는 Redirect로 새 `device-check` 경로에 연결한다. S04와 S06 복귀는 기존 히스토리가 있으면 back, 없으면 해당 세션 경로로 replace한다.
 - S04 확인 완료 후에는 작업자 항목을 잠그는 기존 규칙을 유지한다. S05 성공은 communication 항목만 갱신한다. S04로 돌아가면 6/6과 `Mock 시스템 근거`를 표시한다.
 - `ProcedureSnapshot.deviceCheck`는 장치·필수 센서·측정 종류·단위를 담는 기능 내부 확장이다. 기존 절차에 정의가 없으면 S04는 사용할 수 있지만 S05 점검을 시작하지 못한다. 팀원 데이터에 암묵적으로 LED 센서를 붙이지 않는다.
@@ -53,3 +53,12 @@ E01~E07 라우트를 비상 화면으로 가정하거나 새로 구현하지 않
 - 게이트웨이의 실제 ID와 실험 대상 장치 ID를 어떤 응답에서 받는가?
 - 향후 models.ts의 phase/command/event union, WorkflowProvider 의존성 주입, 라우팅 연결 파일은 통합 시 충돌 가능성이 있다. 한 담당자가 공유 변경을 조율해야 한다.
 - 공통 설정·design-system·팀원 화면은 이번 작업에서 변경하지 않았다. 실제 API 통합을 위해 공통 조립 지점을 바꿀 경우 별도 합의가 필요하다.
+
+## S06~S09 실행 기능 통합
+
+- S06은 측정 응답 확인과 작업자의 명시적 완료를 분리한다. 유효 측정 완료만 조건·회차를 진행시키며, 원래 준비 체크·점검 시도·절차 스냅샷과 근거는 보존한다.
+- S07은 Mock 발화의 뜻을 확인한 후 안내 반복·같은 회차 재측정·현재 상태 유지를 선택한다. 기본 음성 패널은 ‘말씀하세요’와 실제 조건·회차 예시를 표시하며 실제 STT/TTS를 수행하지 않는다.
+- S08 센서 재확인은 통신 복구의 근거이며 회차 완료가 아니다. 성공 후 S09에서 같은 커서의 새 측정 응답을 받고, S06에서 작업자가 완료를 확인한다. 오류·복구·재측정 이력은 삭제하지 않는다.
+- main의 S01 고정 세션 `demo-session-led-m03`와 없는 세션 안내·홈 복귀를 유지한다. 기존 S04~S05 화면·진행률·점검 판정은 그대로이며 S05→S06 연결만 확장했다.
+- Mock Repository는 개발 또는 기존 `EXPO_PUBLIC_HANDSON_MAESTRO=1` fixture 빌드에서 실행한다. 일반 배포는 Mock 세션 조회·생성·명령·구독을 차단한다. 미리보기 시나리오 조작은 개발 환경에만 노출한다. 실제 API Repository 주입 계약은 바꾸지 않는다.
+- S10 사용자 일시정지·재개·영구 저장·실제 센서 및 장비 제어는 이 통합 범위에 없다. S08의 오류 보류는 사용자 일시정지와 구별한다.

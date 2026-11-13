@@ -8,6 +8,7 @@ import {
 } from '../../domain/models';
 import { transitionPreparation } from './transition-engine';
 import { mockProcedure } from './fixtures';
+import { isMockWorkflowEnabled } from './mock-environment';
 import {
   beginDeviceCheck,
   finishDeviceCheck,
@@ -19,11 +20,29 @@ import {
   type MockDeviceScenario,
   type MockDiagnosticsRunner,
 } from './device-check-scenarios';
+import { beginRecovery } from './recovery-transitions';
+import { beginRecoveryRemeasurement } from './remeasurement-transitions';
+import { selectExecution } from '../../domain/execution';
+import { resolveVoiceClarification } from './voice-clarification-transitions';
+import {
+  beginExecutionSample,
+  finishExecutionSample,
+  completeExecutionStep,
+  requestVoiceClarification,
+  dismissVoiceClarification,
+} from './execution-transitions';
+import {
+  runMockExecutionSample,
+  mockExecutionScenarios,
+  type MockExecutionScenario,
+  type MockExecutionRunner,
+} from './execution-scenarios';
 
 export interface MockDependencies {
   readonly now?: () => string;
   readonly id?: () => string;
   readonly inspect?: MockDiagnosticsRunner;
+  readonly sample?: MockExecutionRunner;
 }
 
 const copy = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
@@ -37,14 +56,18 @@ export class MockWorkflowRepository implements WorkflowRepository {
   private readonly id: () => string;
   private readonly inspect: MockDiagnosticsRunner;
   private readonly scenarios = new Map<string, MockDeviceScenario>();
+  private readonly sample: MockExecutionRunner;
+  private readonly executionScenarios = new Map<string, MockExecutionScenario>();
+  private readonly initialStaleReadings = new Map<string, string>();
 
   constructor(dependencies: MockDependencies = {}) {
     this.now = dependencies.now ?? (() => new Date().toISOString());
     this.id = dependencies.id ?? createRequestId;
     this.inspect = dependencies.inspect ?? runMockDiagnostics;
+    this.sample = dependencies.sample ?? runMockExecutionSample;
 
     // S01의 합성 목록과 같은 ID를 가진 S04 재확인용 세션이다.
-    // 현재 모델에는 paused·측정 조건/회차가 없으므로 준비 확인과 측정 진행률을 혼용하지 않는다.
+    // 준비 확인 상태와 S06 측정 진행률을 혼용하지 않는다.
     // 고정 fixture는 주입된 now/id를 소비하지 않아 새 세션 생성 계약을 유지한다.
     const savedAt = '2026-11-12T00:34:00.000Z';
     const session: ExperimentSession = {
@@ -80,9 +103,14 @@ export class MockWorkflowRepository implements WorkflowRepository {
       ],
     };
     this.sessions.set(session.sessionId, session);
+    this.initialStaleReadings.set(
+      session.sessionId,
+      new Date(Date.parse(savedAt) - 1).toISOString(),
+    );
   }
 
   async createSession(input: CreateSessionInput): Promise<ExperimentSession> {
+    this.assertDevelopmentEnvironment();
     const signature = JSON.stringify([input.operatorId, input.procedure]);
     const previous = this.creationRequests.get(input.requestId);
     if (previous) {
@@ -137,11 +165,17 @@ export class MockWorkflowRepository implements WorkflowRepository {
       ],
     };
     this.sessions.set(session.sessionId, session);
+    const createdAt = Date.parse(now);
+    if (Number.isFinite(createdAt)) {
+      // 새 세션의 합성 이전 샘플. 1ms는 시각 순서 구분용이며 최신성 임계값이 아니다.
+      this.initialStaleReadings.set(session.sessionId, new Date(createdAt - 1).toISOString());
+    }
     this.creationRequests.set(input.requestId, { signature, sessionId: session.sessionId });
     return copy(session);
   }
 
   async getSession(sessionId: string): Promise<ExperimentSession> {
+    this.assertDevelopmentEnvironment();
     const session = this.sessions.get(sessionId);
     if (!session)
       throw new WorkflowError(
@@ -152,6 +186,7 @@ export class MockWorkflowRepository implements WorkflowRepository {
   }
 
   async executeCommand(sessionId: string, command: WorkflowCommand, context: CommandContext) {
+    this.assertDevelopmentEnvironment();
     // 한 JS 작업 안에서 조회·전환·저장한다. 같은 revision의 동시 명령은 하나만 적용된다.
     const session = this.sessions.get(sessionId);
     if (!session) throw new WorkflowError('NOT_FOUND', '세션을 찾을 수 없습니다.');
@@ -176,23 +211,150 @@ export class MockWorkflowRepository implements WorkflowRepository {
       evidenceId: this.id(),
     };
     const attemptId = command.type === 'startDeviceCheck' ? this.id() : undefined;
+    const sampleId =
+      command.type === 'requestExecutionSample' ||
+      command.type === 'requestRecovery' ||
+      command.type === 'requestRecoveryRemeasurement' ||
+      (command.type === 'resolveVoiceClarification' && command.choice === 'remeasure')
+        ? this.id()
+        : undefined;
     const next =
       command.type === 'startDeviceCheck'
         ? beginDeviceCheck(session, attemptId!, metadata)
         : command.type === 'startExecution'
           ? startMockExecution(session, metadata)
-          : transitionPreparation(session, command, metadata);
+          : command.type === 'requestRecovery'
+            ? beginRecovery(session, command, sampleId!, metadata)
+            : command.type === 'requestRecoveryRemeasurement'
+              ? beginRecoveryRemeasurement(session, command, sampleId!, metadata)
+              : command.type === 'requestExecutionSample'
+                ? beginExecutionSample(session, command.cursorId, sampleId!, metadata)
+                : command.type === 'completeExecutionStep'
+                  ? completeExecutionStep(
+                      session,
+                      command.cursorId,
+                      command.sampleAttemptId,
+                      this.id(),
+                      metadata,
+                    )
+                  : command.type === 'requestVoiceClarification'
+                    ? requestVoiceClarification(
+                        session,
+                        command.cursorId,
+                        command.utterance,
+                        this.id(),
+                        metadata,
+                      )
+                    : command.type === 'dismissVoiceClarification'
+                      ? dismissVoiceClarification(session, command.commandId, metadata)
+                      : command.type === 'resolveVoiceClarification'
+                        ? resolveVoiceClarification(
+                            session,
+                            command.commandId,
+                            command.choice,
+                            sampleId,
+                            metadata,
+                          )
+                        : transitionPreparation(session, command, metadata);
+    // 의미 확인과 재측정 요청을 원자적으로 저장한다. 중복 확인은 새 요청을 만들지 않는다.
+    const resolved =
+      sampleId && command.type === 'resolveVoiceClarification' && next !== session
+        ? beginExecutionSample(next, next.execution!.cursor!.cursorId, sampleId, {
+            ...metadata,
+            eventId: this.id(),
+            evidenceId: this.id(),
+          })
+        : next;
     requests.set(context.requestId, signature);
     this.commandRequests.set(sessionId, requests);
-    this.sessions.set(sessionId, next);
-    if (next !== session) this.publish(next);
-    if (attemptId) this.scheduleInspection(next, attemptId, context.requestId);
-    return copy(next);
+    this.sessions.set(sessionId, resolved);
+    if (resolved !== session) this.publish(resolved);
+    if (attemptId) this.scheduleInspection(resolved, attemptId, context.requestId);
+    if (sampleId && resolved !== session)
+      this.scheduleExecutionSample(resolved, sampleId, context.requestId);
+    return copy(resolved);
   }
 
   /** Mock 제어는 정식 Repository 명령·API 입력과 분리한다. 실행 중인 시나리오는 바꿀 수 없다. */
   getDeviceCheckScenario(sessionId: string): MockDeviceScenario {
     return this.scenarios.get(sessionId) ?? 'normal';
+  }
+
+  getExecutionScenario(sessionId: string): MockExecutionScenario {
+    return this.executionScenarios.get(sessionId) ?? 'normal';
+  }
+
+  setExecutionScenario(sessionId: string, scenario: MockExecutionScenario) {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new WorkflowError('NOT_FOUND', '세션을 찾을 수 없습니다.');
+    const state = selectExecution(session);
+    if (
+      !state.authorized ||
+      state.sampling ||
+      state.pendingVoice ||
+      state.completed ||
+      !mockExecutionScenarios.some((item) => item.value === scenario)
+    ) {
+      throw new WorkflowError(
+        'INVALID_STATE',
+        '현재 상태에서 측정 응답 조건를 변경할 수 없습니다.',
+      );
+    }
+    this.executionScenarios.set(sessionId, scenario);
+  }
+
+  private scheduleExecutionSample(
+    session: ExperimentSession,
+    attemptId: string,
+    requestId: string,
+  ) {
+    const definition = copy(session.procedure.deviceCheck!);
+    const executionDefinition = copy(session.procedure.execution!);
+    const cursor = copy(session.execution!.cursor!);
+    const scenario = this.getExecutionScenario(session.sessionId);
+    void Promise.resolve()
+      .then(() =>
+        this.sample({
+          definition,
+          executionDefinition,
+          cursor,
+          scenario,
+          sampleAttemptId: attemptId,
+          initialStaleObservedAt: this.initialStaleReadings.get(session.sessionId),
+          now: this.now,
+        }),
+      )
+      .catch(() => ({
+        attemptId,
+        cursorId: cursor.cursorId,
+        source: 'mock' as const,
+        stability: 'stable' as const,
+        diagnostics: {
+          source: 'mock' as const,
+          deviceId: definition.deviceId,
+          connection: 'error' as const,
+          checkedAt: this.now(),
+          sensors: [],
+          issue: {
+            code: 'MOCK_SAMPLE_ERROR',
+            message: '측정 응답을 처리하지 못했습니다. 현재 회차를 유지합니다.',
+          },
+        },
+      }))
+      .then((report) => {
+        const current = this.sessions.get(session.sessionId);
+        if (!current) return;
+        const next = finishExecutionSample(current, attemptId, copy(report), {
+          requestId,
+          now: this.now(),
+          eventId: this.id(),
+          evidenceId: this.id(),
+        });
+        if (next !== current) {
+          this.sessions.set(next.sessionId, next);
+          this.publish(next);
+        }
+      });
   }
 
   setDeviceCheckScenario(sessionId: string, scenario: MockDeviceScenario) {
@@ -254,6 +416,7 @@ export class MockWorkflowRepository implements WorkflowRepository {
   }
 
   subscribe(sessionId: string, listener: (session: ExperimentSession) => void) {
+    this.assertDevelopmentEnvironment();
     const listeners = this.listeners.get(sessionId) ?? new Set();
     listeners.add(listener);
     this.listeners.set(sessionId, listeners);
@@ -261,5 +424,13 @@ export class MockWorkflowRepository implements WorkflowRepository {
       listeners.delete(listener);
       if (listeners.size === 0) this.listeners.delete(sessionId);
     };
+  }
+
+  private assertDevelopmentEnvironment() {
+    if (!isMockWorkflowEnabled())
+      throw new WorkflowError(
+        'INVALID_STATE',
+        '장치 서비스가 준비되지 않아 실험을 진행할 수 없습니다.',
+      );
   }
 }

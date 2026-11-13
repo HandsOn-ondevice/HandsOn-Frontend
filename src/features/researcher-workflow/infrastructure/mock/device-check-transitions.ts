@@ -5,6 +5,7 @@ import {
   type DeviceDiagnosticsReport,
 } from '../../domain/device-check';
 import type { TransitionMetadata } from './transition-engine';
+import { initialExecution } from './execution-transitions';
 
 export function beginDeviceCheck(
   session: ExperimentSession,
@@ -146,6 +147,7 @@ export function startMockExecution(
   return {
     ...session,
     phase: 'running',
+    execution: initialExecution(session, `${meta.eventId}:cursor`),
     revision: session.revision + 1,
     updatedAt: meta.now,
     evidence: [

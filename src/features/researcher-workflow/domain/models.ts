@@ -5,6 +5,8 @@ import type {
   SensorReading,
   DiagnosticIssue,
 } from './device-check';
+import type { ExecutionDefinition, ExecutionState, ExecutionCursor } from './execution';
+import type { VoiceChoice } from './voice-clarification';
 
 export type PreparationCheckId =
   'materials' | 'device' | 'powerOff' | 'wiring' | 'distance' | 'communication';
@@ -27,6 +29,7 @@ export interface ProcedureSnapshot {
   readonly deviceId: string;
   readonly preparation: readonly PreparationRequirement[];
   readonly deviceCheck?: DeviceCheckDefinition;
+  readonly execution?: ExecutionDefinition;
 }
 
 export interface PreparationCheck {
@@ -48,7 +51,13 @@ export interface Evidence {
     | 'preparationCompleted'
     | 'deviceCheckPassed'
     | 'deviceCheckFailed'
-    | 'executionStarted';
+    | 'executionStarted'
+    | 'measurementConfirmed'
+    | 'measurementAccepted'
+    | 'voiceClarificationConfirmed'
+    | 'voiceClarificationCancelled'
+    | 'recoveryRequested'
+    | 'recoveryChecked';
   readonly recordedAt: string;
   readonly source: 'mock' | 'api';
   readonly attemptId?: string;
@@ -56,6 +65,9 @@ export interface Evidence {
   readonly readings?: readonly SensorReading[];
   readonly issue?: DiagnosticIssue;
   readonly diagnostics?: DeviceDiagnosticsReport;
+  readonly cursor?: ExecutionCursor;
+  readonly commandId?: string;
+  readonly voiceChoice?: VoiceChoice | 'cancel';
 }
 
 export interface WorkflowEvent {
@@ -69,11 +81,24 @@ export interface WorkflowEvent {
     | 'deviceCheckStarted'
     | 'deviceCheckPassed'
     | 'deviceCheckFailed'
-    | 'executionStarted';
+    | 'executionStarted'
+    | 'executionSampleRequested'
+    | 'executionSampleReceived'
+    | 'executionSampleRejected'
+    | 'measurementAccepted'
+    | 'voiceClarificationRequested'
+    | 'voiceClarificationDismissed'
+    | 'voiceClarificationResolved'
+    | 'recoveryRequested'
+    | 'recoveryFailed'
+    | 'recoverySucceeded';
   readonly occurredAt: string;
   readonly evidenceId?: string;
   readonly checkId?: PreparationCheckId;
   readonly attemptId?: string;
+  readonly cursor?: ExecutionCursor;
+  readonly commandId?: string;
+  readonly voiceChoice?: VoiceChoice | 'cancel';
 }
 
 export interface ExperimentSession {
@@ -89,6 +114,7 @@ export interface ExperimentSession {
   readonly evidence: readonly Evidence[];
   readonly events: readonly WorkflowEvent[];
   readonly deviceChecks: readonly DeviceCheckAttempt[];
+  readonly execution?: ExecutionState;
 }
 
 export type WorkflowCommand =
@@ -99,7 +125,34 @@ export type WorkflowCommand =
     }
   | { readonly type: 'completePreparation' }
   | { readonly type: 'startDeviceCheck' }
-  | { readonly type: 'startExecution' };
+  | { readonly type: 'startExecution' }
+  | { readonly type: 'requestExecutionSample'; readonly cursorId: string }
+  | {
+      readonly type: 'requestRecovery';
+      readonly cursorId: string;
+      readonly blockedAttemptId: string;
+    }
+  | {
+      readonly type: 'requestRecoveryRemeasurement';
+      readonly cursorId: string;
+      readonly recoveryId: string;
+    }
+  | {
+      readonly type: 'completeExecutionStep';
+      readonly cursorId: string;
+      readonly sampleAttemptId: string;
+    }
+  | {
+      readonly type: 'requestVoiceClarification';
+      readonly cursorId: string;
+      readonly utterance: string;
+    }
+  | { readonly type: 'dismissVoiceClarification'; readonly commandId: string }
+  | {
+      readonly type: 'resolveVoiceClarification';
+      readonly commandId: string;
+      readonly choice: VoiceChoice;
+    };
 
 export interface CommandContext {
   readonly requestId: string;

@@ -1,4 +1,6 @@
 import { createContext, useContext, type ReactNode } from 'react';
+import { AppText, Screen } from '@/design-system';
+import { isMockWorkflowEnabled } from '../infrastructure/mock/mock-environment';
 import type { WorkflowRepository } from '../application/WorkflowRepository';
 import { MockWorkflowRepository } from '../infrastructure/mock/MockWorkflowRepository';
 
@@ -13,6 +15,14 @@ export function WorkflowProvider({
   children: ReactNode;
   repository?: WorkflowRepository;
 }) {
+  if (!isMockWorkflowEnabled() && repository instanceof MockWorkflowRepository) {
+    return (
+      <Screen>
+        <AppText variant="heading">실험 서비스를 준비하고 있습니다.</AppText>
+        <AppText>장치 서비스가 연결되기 전에는 점검이나 측정 결과를 제공하지 않습니다.</AppText>
+      </Screen>
+    );
+  }
   return <RepositoryContext.Provider value={repository}>{children}</RepositoryContext.Provider>;
 }
 
