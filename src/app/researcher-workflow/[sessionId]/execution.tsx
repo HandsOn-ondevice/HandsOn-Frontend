@@ -25,6 +25,9 @@ export default function ExecutionRoute() {
           params: { sessionId },
         })
       }
+      onPause={() =>
+        router.push({ pathname: '/researcher-workflow/[sessionId]/paused', params: { sessionId } })
+      }
       onClarification={() =>
         router.push({
           pathname: '/researcher-workflow/[sessionId]/voice-clarification',

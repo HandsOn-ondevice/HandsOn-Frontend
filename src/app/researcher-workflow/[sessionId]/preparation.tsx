@@ -1,8 +1,16 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { PreparationScreen } from '@/features/researcher-workflow/screens/PreparationScreen';
+import { useWorkflowSession } from '@/features/researcher-workflow/state/useWorkflowSession';
 
 export default function PreparationRoute() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
+  const { session } = useWorkflowSession(sessionId);
+  if (session?.phase === 'paused')
+    return (
+      <Redirect
+        href={{ pathname: '/researcher-workflow/[sessionId]/paused', params: { sessionId } }}
+      />
+    );
   return (
     <PreparationScreen
       key={sessionId}

@@ -1,3 +1,4 @@
+import type { ResumeCheckAttempt, ResumeCheckTarget } from './resume';
 import type {
   DeviceCheckAttempt,
   DeviceCheckDefinition,
@@ -52,6 +53,10 @@ export interface Evidence {
     | 'deviceCheckPassed'
     | 'deviceCheckFailed'
     | 'executionStarted'
+    | 'executionResumed'
+    | 'resumeChecked'
+    | 'resumeSetupConfirmed'
+    | 'resumeSetupRevoked'
     | 'measurementConfirmed'
     | 'measurementAccepted'
     | 'voiceClarificationConfirmed'
@@ -82,6 +87,13 @@ export interface WorkflowEvent {
     | 'deviceCheckPassed'
     | 'deviceCheckFailed'
     | 'executionStarted'
+    | 'executionPaused'
+    | 'resumeCheckRequested'
+    | 'resumeCheckPassed'
+    | 'resumeCheckFailed'
+    | 'resumeSetupConfirmed'
+    | 'resumeSetupRevoked'
+    | 'executionResumed'
     | 'executionSampleRequested'
     | 'executionSampleReceived'
     | 'executionSampleRejected'
@@ -106,7 +118,7 @@ export interface ExperimentSession {
   readonly operatorId: string;
   readonly source: 'mock' | 'api';
   readonly procedure: ProcedureSnapshot;
-  readonly phase: 'preparing' | 'awaitingDeviceCheck' | 'readyToExecute' | 'running';
+  readonly phase: 'preparing' | 'awaitingDeviceCheck' | 'readyToExecute' | 'running' | 'paused';
   readonly revision: number;
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -115,6 +127,7 @@ export interface ExperimentSession {
   readonly events: readonly WorkflowEvent[];
   readonly deviceChecks: readonly DeviceCheckAttempt[];
   readonly execution?: ExecutionState;
+  readonly resumeChecks?: readonly ResumeCheckAttempt[];
 }
 
 export type WorkflowCommand =
@@ -126,6 +139,20 @@ export type WorkflowCommand =
   | { readonly type: 'completePreparation' }
   | { readonly type: 'startDeviceCheck' }
   | { readonly type: 'startExecution' }
+  | { readonly type: 'pauseExecution'; readonly cursorId: string }
+  | {
+      readonly type: 'checkResume';
+      readonly pauseEventId: string;
+      readonly cursorId: string;
+      readonly target: ResumeCheckTarget;
+    }
+  | {
+      readonly type: 'confirmResumeSetup';
+      readonly pauseEventId: string;
+      readonly attemptId: string;
+      readonly confirmed: boolean;
+    }
+  | { readonly type: 'resumeExecution'; readonly pauseEventId: string; readonly cursorId: string }
   | { readonly type: 'requestExecutionSample'; readonly cursorId: string }
   | {
       readonly type: 'requestRecovery';

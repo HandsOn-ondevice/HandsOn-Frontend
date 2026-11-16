@@ -30,12 +30,14 @@ export function ExecutionScreen({
   onClarification,
   onRecovery,
   onRemeasurement,
+  onPause,
 }: {
   sessionId: string;
   onBack: () => void;
   onClarification: () => void;
   onRecovery?: () => void;
   onRemeasurement?: () => void;
+  onPause?: () => void;
 }) {
   const previewControls = useMockDeviceCheckControls();
   const { session, loading, pending, error, refresh, execute } = useWorkflowSession(sessionId);
@@ -65,6 +67,11 @@ export function ExecutionScreen({
       cursorId: state.cursor.cursorId,
       sampleAttemptId: state.latest.attemptId,
     });
+  };
+  const pause = async () => {
+    if (!state?.cursor || !onPause) return;
+    const next = await execute({ type: 'pauseExecution', cursorId: state.cursor.cursorId });
+    if (next?.phase === 'paused') onPause();
   };
   return (
     <SafeAreaView style={styles.root} edges={['top']} testID="execution-screen">
@@ -134,13 +141,19 @@ export function ExecutionScreen({
             ) : null}
             <FeedbackPanel
               title={
-                !state.authorized
-                  ? '실험 진행이 잠겨 있습니다'
-                  : state.completed
-                    ? '반복 측정 완료'
-                    : guidance
+                session.phase === 'paused'
+                  ? '실험이 일시정지되어 있습니다'
+                  : !state.authorized
+                    ? '실험 진행이 잠겨 있습니다'
+                    : state.completed
+                      ? '반복 측정 완료'
+                      : guidance
               }
-              subtitle={state.reason}
+              subtitle={
+                session.phase === 'paused'
+                  ? '재개 전 확인을 완료한 뒤 같은 회차를 이어갈 수 있습니다.'
+                  : state.reason
+              }
               icon={state.latest?.status === 'error' ? 'alert' : 'guidance'}
               tone={
                 state.latest?.status === 'error'
@@ -152,6 +165,9 @@ export function ExecutionScreen({
                       : 'info'
               }
             />
+            {session.phase === 'paused' && onPause ? (
+              <Button label="일시정지 기록 확인" variant="secondary" onPress={onPause} />
+            ) : null}
             {state.authorized && state.configured ? (
               <>
                 <ExecutionMetrics
@@ -213,6 +229,15 @@ export function ExecutionScreen({
                       });
                   }}
                 />
+                <Button
+                  label="실험 일시정지"
+                  variant="secondary"
+                  disabled={pending || !onPause || !state.cursor}
+                  loading={pending}
+                  onPress={() => {
+                    void pause();
+                  }}
+                />
                 <AppText variant="caption">
                   센서 응답 확인만으로 작업자 완료가 기록되지 않습니다. 완료 요청은 현재 회차의
                   작업자 확인을 뜻합니다.
@@ -244,7 +269,9 @@ export function ExecutionScreen({
             />
           </PreviewTools>
         ) : null}
-        <AppText>일시정지·재개와 종료 검토는 아직 제공하지 않습니다.</AppText>
+        <AppText>
+          일시정지와 재개는 앱 상태만 변경합니다. 종료 검토는 아직 제공하지 않습니다.
+        </AppText>
         {session?.source === 'mock' ? (
           <AppText>현재 값은 장치에서 수집한 실측값이 아닙니다.</AppText>
         ) : null}

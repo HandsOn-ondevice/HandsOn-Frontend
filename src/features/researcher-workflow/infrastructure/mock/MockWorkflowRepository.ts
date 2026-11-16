@@ -1,3 +1,9 @@
+import {
+  beginResumeCheck,
+  finishResumeCheck,
+  confirmResumeSetup,
+  resumeExecution,
+} from './resume-transitions';
 import type { CreateSessionInput, WorkflowRepository } from '../../application/WorkflowRepository';
 import { createRequestId } from '../../application/request-id';
 import {
@@ -204,6 +210,14 @@ export class MockWorkflowRepository implements WorkflowRepository {
         '세션이 변경되었습니다. 새로 확인한 뒤 다시 시도해 주세요.',
       );
     }
+    if (
+      session.phase === 'paused' &&
+      !['pauseExecution', 'checkResume', 'confirmResumeSetup', 'resumeExecution'].includes(
+        command.type,
+      )
+    ) {
+      throw new WorkflowError('INVALID_STATE', '일시정지 중에는 실험을 진행할 수 없습니다.');
+    }
     const metadata = {
       requestId: context.requestId,
       now: this.now(),
@@ -219,43 +233,51 @@ export class MockWorkflowRepository implements WorkflowRepository {
         ? this.id()
         : undefined;
     const next =
-      command.type === 'startDeviceCheck'
-        ? beginDeviceCheck(session, attemptId!, metadata)
-        : command.type === 'startExecution'
-          ? startMockExecution(session, metadata)
-          : command.type === 'requestRecovery'
-            ? beginRecovery(session, command, sampleId!, metadata)
-            : command.type === 'requestRecoveryRemeasurement'
-              ? beginRecoveryRemeasurement(session, command, sampleId!, metadata)
-              : command.type === 'requestExecutionSample'
-                ? beginExecutionSample(session, command.cursorId, sampleId!, metadata)
-                : command.type === 'completeExecutionStep'
-                  ? completeExecutionStep(
-                      session,
-                      command.cursorId,
-                      command.sampleAttemptId,
-                      this.id(),
-                      metadata,
-                    )
-                  : command.type === 'requestVoiceClarification'
-                    ? requestVoiceClarification(
-                        session,
-                        command.cursorId,
-                        command.utterance,
-                        this.id(),
-                        metadata,
-                      )
-                    : command.type === 'dismissVoiceClarification'
-                      ? dismissVoiceClarification(session, command.commandId, metadata)
-                      : command.type === 'resolveVoiceClarification'
-                        ? resolveVoiceClarification(
-                            session,
-                            command.commandId,
-                            command.choice,
-                            sampleId,
-                            metadata,
-                          )
-                        : transitionPreparation(session, command, metadata);
+      command.type === 'pauseExecution'
+        ? this.pauseExecution(session, command.cursorId, metadata)
+        : command.type === 'checkResume'
+          ? beginResumeCheck(session, command, this.id(), metadata)
+          : command.type === 'confirmResumeSetup'
+            ? confirmResumeSetup(session, command, metadata)
+            : command.type === 'resumeExecution'
+              ? resumeExecution(session, command, metadata)
+              : command.type === 'startDeviceCheck'
+                ? beginDeviceCheck(session, attemptId!, metadata)
+                : command.type === 'startExecution'
+                  ? startMockExecution(session, metadata)
+                  : command.type === 'requestRecovery'
+                    ? beginRecovery(session, command, sampleId!, metadata)
+                    : command.type === 'requestRecoveryRemeasurement'
+                      ? beginRecoveryRemeasurement(session, command, sampleId!, metadata)
+                      : command.type === 'requestExecutionSample'
+                        ? beginExecutionSample(session, command.cursorId, sampleId!, metadata)
+                        : command.type === 'completeExecutionStep'
+                          ? completeExecutionStep(
+                              session,
+                              command.cursorId,
+                              command.sampleAttemptId,
+                              this.id(),
+                              metadata,
+                            )
+                          : command.type === 'requestVoiceClarification'
+                            ? requestVoiceClarification(
+                                session,
+                                command.cursorId,
+                                command.utterance,
+                                this.id(),
+                                metadata,
+                              )
+                            : command.type === 'dismissVoiceClarification'
+                              ? dismissVoiceClarification(session, command.commandId, metadata)
+                              : command.type === 'resolveVoiceClarification'
+                                ? resolveVoiceClarification(
+                                    session,
+                                    command.commandId,
+                                    command.choice,
+                                    sampleId,
+                                    metadata,
+                                  )
+                                : transitionPreparation(session, command, metadata);
     // 의미 확인과 재측정 요청을 원자적으로 저장한다. 중복 확인은 새 요청을 만들지 않는다.
     const resolved =
       sampleId && command.type === 'resolveVoiceClarification' && next !== session
@@ -272,7 +294,40 @@ export class MockWorkflowRepository implements WorkflowRepository {
     if (attemptId) this.scheduleInspection(resolved, attemptId, context.requestId);
     if (sampleId && resolved !== session)
       this.scheduleExecutionSample(resolved, sampleId, context.requestId);
+    if (command.type === 'checkResume' && resolved !== session)
+      this.scheduleResumeCheck(resolved, context.requestId);
     return copy(resolved);
+  }
+
+  private pauseExecution(
+    session: ExperimentSession,
+    cursorId: string,
+    metadata: { requestId: string; now: string; eventId: string },
+  ): ExperimentSession {
+    const cursor = session.execution?.cursor;
+    if (!cursor || cursor.cursorId !== cursorId) {
+      throw new WorkflowError('INVALID_STATE', '일시정지할 현재 회차를 확인해 주세요.');
+    }
+    if (session.phase === 'paused') return session;
+    if (!selectExecution(session).authorized) {
+      throw new WorkflowError('INVALID_STATE', '진행 중인 실험만 일시정지할 수 있습니다.');
+    }
+    return {
+      ...session,
+      phase: 'paused',
+      revision: session.revision + 1,
+      updatedAt: metadata.now,
+      events: [
+        ...session.events,
+        {
+          eventId: metadata.eventId,
+          requestId: metadata.requestId,
+          type: 'executionPaused',
+          occurredAt: metadata.now,
+          cursor,
+        },
+      ],
+    };
   }
 
   /** Mock 제어는 정식 Repository 명령·API 입력과 분리한다. 실행 중인 시나리오는 바꿀 수 없다. */
@@ -360,7 +415,11 @@ export class MockWorkflowRepository implements WorkflowRepository {
   setDeviceCheckScenario(sessionId: string, scenario: MockDeviceScenario) {
     const session = this.sessions.get(sessionId);
     if (!session) throw new WorkflowError('NOT_FOUND', '세션을 찾을 수 없습니다.');
-    if (session.deviceChecks.at(-1)?.status === 'checking' || session.phase === 'running') {
+    if (
+      session.deviceChecks.at(-1)?.status === 'checking' ||
+      session.phase === 'running' ||
+      session.resumeChecks?.some((attempt) => attempt.status === 'checking')
+    ) {
       throw new WorkflowError(
         'INVALID_STATE',
         '점검 진행 중이거나 실험 시작 뒤에는 시나리오를 변경할 수 없습니다.',
@@ -380,6 +439,55 @@ export class MockWorkflowRepository implements WorkflowRepository {
         /* 구독자는 자체 오류 경계를 사용한다. */
       }
     });
+  }
+
+  private scheduleResumeCheck(session: ExperimentSession, requestId: string) {
+    const attempt = session.resumeChecks!.at(-1)!;
+    const original = session.procedure.deviceCheck!;
+    const definition = copy(
+      attempt.target === 'voltage'
+        ? {
+            ...original,
+            sensors: original.sensors
+              .filter((sensor) => sensor.metrics.some((metric) => metric.id === 'voltage'))
+              .map((sensor) => ({
+                ...sensor,
+                required: true,
+                metrics: sensor.metrics.filter((metric) => metric.id === 'voltage'),
+              })),
+          }
+        : original,
+    );
+    const scenario = this.getDeviceCheckScenario(session.sessionId);
+    void Promise.resolve()
+      .then(() =>
+        this.inspect({ definition, scenario, attemptId: attempt.attemptId, now: this.now }),
+      )
+      .catch(() => ({
+        source: 'mock' as const,
+        deviceId: definition.deviceId,
+        connection: 'error' as const,
+        checkedAt: this.now(),
+        sensors: [],
+        issue: {
+          code: 'RESUME_CHECK_ERROR',
+          message: '재개 전 응답을 확인하지 못했습니다. 다시 확인해 주세요.',
+        },
+      }))
+      .then((report) => {
+        const current = this.sessions.get(session.sessionId);
+        if (!current) return;
+        const next = finishResumeCheck(current, attempt.attemptId, copy(report), {
+          requestId,
+          now: this.now(),
+          eventId: this.id(),
+          evidenceId: this.id(),
+        });
+        if (next !== current) {
+          this.sessions.set(next.sessionId, next);
+          this.publish(next);
+        }
+      });
   }
 
   private scheduleInspection(session: ExperimentSession, attemptId: string, requestId: string) {
