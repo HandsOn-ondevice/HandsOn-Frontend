@@ -274,7 +274,9 @@ describe('S04 사용자 흐름', () => {
     await screen.findByText('S04 준비 확인이 필요합니다');
     expect(screen.getByRole('button', { name: '실험 측정 시작' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '장치·센서 점검 시작' })).toBeDisabled();
-    expect(screen.getByText('Mock 환경 · 실제 장비 연결·측정 아님')).toBeTruthy();
+    expect(screen.queryByText('Mock 환경 · 실제 장비 연결·측정 아님')).toBeNull();
+    await fireEvent.press(screen.getByRole('button', { name: '더 보기' }));
+    await screen.findByText('Mock 환경 · 실제 장비 연결·측정 아님');
   });
 
   test('기존 갤러리에서 S06 예제를 열고 돌아올 수 있다', async () => {

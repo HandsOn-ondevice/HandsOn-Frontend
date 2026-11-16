@@ -16,6 +16,7 @@ import { selectDeviceCheck } from '../domain/device-check';
 import { useWorkflowSession } from '../state/useWorkflowSession';
 import { DeviceCheckResults } from './DeviceCheckResults';
 import { MockDeviceScenarioControl } from './MockDeviceScenarioControl';
+import { WorkflowProvider, useMockDeviceCheckControls } from '../state/WorkflowProvider';
 
 /** 기존 임시 화면의 export 이름을 유지한 실제 S05 조합 화면. 통신은 Repository 책임이다. */
 export function DeviceCheckConnectionScreen({
@@ -28,12 +29,12 @@ export function DeviceCheckConnectionScreen({
   onExecution: () => void;
 }) {
   const { session, loading, pending, error, refresh, execute } = useWorkflowSession(sessionId);
+  const controls = useMockDeviceCheckControls();
   const [details, setDetails] = useState(false);
   const state = session ? selectDeviceCheck(session) : null;
   const attempt = state?.latest;
   const definition = session?.procedure.deviceCheck;
   const locked = pending || loading || state?.checking === true;
-  const sourceLabel = session?.source === 'api' ? '' : 'Mock ';
   const subtitle =
     session?.source === 'mock'
       ? 'Mock 환경 · 실제 장비 연결·측정 아님'
@@ -44,9 +45,9 @@ export function DeviceCheckConnectionScreen({
       : state.checking
         ? '장치·센서 점검 중입니다'
         : state.executionStarted
-          ? `${sourceLabel}실험 시작 상태입니다`
+          ? '실험 시작 상태입니다'
           : state.canStart
-            ? `${definition?.title ?? '장치'} 연결됨 · ${sourceLabel}점검 성공`
+            ? '점검 응답을 확인했어요'
             : attempt?.status === 'failed'
               ? '장치·센서 점검에 실패했습니다'
               : '장치·센서 점검을 시작해 주세요';
@@ -65,9 +66,6 @@ export function DeviceCheckConnectionScreen({
       <ScrollView contentContainerStyle={styles.content}>
         <AppText variant="heading" accessibilityRole="header">
           실험 시작 전 점검
-        </AppText>
-        <AppText variant="caption" color={colors.text.secondary}>
-          {subtitle}
         </AppText>
         {loading ? (
           <AppText accessibilityLiveRegion="polite">장치 점검 상태를 불러오고 있습니다.</AppText>
@@ -90,15 +88,12 @@ export function DeviceCheckConnectionScreen({
         ) : null}
         {session && state ? (
           <>
-            <AppText variant="caption">
-              세션 {session.sessionId} · 절차 v{session.procedure.version}
-            </AppText>
             <FeedbackPanel
               title={title}
               subtitle={
                 attempt?.issue?.message ??
                 (state.canStart || state.executionStarted
-                  ? `필수 센서의 ${sourceLabel}응답을 확인했습니다. 장비의 안전 범위를 별도로 승인한 결과는 아닙니다.`
+                  ? `필수 센서 ${definition?.sensors.filter((sensor) => sensor.required).length ?? 0}개의 점검 응답을 확인했습니다.`
                   : state.checking
                     ? '점검 응답을 기다려 주세요. 화면을 나가도 점검은 유지됩니다.'
                     : 'S04 필수 확인 후 장치·센서 점검을 요청해 주세요.')
@@ -115,19 +110,6 @@ export function DeviceCheckConnectionScreen({
                 tone="warning"
               />
             )}
-            {attempt ? (
-              <AppText variant="caption">
-                점검 시도 {session.deviceChecks.length}회 ·{' '}
-                {attempt.completedAt
-                  ? `완료 ${new Date(attempt.completedAt).toLocaleTimeString('ko-KR', { hour12: false })}`
-                  : '응답 대기 중'}
-              </AppText>
-            ) : null}
-            <MockDeviceScenarioControl
-              key={sessionId}
-              sessionId={sessionId}
-              disabled={locked || state.executionStarted}
-            />
             <Button
               label={
                 state.checking
@@ -143,9 +125,6 @@ export function DeviceCheckConnectionScreen({
                 void execute({ type: 'startDeviceCheck' });
               }}
             />
-            <AppText variant="caption" color={colors.text.secondary}>
-              표시값은 점검 시점의 기록입니다. 실시간 센서 감시·안전 범위 판정은 수행하지 않습니다.
-            </AppText>
           </>
         ) : null}
       </ScrollView>
@@ -165,12 +144,37 @@ export function DeviceCheckConnectionScreen({
         icon="device"
       >
         <AppText>{subtitle}</AppText>
+        {session ? (
+          <AppText variant="caption">
+            세션 {session.sessionId} · 절차 v{session.procedure.version}
+          </AppText>
+        ) : null}
+        {session && attempt ? (
+          <AppText variant="caption">
+            점검 시도 {session.deviceChecks.length}회 ·{' '}
+            {attempt.completedAt
+              ? `완료 ${new Date(attempt.completedAt).toLocaleTimeString('ko-KR', { hour12: false })}`
+              : '응답 대기 중'}
+          </AppText>
+        ) : null}
+        {session && controls ? (
+          <WorkflowProvider repository={controls}>
+            <MockDeviceScenarioControl
+              key={sessionId}
+              sessionId={sessionId}
+              disabled={locked || !!state?.executionStarted}
+            />
+          </WorkflowProvider>
+        ) : null}
         <AppText>
           작업자 확인과 센서 응답은 별도 근거로 기록합니다. 통신 점검 성공 후에만 실험 시작 상태로
           전환할 수 있습니다.
         </AppText>
         <AppText>
           Mock 상태는 앱 재시작 시 초기화됩니다. 실제 API·장치 서비스는 연결하지 않았습니다.
+        </AppText>
+        <AppText>
+          표시값은 점검 시점의 기록입니다. 실시간 센서 감시·안전 범위 판정은 수행하지 않습니다.
         </AppText>
       </BottomSheet>
     </SafeAreaView>

@@ -53,10 +53,28 @@ async function setup(
   return { repository, session, onExecution, onBack, view, screen };
 }
 
+async function chooseScenario(
+  screen: Awaited<ReturnType<typeof render>>,
+  current: string,
+  next: string,
+) {
+  await fireEvent.press(screen.getByRole('button', { name: '더 보기' }));
+  await screen.findByRole('header', { name: '장치 점검 정보' });
+  await fireEvent.press(screen.getByRole('button', { name: `Mock 점검 시나리오: ${current}` }));
+  await fireEvent.press(screen.getByRole('radio', { name: next }));
+  await fireEvent.press(screen.getByRole('button', { name: '하단 시트 닫기' }));
+  await waitFor(() => expect(screen.queryByRole('button', { name: '하단 시트 닫기' })).toBeNull());
+}
+
 describe('S04~S06 장치 점검 화면 연결', () => {
   test('미점검 상태의 센서를 정상으로 표시하지 않고 시작을 차단한다', async () => {
     const { screen } = await setup();
-    expect(screen.getByText('Mock 환경 · 실제 장비 연결·측정 아님')).toBeTruthy();
+    expect(screen.queryByText('Mock 환경 · 실제 장비 연결·측정 아님')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Mock 점검 시나리오/ })).toBeNull();
+    await fireEvent.press(screen.getByRole('button', { name: '더 보기' }));
+    await screen.findByText('Mock 환경 · 실제 장비 연결·측정 아님');
+    expect(screen.getByRole('button', { name: 'Mock 점검 시나리오: 정상 연결' })).toBeEnabled();
+    await fireEvent.press(screen.getByRole('button', { name: '하단 시트 닫기' }));
     expect(screen.getAllByText('점검 전')).toHaveLength(3);
     expect(screen.getByRole('button', { name: '실험 측정 시작' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '장치·센서 점검 시작' })).toBeEnabled();
@@ -72,6 +90,9 @@ describe('S04~S06 장치 점검 화면 연결', () => {
     await screen.findByText('장치·센서 점검 중입니다');
     expect(screen.getByRole('button', { name: '실험 측정 시작' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '장치·센서 점검 중' })).toBeDisabled();
+    await fireEvent.press(screen.getByRole('button', { name: '더 보기' }));
+    expect(screen.getByRole('button', { name: 'Mock 점검 시나리오: 정상 연결' })).toBeDisabled();
+    await fireEvent.press(screen.getByRole('button', { name: '하단 시트 닫기' }));
     await screen.unmount();
     const reopened = await render(view());
     await reopened.findByText('장치·센서 점검 중입니다');
@@ -86,7 +107,7 @@ describe('S04~S06 장치 점검 화면 연결', () => {
         }),
       ),
     );
-    await reopened.findByText('Orange Pi 5+ 연결됨 · Mock 점검 성공');
+    await reopened.findByText('점검 응답을 확인했어요');
     expect(reopened.getByRole('button', { name: '실험 측정 시작' })).toBeEnabled();
     await fireEvent.press(reopened.getByRole('button', { name: '실험 측정 시작' }));
     await waitFor(() => expect(onExecution).toHaveBeenCalledTimes(1));
@@ -96,16 +117,12 @@ describe('S04~S06 장치 점검 화면 연결', () => {
 
   test('오류 문구와 미연결 상태를 표시하고 시나리오 선택 후 재시도한다', async () => {
     const { screen, repository, session } = await setup();
-    await fireEvent.press(screen.getByRole('button', { name: 'Mock 점검 시나리오: 정상 연결' }));
-    await fireEvent.press(screen.getByRole('radio', { name: '센서 통신 오류' }));
+    await chooseScenario(screen, '정상 연결', '센서 통신 오류');
     await fireEvent.press(screen.getByRole('button', { name: '장치·센서 점검 시작' }));
     await screen.findByText('장치·센서 점검에 실패했습니다');
     expect(screen.getAllByText(/통신 오류 시뮬레이션/).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: '실험 측정 시작' })).toBeDisabled();
-    await fireEvent.press(
-      screen.getByRole('button', { name: 'Mock 점검 시나리오: 센서 통신 오류' }),
-    );
-    await fireEvent.press(screen.getByRole('radio', { name: '장치 미연결' }));
+    await chooseScenario(screen, '센서 통신 오류', '장치 미연결');
     await fireEvent.press(screen.getByRole('button', { name: '장치·센서 다시 점검' }));
     await waitFor(async () =>
       expect((await repository.getSession(session.sessionId)).deviceChecks).toHaveLength(2),
@@ -114,10 +131,9 @@ describe('S04~S06 장치 점검 화면 연결', () => {
       'Mock 장치에 연결되지 않았습니다. 실제 Orange Pi 연결 상태를 나타내지 않습니다.',
     );
     expect(screen.queryByText('18.4 lx')).toBeNull();
-    await fireEvent.press(screen.getByRole('button', { name: 'Mock 점검 시나리오: 장치 미연결' }));
-    await fireEvent.press(screen.getByRole('radio', { name: '정상 연결' }));
+    await chooseScenario(screen, '장치 미연결', '정상 연결');
     await fireEvent.press(screen.getByRole('button', { name: '장치·센서 다시 점검' }));
-    await screen.findByText('Orange Pi 5+ 연결됨 · Mock 점검 성공');
+    await screen.findByText('점검 응답을 확인했어요');
     expect(screen.getByRole('button', { name: '실험 측정 시작' })).toBeEnabled();
     expect(
       (await repository.getSession(session.sessionId)).deviceChecks.map(
@@ -129,7 +145,7 @@ describe('S04~S06 장치 점검 화면 연결', () => {
   test('S05 성공 후 S04 복귀에서는 6/6과 시스템 근거를 표시한다', async () => {
     const { repository, session, screen } = await setup();
     await fireEvent.press(screen.getByRole('button', { name: '장치·센서 점검 시작' }));
-    await screen.findByText('Orange Pi 5+ 연결됨 · Mock 점검 성공');
+    await screen.findByText('점검 응답을 확인했어요');
     await screen.rerender(
       <WorkflowProvider repository={repository}>
         <PreparationScreen
@@ -185,6 +201,8 @@ describe('S04~S06 장치 점검 화면 연결', () => {
       </WorkflowProvider>,
     );
     await screen.findByText('장치·센서 점검을 시작해 주세요');
+    await fireEvent.press(screen.getByRole('button', { name: '더 보기' }));
+    await screen.findByRole('header', { name: '장치 점검 정보' });
     expect(screen.queryByRole('button', { name: /Mock 점검 시나리오/ })).toBeNull();
   });
 
@@ -199,4 +217,43 @@ describe('S04~S06 장치 점검 화면 연결', () => {
     expect(screen.getByRole('button', { name: '점검 상태 다시 불러오기' })).toBeEnabled();
     expect(screen.getByRole('button', { name: '실험 측정 시작' })).toBeDisabled();
   });
+});
+
+test('S05 시트에서 선택한 시나리오는 유지되고 다음 재점검 전까지 성공 결과·이력을 바꾸지 않는다', async () => {
+  const { screen, repository, session } = await setup();
+  await fireEvent.press(screen.getByRole('button', { name: '장치·센서 점검 시작' }));
+  await screen.findByText('점검 응답을 확인했어요');
+  const passed = await repository.getSession(session.sessionId);
+  await chooseScenario(screen, '정상 연결', '장치 미연결');
+  expect(await repository.getSession(session.sessionId)).toEqual(passed);
+  expect(repository.getDeviceCheckScenario(session.sessionId)).toBe('disconnected');
+  expect(screen.getByRole('button', { name: '실험 측정 시작' })).toBeEnabled();
+  await fireEvent.press(screen.getByRole('button', { name: '더 보기' }));
+  expect(screen.getByRole('button', { name: 'Mock 점검 시나리오: 장치 미연결' })).toBeEnabled();
+  await fireEvent.press(screen.getByRole('button', { name: '하단 시트 닫기' }));
+  await fireEvent.press(screen.getByRole('button', { name: '장치·센서 다시 점검' }));
+  await screen.findByText('장치·센서 점검에 실패했습니다');
+  expect(screen.getByRole('button', { name: '실험 측정 시작' })).toBeDisabled();
+  const failed = await repository.getSession(session.sessionId);
+  expect(failed.deviceChecks.map((attempt) => attempt.status)).toEqual(['passed', 'failed']);
+  expect(failed.deviceChecks[0]).toEqual(passed.deviceChecks[0]);
+  expect(failed.evidence.slice(0, passed.evidence.length)).toEqual(passed.evidence);
+});
+
+test('개발 플래그가 꺼진 Maestro fixture에서도 S05 시트의 Mock 선택을 제공한다', async () => {
+  const environment = globalThis as unknown as { __DEV__: boolean };
+  const previousDev = environment.__DEV__;
+  const previousFlag = process.env.EXPO_PUBLIC_HANDSON_MAESTRO;
+  try {
+    environment.__DEV__ = false;
+    process.env.EXPO_PUBLIC_HANDSON_MAESTRO = '1';
+    const { screen } = await setup();
+    await fireEvent.press(screen.getByRole('button', { name: '더 보기' }));
+    expect(screen.getByRole('button', { name: 'Mock 점검 시나리오: 정상 연결' })).toBeEnabled();
+    await screen.unmount();
+  } finally {
+    environment.__DEV__ = previousDev;
+    if (previousFlag === undefined) delete process.env.EXPO_PUBLIC_HANDSON_MAESTRO;
+    else process.env.EXPO_PUBLIC_HANDSON_MAESTRO = previousFlag;
+  }
 });
