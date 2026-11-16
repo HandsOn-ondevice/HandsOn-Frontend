@@ -38,7 +38,7 @@ for (const viewport of [
     await expect(page).toHaveURL(`${route}/execution`);
     await expect(page.getByText('말씀하세요', { exact: true })).toBeVisible();
     await expect(page.getByText('“0% 조건 1회차 완료했어”', { exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: '실험 일시정지', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '실험 일시정지', exact: true })).toBeEnabled();
     const complete = page.getByRole('button', { name: '완료 요청', exact: true });
     await expect(complete).toBeDisabled();
     await page.getByRole('button', { name: '현재 회차 측정값 확인', exact: true }).click();
