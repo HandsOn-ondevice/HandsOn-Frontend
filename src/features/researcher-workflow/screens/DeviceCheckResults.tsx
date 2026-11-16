@@ -44,10 +44,7 @@ export function DeviceCheckResults({
           state={result.status === 'passed' ? 'normal' : result.status}
           value={value}
           meta={`점검 시각 ${new Date(result.checkedAt).toLocaleTimeString('ko-KR', { hour12: false })}`}
-          detail={
-            result.issue?.message ??
-            `${attempt?.report?.source === 'mock' ? 'Mock 응답 확인' : '서비스 응답 확인'} · 안전 범위 판정 아님`
-          }
+          detail={result.issue?.message ?? sensor.metrics.map((metric) => metric.label).join(' · ')}
         />
       );
     }

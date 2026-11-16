@@ -6,6 +6,7 @@ import {
 } from '../infrastructure/mock/device-check-scenarios';
 import { useMockDeviceCheckControls } from '../state/WorkflowProvider';
 import { workflowErrorMessage } from '../state/useWorkflowSession';
+import { isMockWorkflowEnabled } from '../infrastructure/mock/mock-environment';
 
 export function MockDeviceScenarioControl({
   sessionId,
@@ -19,7 +20,7 @@ export function MockDeviceScenarioControl({
     () => controls?.getDeviceCheckScenario(sessionId) ?? 'normal',
   );
   const [error, setError] = useState<string | null>(null);
-  if (!__DEV__ || !controls) return null;
+  if (!isMockWorkflowEnabled() || !controls) return null;
   return (
     <>
       <SelectField
