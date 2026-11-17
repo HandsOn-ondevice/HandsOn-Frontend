@@ -155,7 +155,7 @@ export function selectExecution(session: ExperimentSession) {
     : !configured || !execution
       ? '절차의 실행 정의가 없습니다. 담당자와 실행 계약을 확인해 주세요.'
       : completed
-        ? '반복 측정을 마쳤습니다. 종료 검토·장치 정리·제출은 아직 제공하지 않습니다.'
+        ? '반복 측정을 마쳤습니다. 누락·이상 검토에서 기록을 확인해 주세요.'
         : pendingVoice
           ? '모호한 음성은 실행하지 않았습니다. 뜻을 확인하거나 취소해 주세요.'
           : sampling

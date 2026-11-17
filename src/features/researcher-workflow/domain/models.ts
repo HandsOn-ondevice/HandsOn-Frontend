@@ -8,6 +8,7 @@ import type {
 } from './device-check';
 import type { ExecutionDefinition, ExecutionState, ExecutionCursor } from './execution';
 import type { VoiceChoice } from './voice-clarification';
+import type { CleanupCheckId, CompletionState } from './completion';
 
 export type PreparationCheckId =
   'materials' | 'device' | 'powerOff' | 'wiring' | 'distance' | 'communication';
@@ -62,7 +63,12 @@ export interface Evidence {
     | 'voiceClarificationConfirmed'
     | 'voiceClarificationCancelled'
     | 'recoveryRequested'
-    | 'recoveryChecked';
+    | 'recoveryChecked'
+    | 'cleanupOutputConfirmed'
+    | 'cleanupConfirmed'
+    | 'cleanupRevoked'
+    | 'experimentFinished'
+    | 'mockResultSubmitted';
   readonly recordedAt: string;
   readonly source: 'mock' | 'api';
   readonly attemptId?: string;
@@ -73,6 +79,7 @@ export interface Evidence {
   readonly cursor?: ExecutionCursor;
   readonly commandId?: string;
   readonly voiceChoice?: VoiceChoice | 'cancel';
+  readonly cleanupCheckId?: CleanupCheckId;
 }
 
 export interface WorkflowEvent {
@@ -103,7 +110,18 @@ export interface WorkflowEvent {
     | 'voiceClarificationResolved'
     | 'recoveryRequested'
     | 'recoveryFailed'
-    | 'recoverySucceeded';
+    | 'recoverySucceeded'
+    | 'reviewMeasurementRequested'
+    | 'cleanupStarted'
+    | 'cleanupOutputRequested'
+    | 'cleanupOutputConfirmed'
+    | 'cleanupOutputFailed'
+    | 'cleanupConfirmed'
+    | 'cleanupRevoked'
+    | 'experimentFinished'
+    | 'mockSubmissionRequested'
+    | 'mockSubmissionFailed'
+    | 'mockResultSubmitted';
   readonly occurredAt: string;
   readonly evidenceId?: string;
   readonly checkId?: PreparationCheckId;
@@ -111,6 +129,7 @@ export interface WorkflowEvent {
   readonly cursor?: ExecutionCursor;
   readonly commandId?: string;
   readonly voiceChoice?: VoiceChoice | 'cancel';
+  readonly cleanupCheckId?: CleanupCheckId;
 }
 
 export interface ExperimentSession {
@@ -118,7 +137,15 @@ export interface ExperimentSession {
   readonly operatorId: string;
   readonly source: 'mock' | 'api';
   readonly procedure: ProcedureSnapshot;
-  readonly phase: 'preparing' | 'awaitingDeviceCheck' | 'readyToExecute' | 'running' | 'paused';
+  readonly phase:
+    | 'preparing'
+    | 'awaitingDeviceCheck'
+    | 'readyToExecute'
+    | 'running'
+    | 'paused'
+    | 'cleaningUp'
+    | 'completed'
+    | 'submitted';
   readonly revision: number;
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -128,9 +155,24 @@ export interface ExperimentSession {
   readonly deviceChecks: readonly DeviceCheckAttempt[];
   readonly execution?: ExecutionState;
   readonly resumeChecks?: readonly ResumeCheckAttempt[];
+  readonly completion?: CompletionState;
 }
 
 export type WorkflowCommand =
+  | {
+      readonly type: 'requestReviewMeasurement';
+      readonly conditionId: string;
+      readonly trialIndex: number;
+    }
+  | { readonly type: 'startCleanup' }
+  | { readonly type: 'retryCleanupOutput' }
+  | {
+      readonly type: 'setCleanupCheck';
+      readonly checkId: CleanupCheckId;
+      readonly checked: boolean;
+    }
+  | { readonly type: 'finishExperiment' }
+  | { readonly type: 'submitMockResult' }
   | {
       readonly type: 'setPreparationCheck';
       readonly checkId: PreparationCheckId;
