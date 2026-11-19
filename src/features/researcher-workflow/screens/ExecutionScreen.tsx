@@ -270,7 +270,8 @@ export function ExecutionScreen({
           </PreviewTools>
         ) : null}
         <AppText>
-          일시정지와 재개는 앱 상태만 변경합니다. 종료 검토는 아직 제공하지 않습니다.
+          일시정지와 재개는 앱 상태만 변경합니다. 마지막 회차를 완료하면 누락·이상 검토로
+          이동합니다.
         </AppText>
         {session?.source === 'mock' ? (
           <AppText>현재 값은 장치에서 수집한 실측값이 아닙니다.</AppText>

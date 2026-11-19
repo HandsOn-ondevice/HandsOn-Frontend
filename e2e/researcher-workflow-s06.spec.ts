@@ -102,7 +102,7 @@ test('360px에서 긴 보류 문구와 최하단 콘텐츠가 버튼 위로 스�
   await expect(page.getByText('유효 측정 0 / 15회', { exact: true })).toBeVisible();
 });
 
-test('15/15 완료 후 마지막 유효 측정값을 표시하고 재측정이나 재완료를 허용하지 않는다', async ({
+test('15/15 완료 후 S12로 이동하고 마지막 유효 측정값과 재완료 차단을 유지한다', async ({
   page,
 }, testInfo) => {
   await page.setViewportSize({ width: 412, height: 920 });
@@ -113,16 +113,22 @@ test('15/15 완료 후 마지막 유효 측정값을 표시하고 재측정이�
     await sample.click();
     await expect(complete).toBeEnabled();
     await complete.click();
-    const progress = page.getByText(`유효 측정 ${count} / 15회`, { exact: true });
-    await progress.scrollIntoViewIfNeeded();
-    await expect(progress).toBeVisible();
+    if (count < 15) {
+      const progress = page.getByText(`유효 측정 ${count} / 15회`, { exact: true });
+      await progress.scrollIntoViewIfNeeded();
+      await expect(progress).toBeVisible();
+    }
   }
-  const last = page.getByText('마지막 유효 측정값 · 100% 조건 3회차', { exact: true });
+  await expect(page).toHaveURL(/\/review$/);
+  await expect(page.getByText('유효 측정 15회가 확인되었습니다', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '100% 조건 상세 보기', exact: true }).click();
+  const last = page.getByText('3회차 · 810 lx · 유효', { exact: true });
   await last.scrollIntoViewIfNeeded();
   await expect(last).toBeVisible();
-  await expect(page.getByLabel(/BH1750 조도, 810, lx/)).toBeVisible();
+  await expect(page.getByText(/회차 · 810 lx · 유효$/)).toHaveCount(3);
   await expect(page.getByText('현재 회차 응답 없음', { exact: true })).toHaveCount(0);
-  await expect(sample).toBeDisabled();
-  await expect(complete).toBeDisabled();
-  await page.screenshot({ path: testInfo.outputPath('s06-completed-412x920.png') });
+  await expect(sample).toHaveCount(0);
+  await expect(complete).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '장치 정리로 이동', exact: true })).toBeEnabled();
+  await page.screenshot({ path: testInfo.outputPath('s06-s12-completed-412x920.png') });
 });

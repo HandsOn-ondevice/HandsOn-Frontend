@@ -69,7 +69,11 @@ export function beginExecutionSample(
           status: 'sampling',
           requestedAt: meta.now,
           purpose:
-            purpose === 'measurement' && state.recovery?.cursor.cursorId === cursorId
+            purpose === 'measurement' &&
+            (state.recovery?.cursor.cursorId === cursorId ||
+              session.completion?.reviewRequests.some(
+                (request) => !request.completedAt && request.cursor.cursorId === cursorId,
+              ))
               ? 'remeasurement'
               : purpose,
           ...(purpose !== 'recoveryCheck' && state.recovery?.cursor.cursorId === cursorId
@@ -228,19 +232,34 @@ export function completeExecutionStep(
         trialIndex: next.id === current.id ? state.cursor.trialIndex + 1 : 1,
       }
     : null;
+  const reviewRequest = session.completion?.reviewRequests.find(
+    (request) => !request.completedAt && request.cursor.cursorId === cursorId,
+  );
   return {
     ...session,
     revision: session.revision + 1,
     updatedAt: meta.now,
     execution: {
       ...session.execution,
-      cursor,
+      cursor: reviewRequest ? null : cursor,
       attempts: session.execution.attempts.map((attempt) =>
         attempt.attemptId === sampleAttemptId
           ? { ...attempt, status: 'valid', confirmedAt: meta.now }
           : attempt,
       ),
     },
+    ...(reviewRequest && session.completion
+      ? {
+          completion: {
+            ...session.completion,
+            reviewRequests: session.completion.reviewRequests.map((request) =>
+              request === reviewRequest
+                ? { ...request, completedAt: meta.now, acceptedAttemptId: sampleAttemptId }
+                : request,
+            ),
+          },
+        }
+      : {}),
     evidence: [
       ...session.evidence,
       {

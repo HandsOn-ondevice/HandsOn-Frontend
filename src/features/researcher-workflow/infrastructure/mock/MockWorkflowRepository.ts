@@ -4,6 +4,18 @@ import {
   confirmResumeSetup,
   resumeExecution,
 } from './resume-transitions';
+import {
+  isCompletionCommand,
+  transitionCompletion,
+  finishCleanupOutput,
+  finishMockSubmission,
+} from './completion-transitions';
+import {
+  runMockCleanup,
+  runMockSubmission,
+  type MockCleanupRunner,
+  type MockSubmissionRunner,
+} from './completion-scenarios';
 import type { CreateSessionInput, WorkflowRepository } from '../../application/WorkflowRepository';
 import { createRequestId } from '../../application/request-id';
 import {
@@ -49,6 +61,8 @@ export interface MockDependencies {
   readonly id?: () => string;
   readonly inspect?: MockDiagnosticsRunner;
   readonly sample?: MockExecutionRunner;
+  readonly cleanup?: MockCleanupRunner;
+  readonly submit?: MockSubmissionRunner;
 }
 
 const copy = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
@@ -65,12 +79,16 @@ export class MockWorkflowRepository implements WorkflowRepository {
   private readonly sample: MockExecutionRunner;
   private readonly executionScenarios = new Map<string, MockExecutionScenario>();
   private readonly initialStaleReadings = new Map<string, string>();
+  private readonly cleanup: MockCleanupRunner;
+  private readonly submit: MockSubmissionRunner;
 
   constructor(dependencies: MockDependencies = {}) {
     this.now = dependencies.now ?? (() => new Date().toISOString());
     this.id = dependencies.id ?? createRequestId;
     this.inspect = dependencies.inspect ?? runMockDiagnostics;
     this.sample = dependencies.sample ?? runMockExecutionSample;
+    this.cleanup = dependencies.cleanup ?? runMockCleanup;
+    this.submit = dependencies.submit ?? runMockSubmission;
 
     // S01의 합성 목록과 같은 ID를 가진 S04 재확인용 세션이다.
     // 준비 확인 상태와 S06 측정 진행률을 혼용하지 않는다.
@@ -211,6 +229,15 @@ export class MockWorkflowRepository implements WorkflowRepository {
       );
     }
     if (
+      ['cleaningUp', 'completed', 'submitted'].includes(session.phase) &&
+      !isCompletionCommand(command)
+    ) {
+      throw new WorkflowError(
+        'INVALID_STATE',
+        '정리·종료된 세션은 측정이나 준비 상태로 되돌릴 수 없습니다.',
+      );
+    }
+    if (
       session.phase === 'paused' &&
       !['pauseExecution', 'checkResume', 'confirmResumeSetup', 'resumeExecution'].includes(
         command.type,
@@ -232,8 +259,9 @@ export class MockWorkflowRepository implements WorkflowRepository {
       (command.type === 'resolveVoiceClarification' && command.choice === 'remeasure')
         ? this.id()
         : undefined;
-    const next =
-      command.type === 'pauseExecution'
+    const next = isCompletionCommand(command)
+      ? transitionCompletion(session, command, this.id(), metadata)
+      : command.type === 'pauseExecution'
         ? this.pauseExecution(session, command.cursorId, metadata)
         : command.type === 'checkResume'
           ? beginResumeCheck(session, command, this.id(), metadata)
@@ -296,6 +324,13 @@ export class MockWorkflowRepository implements WorkflowRepository {
       this.scheduleExecutionSample(resolved, sampleId, context.requestId);
     if (command.type === 'checkResume' && resolved !== session)
       this.scheduleResumeCheck(resolved, context.requestId);
+    if (
+      (command.type === 'startCleanup' || command.type === 'retryCleanupOutput') &&
+      resolved !== session
+    )
+      this.scheduleCleanup(resolved, context.requestId);
+    if (command.type === 'submitMockResult' && resolved !== session)
+      this.scheduleSubmission(resolved, context.requestId);
     return copy(resolved);
   }
 
@@ -412,12 +447,62 @@ export class MockWorkflowRepository implements WorkflowRepository {
       });
   }
 
+  private scheduleCleanup(session: ExperimentSession, requestId: string) {
+    const attemptId = session.completion!.cleanupAttempts.at(-1)!.attemptId;
+    void Promise.resolve()
+      .then(() =>
+        this.cleanup({
+          attemptId,
+          sessionId: session.sessionId,
+          deviceId: session.procedure.deviceCheck!.deviceId,
+          now: this.now,
+        }),
+      )
+      .catch(() => undefined)
+      .then((report) => {
+        const current = this.sessions.get(session.sessionId);
+        if (!current) return;
+        const next = finishCleanupOutput(current, attemptId, report && copy(report), {
+          requestId,
+          now: this.now(),
+          eventId: this.id(),
+          evidenceId: this.id(),
+        });
+        if (next !== current) {
+          this.sessions.set(next.sessionId, next);
+          this.publish(next);
+        }
+      });
+  }
+
+  private scheduleSubmission(session: ExperimentSession, requestId: string) {
+    const attemptId = session.completion!.submissions.at(-1)!.attemptId;
+    const resultId = session.completion!.resultId!;
+    void Promise.resolve()
+      .then(() => this.submit({ attemptId, sessionId: session.sessionId, resultId, now: this.now }))
+      .catch(() => undefined)
+      .then((report) => {
+        const current = this.sessions.get(session.sessionId);
+        if (!current) return;
+        const next = finishMockSubmission(current, attemptId, report && copy(report), {
+          requestId,
+          now: this.now(),
+          eventId: this.id(),
+          evidenceId: this.id(),
+        });
+        if (next !== current) {
+          this.sessions.set(next.sessionId, next);
+          this.publish(next);
+        }
+      });
+  }
+
   setDeviceCheckScenario(sessionId: string, scenario: MockDeviceScenario) {
     const session = this.sessions.get(sessionId);
     if (!session) throw new WorkflowError('NOT_FOUND', '세션을 찾을 수 없습니다.');
     if (
       session.deviceChecks.at(-1)?.status === 'checking' ||
-      session.phase === 'running' ||
+      ['running', 'cleaningUp', 'completed', 'submitted'].includes(session.phase) ||
       session.resumeChecks?.some((attempt) => attempt.status === 'checking')
     ) {
       throw new WorkflowError(
