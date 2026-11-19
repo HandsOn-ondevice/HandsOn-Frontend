@@ -1,3 +1,5 @@
+import { getDemoHomeReviews, type ReviewStatus } from '@/features/expert-review/reviewData';
+
 export interface ExpertProcedure {
   readonly id: string;
   readonly title: string;
@@ -14,7 +16,9 @@ export interface ExpertResult {
   readonly procedureTitle: string;
   readonly studentName: string;
   readonly deviceName: string;
-  readonly status: 'pending' | 'reviewed';
+  readonly status: ReviewStatus;
+  readonly sessionId?: string;
+  readonly approvedVersion?: string;
   readonly summary: string;
   readonly submittedLabel: string;
 }
@@ -40,7 +44,7 @@ export type LoadExpertHome = (environmentId: string) => Promise<ExpertHomeData>;
 
 function createDemoHome(environmentId: string): ExpertHomeData {
   const procedureId = (name: string) => `${environmentId}:procedure:${name}`;
-  const resultId = (name: string) => `${environmentId}:result:${name}`;
+  const { results, recentReviews } = getDemoHomeReviews(environmentId);
 
   return {
     displayName: '지연',
@@ -87,39 +91,9 @@ function createDemoHome(environmentId: string): ExpertHomeData {
         summary: '온도 · 습도 측정',
       },
     ],
-    results: [
-      {
-        id: resultId('led-m03'),
-        procedureId: procedureId('led-output'),
-        procedureTitle: 'LED 출력 특성 측정',
-        studentName: '노준혁',
-        deviceName: 'LED-M03',
-        status: 'pending',
-        summary: '보류 1건 · 재측정 2회 · v1.2',
-        submittedLabel: '10분 전 제출',
-      },
-      {
-        id: resultId('led-m02'),
-        procedureId: procedureId('led-output'),
-        procedureTitle: 'LED 출력 특성 측정',
-        studentName: '김민지',
-        deviceName: 'LED-M02',
-        status: 'pending',
-        summary: '기준값 확인 필요 · v1.2',
-        submittedLabel: '25분 전 제출',
-      },
-      {
-        id: resultId('led-m01'),
-        procedureId: procedureId('led-output'),
-        procedureTitle: 'LED 출력 특성 측정',
-        studentName: '이서준',
-        deviceName: 'LED-M01',
-        status: 'reviewed',
-        summary: '검토 완료 · v1.2',
-        submittedLabel: '어제 제출',
-      },
-    ],
+    results,
     recentWork: [
+      ...recentReviews,
       {
         id: `${environmentId}:recent:draft`,
         kind: 'procedure',
@@ -131,7 +105,7 @@ function createDemoHome(environmentId: string): ExpertHomeData {
       {
         id: `${environmentId}:recent:review`,
         kind: 'result',
-        resultId: resultId('led-m01'),
+        resultId: `${environmentId}:result:led-m01`,
         procedureId: procedureId('led-output'),
         title: '이서준 · LED-M01',
         summary: '결과 검토 완료',
