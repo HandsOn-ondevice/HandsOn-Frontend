@@ -44,20 +44,27 @@ export function ResultSummaryScreen({
   sessionId,
   onHome,
   onDetails,
+  showSubmittedResult = false,
 }: {
   sessionId: string;
   onHome: () => void;
-  onDetails: (conditionId: string) => void;
+  onDetails: (conditionId: string, resultId: string) => void;
+  showSubmittedResult?: boolean;
 }) {
   const resource = useWorkflowSession(sessionId);
   const { session, loading, pending, error, execute } = resource;
   const state = session ? selectResult(session) : null;
   const [menu, setMenu] = useState(false);
+  const readOnly = !!state?.submitted;
+  const openDetails = (conditionId: string) => {
+    if (state?.available && state.completion?.resultId)
+      onDetails(conditionId, state.completion.resultId);
+  };
   const details = () => {
     const first = session?.procedure.execution?.conditions[0];
-    if (first && state?.available) onDetails(first.id);
+    if (first) openDetails(first.id);
   };
-  if (state?.submitted && session)
+  if (state?.submitted && state.available && session && !showSubmittedResult)
     return (
       <CompletionScaffold
         title="처리 결과"
@@ -90,7 +97,9 @@ export function ResultSummaryScreen({
             {state?.finished ? '작업을 완료했어요' : '실험 결과 확인'}
           </AppText>
           <AppText variant="caption" color={colors.text.inverse}>
-            측정 기록을 확인한 뒤 제출해 주세요.
+            {readOnly
+              ? '제출한 세션의 결과를 읽기 전용으로 확인합니다.'
+              : '측정 기록을 확인한 뒤 제출해 주세요.'}
           </AppText>
         </View>
       </LinearGradient>
@@ -106,6 +115,14 @@ export function ResultSummaryScreen({
         ) : null}
         {session && state?.available ? (
           <>
+            {readOnly ? (
+              <FeedbackPanel
+                title="제출 완료 · 읽기 전용"
+                subtitle="시연용 Mock 접수 기록입니다. 실제 백엔드 제출이나 영구 저장이 아닙니다."
+                tone="success"
+                icon="check"
+              />
+            ) : null}
             <AppText variant="title">
               실험 결과 · {state.completion?.resultId?.replace('mock-result-', '').slice(0, 8)}
             </AppText>
@@ -119,7 +136,7 @@ export function ResultSummaryScreen({
             <CompletionConditions
               items={state.review.conditions}
               state="complete"
-              onSelect={(index) => onDetails(session.procedure.execution!.conditions[index].id)}
+              onSelect={(index) => openDetails(session.procedure.execution!.conditions[index].id)}
             />
             <View style={completionStyles.row}>
               <MetricTile
@@ -154,13 +171,14 @@ export function ResultSummaryScreen({
       <ActionShelf
         safeArea
         layout="dual"
-        primary="숙련자에게 제출"
+        primary={readOnly ? '홈으로' : '숙련자에게 제출'}
         secondary="상세 이력"
-        disabled={loading || !state?.canSubmit}
+        disabled={loading || !(readOnly ? state?.available : state?.canSubmit)}
         loading={pending || state?.submission?.status === 'pending'}
         onSecondary={details}
         onPrimary={() => {
-          void execute({ type: 'submitMockResult' });
+          if (readOnly) onHome();
+          else void execute({ type: 'submitMockResult' });
         }}
       />
       <BottomSheet open={menu} onClose={() => setMenu(false)} title="결과 요약 정보">

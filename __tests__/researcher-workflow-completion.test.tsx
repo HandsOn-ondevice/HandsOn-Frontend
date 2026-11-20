@@ -1,6 +1,19 @@
 import { describe, expect, jest, test } from '@jest/globals';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
-import { WorkflowProvider } from '../src/features/researcher-workflow/state/WorkflowProvider';
+import { Text } from 'react-native';
+import {
+  WorkflowProvider,
+  useWorkflowRepository,
+} from '../src/features/researcher-workflow/state/WorkflowProvider';
+import {
+  developmentRepository,
+  workflowQueries,
+} from '../src/features/researcher-workflow/state/workflow-repository';
+import {
+  createWorkflowQueries,
+  matchesWorkflowResult,
+} from '../src/features/researcher-workflow/application/workflow-queries';
+import { CompletionRouteGate } from '../src/features/researcher-workflow/screens/CompletionRouteGate';
 import { CleanupScreen } from '../src/features/researcher-workflow/screens/CleanupScreen';
 import { CompletionReviewScreen } from '../src/features/researcher-workflow/screens/CompletionReviewScreen';
 import { ResultSummaryScreen } from '../src/features/researcher-workflow/screens/ResultSummaryScreen';
@@ -304,6 +317,146 @@ async function finishFixture(dependencies: MockDependencies = {}) {
   return { ...f, before };
 }
 
+describe('읽기 전용 워크플로 조회 계약', () => {
+  test('기본 Provider와 외부 조회는 같은 저장소를 읽으며 M03 초기 상태를 바꾸거나 M02를 생성하지 않는다', async () => {
+    const before = await developmentRepository.getSession('demo-session-led-m03');
+    let captured: unknown;
+    function CaptureRepository() {
+      captured = useWorkflowRepository();
+      return null;
+    }
+    await render(
+      <WorkflowProvider>
+        <CaptureRepository />
+      </WorkflowProvider>,
+    );
+    expect(captured).toBe(developmentRepository);
+    const commands = jest.spyOn(developmentRepository, 'executeCommand');
+    const summary = await workflowQueries.getSessionSummary('demo-session-led-m03');
+    expect(summary).toMatchObject({
+      sessionId: 'demo-session-led-m03',
+      phase: 'preparing',
+      source: 'mock',
+      cursor: null,
+      condition: null,
+      resultId: null,
+      canOpenResume: false,
+      progress: { validMeasurements: 0, totalMeasurements: 15, percentage: 0 },
+    });
+    expect(Object.keys(workflowQueries).sort()).toEqual(['getResult', 'getSessionSummary']);
+    await expect(workflowQueries.getSessionSummary('demo-session-led-m02')).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+    expect(commands).not.toHaveBeenCalled();
+    expect(await developmentRepository.getSession(before.sessionId)).toEqual(before);
+    commands.mockRestore();
+  });
+
+  test('실제 완료·제출 결과만 ID 쌍으로 조회하며 잘못된 ID·다중 ID·없는 세션은 허용하지 않는다', async () => {
+    const f = await finishFixture();
+    const queries = createWorkflowQueries(f.repository);
+    const completed = await f.get();
+    const resultId = completed.completion!.resultId!;
+    expect(await queries.getResult(completed.sessionId, resultId)).toEqual(completed);
+    for (const id of ['', 'demo-result-led-m02', 'mock-result-missing'])
+      await expect(queries.getResult(completed.sessionId, id)).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+      });
+    expect(matchesWorkflowResult(completed, [resultId])).toBe(false);
+    await expect(queries.getResult('missing', resultId)).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+    await expect(queries.getResult('demo-session-led-m03', resultId)).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+    await f.send({ type: 'submitMockResult' });
+    await f.settle();
+    const submitted = await f.get();
+    const commands = jest.spyOn(f.repository, 'executeCommand');
+    expect(await queries.getSessionSummary(submitted.sessionId)).toMatchObject({
+      phase: 'submitted',
+      resultId,
+      cursor: null,
+      canOpenResume: false,
+      progress: { validMeasurements: 15, totalMeasurements: 15, percentage: 100 },
+    });
+    const snapshot = await queries.getResult(submitted.sessionId, resultId);
+    (snapshot as { phase: string }).phase = 'preparing';
+    expect(await f.get()).toEqual(submitted);
+    expect(commands).not.toHaveBeenCalled();
+  });
+
+  test('명시한 결과 ID가 틀리면 결과 화면을 마운트하지 않으며 올바른 ID만 조회한다', async () => {
+    const f = await finishFixture();
+    const before = await f.get();
+    const commands = jest.spyOn(f.repository, 'executeCommand');
+    const content = (resultId: string | readonly string[]) => (
+      <WorkflowProvider repository={f.repository}>
+        <CompletionRouteGate sessionId={before.sessionId} screen="results" resultId={resultId}>
+          <Text>허용된 결과 화면</Text>
+        </CompletionRouteGate>
+      </WorkflowProvider>
+    );
+    const screen = await render(content('missing-result'));
+    expect(screen.queryByText('허용된 결과 화면')).toBeNull();
+    await screen.findByText('결과를 찾을 수 없습니다');
+    await screen.rerender(content([before.completion!.resultId!]));
+    expect(screen.queryByText('허용된 결과 화면')).toBeNull();
+    await screen.rerender(content(before.completion!.resultId!));
+    await screen.findByText('허용된 결과 화면');
+    expect(commands).not.toHaveBeenCalled();
+    expect(await f.get()).toEqual(before);
+  });
+
+  test('접수 안내는 조회 버튼 없이 유지하고 외부 결과 조회·상세 이동은 ID·revision·제출과 측정 이력을 보존한다', async () => {
+    const f = await finishFixture();
+    await f.send({ type: 'submitMockResult' });
+    await f.settle();
+    const before = await f.get();
+    const commands = jest.spyOn(f.repository, 'executeCommand');
+    const details = jest.fn();
+    const results = jest.fn();
+    const screen = await render(
+      <WorkflowProvider repository={f.repository}>
+        <ResultSummaryScreen sessionId={before.sessionId} onHome={() => {}} onDetails={details} />
+      </WorkflowProvider>,
+    );
+    await screen.findByText('결과를 제출했습니다');
+    expect(screen.queryByRole('button', { name: '제출한 결과 조회' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '상세 이력' })).toBeNull();
+    expect(screen.getByRole('button', { name: '홈으로' })).toBeTruthy();
+    await screen.rerender(
+      <WorkflowProvider repository={f.repository}>
+        <ResultSummaryScreen
+          sessionId={before.sessionId}
+          onHome={() => {}}
+          onDetails={details}
+          showSubmittedResult
+        />
+      </WorkflowProvider>,
+    );
+    await screen.findByText('제출 완료 · 읽기 전용');
+    expect(screen.getByText('조건별 측정 · 15 / 15')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '숙련자에게 제출' })).toBeNull();
+    await fireEvent.press(screen.getByRole('button', { name: '50% 조건 상세 보기' }));
+    expect(details).toHaveBeenCalledWith('output-50', before.completion!.resultId);
+    await screen.rerender(
+      <WorkflowProvider repository={f.repository}>
+        <MeasurementDetailsScreen
+          sessionId={before.sessionId}
+          conditionId="output-50"
+          onResults={results}
+        />
+      </WorkflowProvider>,
+    );
+    await screen.findByText('420.0 lx');
+    await fireEvent.press(screen.getByRole('button', { name: '전체 결과로 돌아가기' }));
+    expect(results).toHaveBeenCalledWith(before.completion!.resultId);
+    expect(commands).not.toHaveBeenCalled();
+    expect(await f.get()).toEqual(before);
+  });
+});
+
 describe('S14 종료·Mock 제출과 S15 실제 결과', () => {
   test('종료와 제출 중복을 막고 기존 측정·작업자·정리 이력 및 실제 조건별 평균을 유지한다', async () => {
     const f = await finishFixture();
@@ -576,7 +729,7 @@ describe('S12~S15 화면과 동일 Repository 연결', () => {
     const screen = await render(summary);
     await screen.findByText('조건별 측정 · 15 / 15');
     await fireEvent.press(screen.getByRole('button', { name: '50% 조건 상세 보기' }));
-    expect(onDetails).toHaveBeenCalledWith('output-50');
+    expect(onDetails).toHaveBeenCalledWith('output-50', session.completion!.resultId);
     await screen.rerender(
       <WorkflowProvider repository={f.repository}>
         <MeasurementDetailsScreen

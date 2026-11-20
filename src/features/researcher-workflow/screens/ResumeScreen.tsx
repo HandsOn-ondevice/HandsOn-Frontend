@@ -100,6 +100,11 @@ export function ResumeScreen({
         ) : null}
         {session && state?.paused ? (
           <>
+            {session.source === 'mock' ? (
+              <AppText variant="caption" color={colors.text.secondary}>
+                시뮬레이션 · 실제 장치 연결이나 전압 안전을 보증하지 않습니다.
+              </AppText>
+            ) : null}
             <View style={styles.identity}>
               <AppText variant="caption" color={colors.text.secondary}>
                 {pausedAge.replace(/ 전$/, '')}간 일시정지됨
@@ -113,11 +118,15 @@ export function ResumeScreen({
             />
             {progress ? (
               <StepProgress
-                title={`복원 위치 · ${progress.step}/16단계`}
+                title={`복원 위치 · ${progress.step}/${progress.total}단계`}
                 value={progress.percentage}
                 state="paused"
               />
             ) : null}
+            <AppText variant="caption" color={colors.text.secondary}>
+              {progress ? '진행률은 재개할 단계의 위치입니다. ' : ''}
+              유효 측정 {state.completedCount} / {state.total}회 · {state.percentage}%
+            </AppText>
             <ConditionProgress
               items={state.conditions}
               currentIndex={state.currentIndex}
@@ -210,10 +219,7 @@ export function ResumeScreen({
                   },
                 ]}
               >
-                <Icon
-                  name="person"
-                  color={confirmed ? colors.status.success : colors.text.action}
-                />
+                <Icon name="person" color={colors.text.action} />
               </View>
               <View style={styles.operatorCopy}>
                 <AppText variant="label">거리 20cm와 지그 고정 확인</AppText>
@@ -229,14 +235,16 @@ export function ResumeScreen({
               </AppText>
             </Pressable>
             <VoicePanel
-              title={confirmed ? '재개 준비를 확인했어요' : '확인을 기다리고 있어요'}
+              title={confirmed ? '재개 준비 완료' : '확인을 기다리고 있어요'}
               subtitle={
-                notice
-                  ? '거리와 지그 확인 항목을 눌러 직접 확인해 주세요.'
-                  : '“거리와 방향 확인했어”'
+                confirmed
+                  ? '같은 회차에서 새 측정 응답을 확인합니다.'
+                  : notice
+                    ? '거리와 지그 확인 항목을 눌러 직접 확인해 주세요.'
+                    : '“거리와 방향 확인했어”'
               }
               state={confirmed ? 'confirmed' : 'clarify'}
-              icon="alert"
+              icon={confirmed ? 'check' : 'alert'}
               onPress={() => setNotice(true)}
             />
           </>
@@ -251,7 +259,7 @@ export function ResumeScreen({
       <ActionShelf
         safeArea
         layout="single"
-        primary={state?.canResume ? '확인 완료 후 재개' : '확인 후 재개 가능'}
+        primary="확인하고 재개"
         disabled={loading || pending || !state?.canResume}
         loading={pending}
         onPrimary={() => {

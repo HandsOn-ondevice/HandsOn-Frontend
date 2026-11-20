@@ -35,11 +35,12 @@ export function MeasurementDetailsScreen({
 }: {
   sessionId: string;
   conditionId: string;
-  onResults: () => void;
+  onResults: (resultId?: string) => void;
 }) {
   const resource = useWorkflowSession(sessionId);
   const { session, loading } = resource;
   const state = session ? selectResult(session) : null;
+  const returnToResults = () => onResults(state?.completion?.resultId);
   const condition = session?.procedure.execution?.conditions.find(
     (item) => item.id === conditionId,
   );
@@ -101,8 +102,8 @@ export function MeasurementDetailsScreen({
     <CompletionScaffold
       title="측정 상세와 근거 이력"
       {...resource}
-      onBack={onResults}
-      action={<ActionShelf safeArea primary="전체 결과로 돌아가기" onPrimary={onResults} />}
+      onBack={returnToResults}
+      action={<ActionShelf safeArea primary="전체 결과로 돌아가기" onPrimary={returnToResults} />}
       menuChildren={
         <>
           <AppText>

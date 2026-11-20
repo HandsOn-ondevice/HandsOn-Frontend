@@ -1,4 +1,5 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import { openWorkflowInformation, closeWorkflowInformation } from './helpers/workflow-information';
 
 async function enterExecution(page: Page) {
   page.setDefaultTimeout(15_000);
@@ -25,23 +26,23 @@ async function measure(page: Page) {
   await complete.click();
 }
 async function scenario(page: Page, label: string) {
-  const screen = page.getByTestId(
-    new URL(page.url()).pathname.endsWith('/recovery') ? 'recovery-screen' : 'execution-screen',
-  );
-  await screen.getByRole('button', { name: '더 보기', exact: true }).click();
+  const screenId = new URL(page.url()).pathname.endsWith('/recovery')
+    ? 'recovery-screen'
+    : 'execution-screen';
+  await openWorkflowInformation(page, screenId);
   await page.getByRole('button', { name: '미리보기 설정', exact: true }).click();
   await page.getByRole('button', { name: /^측정 응답 조건:/ }).click();
   await page.getByRole('radio', { name: label, exact: true }).click();
-  await page.getByRole('button', { name: '하단 시트 닫기', exact: true }).click();
+  await closeWorkflowInformation(page);
   await expect(page.getByRole('button', { name: '하단 시트 닫기', exact: true })).toHaveCount(0);
 }
 // 같은 앱 실행 중 URL 이동·뒤로 가기를 재현한다. 새로고침으로 메모리 Repository를 바꾸지 않는다.
-async function navigate(page: Page, path: string) {
+async function navigate(page: Page, path: string, expectedPath = path) {
   await page.evaluate((path) => {
     history.pushState({}, '', path);
     dispatchEvent(new PopStateEvent('popstate'));
   }, path);
-  await expect(page).toHaveURL(path);
+  await expect(page).toHaveURL(expectedPath);
 }
 async function resultIdentity(page: Page) {
   await page
@@ -53,7 +54,7 @@ async function resultIdentity(page: Page) {
   const value = await identity.innerText();
   await page.getByRole('button', { name: '하단 시트 닫기', exact: true }).click();
   await expect(page.getByRole('button', { name: '하단 시트 닫기', exact: true })).toHaveCount(0);
-  return value;
+  return value.replace(/^전체 결과 ID:\s*/, '');
 }
 async function capture(
   page: Page,
@@ -218,7 +219,12 @@ for (const viewport of [
     );
     const resultId = await resultIdentity(page);
     await page.getByRole('button', { name: '상세 이력', exact: true }).click();
-    await expect(page).toHaveURL(/\/measurement-details\?conditionId=output-0$/);
+    await expect(page).toHaveURL(
+      (url) =>
+        url.pathname === `${route}/measurement-details` &&
+        url.searchParams.get('conditionId') === 'output-0' &&
+        url.searchParams.get('resultId') === resultId,
+    );
     await expect(page.getByText('유효 3건 · 무효 1건', { exact: true })).toBeVisible();
     await expect(page.getByText('센서 응답 재확인 완료', { exact: true })).toBeAttached();
     await capture(
@@ -263,10 +269,12 @@ for (const viewport of [
       .getByTestId('completion-측정 상세와 근거 이력')
       .getByRole('button', { name: '뒤로가기', exact: true })
       .click();
-    await expect(page).toHaveURL(`${route}/results`);
+    await expect(page).toHaveURL(
+      (url) => url.pathname === `${route}/results` && url.searchParams.get('resultId') === resultId,
+    );
     expect(await resultIdentity(page)).toBe(resultId);
     await expect(page.getByText('조건별 측정 · 15 / 15', { exact: true })).toBeVisible();
-    await navigate(page, `${route}/execution`);
+    await navigate(page, `${route}/execution`, `${route}/results`);
     await expect(page).toHaveURL(`${route}/results`);
     await page.getByRole('button', { name: '숙련자에게 제출', exact: true }).dblclick();
     await expect(page.getByText('결과를 제출했습니다', { exact: true })).toBeVisible();
@@ -282,7 +290,43 @@ for (const viewport of [
     await expect(page.getByText(/제출은 메모리 안의 Mock 검토 대기열 접수입니다/)).toBeVisible();
     await page.getByRole('button', { name: '하단 시트 닫기', exact: true }).click();
     await expect(page.getByRole('button', { name: '하단 시트 닫기', exact: true })).toHaveCount(0);
-    await navigate(page, `${route}/cleanup`);
+    await expect(page.getByRole('button', { name: '제출한 결과 조회', exact: true })).toHaveCount(
+      0,
+    );
+    await expect(page.getByRole('button', { name: '홈으로', exact: true })).toBeVisible();
+    await navigate(page, `${route}/results?resultId=${encodeURIComponent(resultId)}&view=summary`);
+    await expect(page.getByText('제출 완료 · 읽기 전용', { exact: true })).toBeVisible();
+    await expect(page).toHaveURL(
+      (url) =>
+        url.pathname === `${route}/results` &&
+        url.searchParams.get('resultId') === resultId &&
+        url.searchParams.get('view') === 'summary',
+    );
+    await expect(page.getByRole('button', { name: '숙련자에게 제출', exact: true })).toHaveCount(0);
+    expect(await resultIdentity(page)).toBe(resultId);
+    await page.getByRole('button', { name: '50% 조건 상세 보기', exact: true }).click();
+    await expect(page).toHaveURL(
+      (url) =>
+        url.pathname === `${route}/measurement-details` &&
+        url.searchParams.get('conditionId') === 'output-50' &&
+        url.searchParams.get('resultId') === resultId,
+    );
+    await expect(page.getByText('420.0 lx', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: '전체 결과로 돌아가기', exact: true }).click();
+    await expect(page.getByText('제출 완료 · 읽기 전용', { exact: true })).toBeVisible();
+    expect(await resultIdentity(page)).toBe(resultId);
+    await page.screenshot({ path: testInfo.outputPath(`s14-read-only-${viewport.width}.png`) });
+    for (const path of [
+      `${route}/results?resultId=missing-result&view=summary`,
+      `${route}/measurement-details?conditionId=output-50&resultId=missing-result`,
+    ]) {
+      await navigate(page, path);
+      await expect(page.getByText('결과를 찾을 수 없습니다', { exact: true })).toBeVisible();
+      await expect(
+        page.getByTestId('unavailable-workflow-result').getByText('420.0 lx', { exact: true }),
+      ).toHaveCount(0);
+    }
+    await navigate(page, `${route}/cleanup`, `${route}/results`);
     await expect(page).toHaveURL(`${route}/results`);
     await expect(page.getByText('결과를 제출했습니다', { exact: true })).toBeVisible();
     expect(errors).toEqual([]);

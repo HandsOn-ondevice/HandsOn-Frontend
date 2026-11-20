@@ -1,5 +1,18 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 
+async function pauseFromMenu(page: Page) {
+  const execution = page.getByTestId('execution-screen');
+  await expect(execution.getByRole('button', { name: '실험 일시정지', exact: true })).toHaveCount(
+    0,
+  );
+  await execution.getByRole('button', { name: '더 보기', exact: true }).click();
+  await expect(page).toHaveURL(/\/session-menu$/);
+  await page
+    .getByTestId('session-menu-screen')
+    .getByRole('button', { name: '실험 일시정지', exact: true })
+    .click();
+}
+
 async function enterExecution(page: Page) {
   await page.goto('/');
   await page.getByRole('radio', { name: '신규 연구생, 승인된 절차 실행' }).click();
@@ -37,7 +50,7 @@ async function capture(page: Page, testInfo: TestInfo, name: string, bottomText:
   await last.scrollIntoViewIfNeeded();
   const box = await last.boundingBox();
   const shelf = await page
-    .getByRole('button', { name: /^(바로 재개|확인 후 재개 가능|확인 완료 후 재개)$/ })
+    .getByRole('button', { name: /^(바로 재개|확인하고 재개)$/ })
     .boundingBox();
   expect(box!.y + box!.height).toBeLessThanOrEqual(shelf!.y);
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
@@ -66,7 +79,7 @@ for (const viewport of [
     await expect(complete).toBeEnabled();
     await complete.click();
     await expect(page.getByText('“0% 조건 2회차 완료했어”', { exact: true })).toBeVisible();
-    await page.getByRole('button', { name: '실험 일시정지', exact: true }).click();
+    await pauseFromMenu(page);
     await expect(page).toHaveURL(/\/demo-session-led-m03\/paused$/);
     await expect(page.getByText('진행 상태를 안전하게 저장했어요', { exact: true })).toBeVisible();
     await expect(page.getByText('다음 작업 · 0% 2회차', { exact: true })).toBeVisible();
@@ -87,9 +100,7 @@ for (const viewport of [
     await expect(page).toHaveURL(/\/demo-session-led-m03\/paused$/);
     await page.getByRole('button', { name: '바로 재개', exact: true }).click();
     await expect(page).toHaveURL(/\/demo-session-led-m03\/resume$/);
-    await expect(
-      page.getByRole('button', { name: '확인 후 재개 가능', exact: true }),
-    ).toBeDisabled();
+    await expect(page.getByRole('button', { name: '확인하고 재개', exact: true })).toBeDisabled();
     await expect(page.getByText('공급 전압 확인 필요', { exact: true })).toBeAttached();
     await capture(
       page,
@@ -106,9 +117,7 @@ for (const viewport of [
     await expect(page.getByRole('progressbar')).toContainText('56%');
     await checkCard(page, 'connection');
     await expect(voltageCard(page)).toHaveAccessibleName(/, 대기$/);
-    await expect(
-      page.getByRole('button', { name: '확인 후 재개 가능', exact: true }),
-    ).toBeDisabled();
+    await expect(page.getByRole('button', { name: '확인하고 재개', exact: true })).toBeDisabled();
     await capture(
       page,
       testInfo,
@@ -117,26 +126,20 @@ for (const viewport of [
     );
     await checkCard(page, 'voltage');
     await expect(page.getByText('공급 전압 5.01 V', { exact: true })).toBeAttached();
-    await expect(
-      page.getByRole('button', { name: '확인 후 재개 가능', exact: true }),
-    ).toBeDisabled();
+    await expect(page.getByRole('button', { name: '확인하고 재개', exact: true })).toBeDisabled();
     const operator = page.getByText('거리 20cm와 지그 고정 확인', { exact: true });
     await operator.click();
-    await expect(
-      page.getByRole('button', { name: '확인 완료 후 재개', exact: true }),
-    ).toBeEnabled();
+    await expect(page.getByRole('button', { name: '확인하고 재개', exact: true })).toBeEnabled();
     await operator.click();
-    await expect(
-      page.getByRole('button', { name: '확인 후 재개 가능', exact: true }),
-    ).toBeDisabled();
+    await expect(page.getByRole('button', { name: '확인하고 재개', exact: true })).toBeDisabled();
     await operator.click();
     await capture(
       page,
       testInfo,
       `s11-ready-${viewport.width}x${viewport.height}`,
-      /^“거리와 방향 확인했어”$/,
+      /^같은 회차에서 새 측정 응답을 확인합니다\.$/,
     );
-    await page.getByRole('button', { name: '확인 완료 후 재개', exact: true }).click();
+    await page.getByRole('button', { name: '확인하고 재개', exact: true }).click();
     await expect(page).toHaveURL(/\/demo-session-led-m03\/execution$/);
     await expect(page.getByText('유효 측정 1 / 15회', { exact: true })).toBeAttached();
     await expect(page.getByText('“0% 조건 2회차 완료했어”', { exact: true })).toBeVisible();
@@ -157,7 +160,7 @@ test('S11 실패 응답은 재개를 차단하며 재시도와 재진입에도 �
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await enterExecution(page);
-  await page.getByRole('button', { name: '실험 일시정지', exact: true }).click();
+  await pauseFromMenu(page);
   await page.getByRole('button', { name: '바로 재개', exact: true }).click();
   async function scenario(current: string, next: string) {
     await expect(page).toHaveURL(/\/demo-session-led-m03\/resume$/);
@@ -169,17 +172,26 @@ test('S11 실패 응답은 재개를 차단하며 재시도와 재진입에도 �
     await page.getByRole('button', { name: '미리보기 설정', exact: true }).click();
     await page.getByRole('button', { name: `Mock 점검 시나리오: ${current}`, exact: true }).click();
     await page.getByRole('radio', { name: next, exact: true }).click();
+    await expect(
+      page.getByRole('button', { name: `Mock 점검 시나리오: ${next}`, exact: true }),
+    ).toBeVisible();
+    // SelectField는 별도 fade Modal이다. 상태 갱신 뒤에도 DOM과 포커스 처리가 남으므로
+    // 선택창이 완전히 제거된 뒤 바깥 BottomSheet를 닫는다.
+    await expect(
+      page.getByRole('radio', { name: next, exact: true, includeHidden: true }),
+    ).toHaveCount(0);
     await page.getByRole('button', { name: '하단 시트 닫기', exact: true }).click();
     await expect(page.getByRole('button', { name: '하단 시트 닫기', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: '재개 전 확인 정보', exact: true })).toHaveCount(
+      0,
+    );
   }
   for (const target of ['connection', 'voltage'] as const) {
     await scenario('정상 연결', '장치 미연결');
     const card = target === 'connection' ? connectionCard(page) : voltageCard(page);
     await card.click();
     await expect(card).toHaveAccessibleName(/, 실패$/);
-    await expect(
-      page.getByRole('button', { name: '확인 후 재개 가능', exact: true }),
-    ).toBeDisabled();
+    await expect(page.getByRole('button', { name: '확인하고 재개', exact: true })).toBeDisabled();
     await page.screenshot({ path: testInfo.outputPath(`s11-${target}-failed.png`) });
     await scenario('장치 미연결', '응답 시간 초과');
     await card.click();
@@ -198,11 +210,11 @@ test('S11 실패 응답은 재개를 차단하며 재시도와 재진입에도 �
   await expect(page.getByRole('progressbar')).toHaveAccessibleName(
     '복원 위치 · 9/16단계, 일시정지',
   );
-  await expect(page.getByRole('button', { name: '확인 후 재개 가능', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '확인하고 재개', exact: true })).toBeDisabled();
   await page.getByText('거리 20cm와 지그 고정 확인', { exact: true }).click();
-  await expect(page.getByRole('button', { name: '확인 완료 후 재개', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: '확인하고 재개', exact: true })).toBeEnabled();
   await checkCard(page, 'connection');
   await expect(voltageCard(page)).toHaveAccessibleName(/, 확인$/);
-  await expect(page.getByRole('button', { name: '확인 후 재개 가능', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '확인하고 재개', exact: true })).toBeDisabled();
   expect(errors).toEqual([]);
 });
