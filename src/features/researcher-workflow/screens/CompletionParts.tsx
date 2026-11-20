@@ -1,3 +1,4 @@
+import { procedureVersionLabel } from './procedure-version-label';
 import { useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -42,7 +43,7 @@ export function CompletionInfo({ session }: { session: ExperimentSession | null 
     <>
       {session ? (
         <AppText>
-          세션 {session.sessionId} · 절차 v{session.procedure.version}
+          세션 {session.sessionId} · 절차 {procedureVersionLabel(session.procedure.version)}
         </AppText>
       ) : null}
       <AppText>

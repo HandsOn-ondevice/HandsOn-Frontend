@@ -1,11 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openWorkflowInformation, closeWorkflowInformation } from './helpers/workflow-information';
 
 async function scenario(page: Page, current: string, next: string, screenId = 'execution-screen') {
-  await page.getByTestId(screenId).getByRole('button', { name: '더 보기', exact: true }).click();
+  await openWorkflowInformation(page, screenId);
   await page.getByRole('button', { name: '미리보기 설정', exact: true }).click();
   await page.getByRole('button', { name: `측정 응답 조건: ${current}`, exact: true }).click();
   await page.getByRole('radio', { name: next, exact: true }).click();
-  await page.getByRole('button', { name: '하단 시트 닫기', exact: true }).click();
+  await closeWorkflowInformation(page);
 }
 async function openRecovered(page: Page, failures = 0) {
   await page.goto('/researcher-workflow');

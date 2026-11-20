@@ -456,7 +456,7 @@ describe('S11 화면과 명시적 재개', () => {
     );
     await screen.findByText('확인을 기다리고 있어요');
     expect(await repo.getSession(session.sessionId)).toEqual(paused);
-    expect(screen.getByRole('button', { name: '확인 후 재개 가능' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '확인하고 재개' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: '장치·센서 다시 확인' })).toBeNull();
     await fireEvent.press(screen.getByText('Orange Pi 5+와 필수 센서 3개 연결'));
     await waitFor(async () =>
@@ -465,17 +465,17 @@ describe('S11 화면과 명시적 재개', () => {
     expect(selectResume(await repo.getSession(session.sessionId)).voltageCheck.passed).toBe(false);
     await fireEvent.press(screen.getByText('공급 전압 확인 필요'));
     await screen.findByText('공급 전압 5.01 V');
-    expect(screen.getByRole('button', { name: '확인 후 재개 가능' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '확인하고 재개' })).toBeDisabled();
     await fireEvent.press(screen.getByText('거리 20cm와 지그 고정 확인'));
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: '확인 완료 후 재개' })).toBeEnabled(),
+      expect(screen.getByRole('button', { name: '확인하고 재개' })).toBeEnabled(),
     );
     await fireEvent.press(screen.getByText('거리 20cm와 지그 고정 확인'));
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: '확인 후 재개 가능' })).toBeDisabled(),
+      expect(screen.getByRole('button', { name: '확인하고 재개' })).toBeDisabled(),
     );
     await fireEvent.press(screen.getByText('거리 20cm와 지그 고정 확인'));
-    await fireEvent.press(await screen.findByRole('button', { name: '확인 완료 후 재개' }));
+    await fireEvent.press(await screen.findByRole('button', { name: '확인하고 재개' }));
     await waitFor(() => expect(onExecution).toHaveBeenCalledTimes(1));
     expect((await repo.getSession(session.sessionId)).phase).toBe('running');
   });
@@ -489,7 +489,7 @@ describe('S11 화면과 명시적 재개', () => {
       </WorkflowProvider>,
     );
     await screen.findByText('재개 전 확인할 실험이 없습니다');
-    expect(screen.getByRole('button', { name: '확인 후 재개 가능' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '확인하고 재개' })).toBeDisabled();
     await screen.rerender(
       <WorkflowProvider repository={repo}>
         <ResumeScreen key="missing" sessionId="missing" onBack={() => {}} onExecution={() => {}} />

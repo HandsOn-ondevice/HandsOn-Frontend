@@ -26,6 +26,7 @@ import {
 } from '../../domain/models';
 import { transitionPreparation } from './transition-engine';
 import { mockProcedure } from './fixtures';
+import { createLedM02ResultFixture } from './led-m02-result-fixture';
 import { isMockWorkflowEnabled } from './mock-environment';
 import {
   beginDeviceCheck,
@@ -131,6 +132,8 @@ export class MockWorkflowRepository implements WorkflowRepository {
       session.sessionId,
       new Date(Date.parse(savedAt) - 1).toISOString(),
     );
+    const completedDemo = createLedM02ResultFixture();
+    this.sessions.set(completedDemo.sessionId, completedDemo);
   }
 
   async createSession(input: CreateSessionInput): Promise<ExperimentSession> {
