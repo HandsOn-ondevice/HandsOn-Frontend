@@ -344,7 +344,7 @@ describe('읽기 전용 워크플로 조회 계약', () => {
       progress: { validMeasurements: 0, totalMeasurements: 15, percentage: 0 },
     });
     expect(Object.keys(workflowQueries).sort()).toEqual(['getResult', 'getSessionSummary']);
-    await expect(workflowQueries.getSessionSummary('demo-session-led-m02')).rejects.toMatchObject({
+    await expect(workflowQueries.getSessionSummary('missing-session')).rejects.toMatchObject({
       code: 'NOT_FOUND',
     });
     expect(commands).not.toHaveBeenCalled();
