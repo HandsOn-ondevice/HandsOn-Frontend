@@ -1,3 +1,4 @@
+import { procedureVersionLabel } from './procedure-version-label';
 import { useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -68,8 +69,8 @@ export function SessionMenuScreen({
             />
             {state?.cursor ? (
               <AppText variant="caption" color={colors.text.secondary}>
-                {state.condition?.label} 조건 · {state.cursor.trialIndex}회차 · 절차 v
-                {session.procedure.version}
+                {state.condition?.label} 조건 · {state.cursor.trialIndex}회차 · 절차{' '}
+                {procedureVersionLabel(session.procedure.version)}
               </AppText>
             ) : null}
             {session.source === 'mock' ? (

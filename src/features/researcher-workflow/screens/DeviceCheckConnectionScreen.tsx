@@ -1,3 +1,4 @@
+import { procedureVersionLabel } from './procedure-version-label';
 import { useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -146,7 +147,7 @@ export function DeviceCheckConnectionScreen({
         <AppText>{subtitle}</AppText>
         {session ? (
           <AppText variant="caption">
-            세션 {session.sessionId} · 절차 v{session.procedure.version}
+            세션 {session.sessionId} · 절차 {procedureVersionLabel(session.procedure.version)}
           </AppText>
         ) : null}
         {session && attempt ? (

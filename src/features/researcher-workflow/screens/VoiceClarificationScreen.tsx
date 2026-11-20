@@ -1,3 +1,4 @@
+import { procedureVersionLabel } from './procedure-version-label';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -170,7 +171,11 @@ export function VoiceClarificationScreen({
         }}
       />
       <BottomSheet open={menu} title="음성 확인 정보" onClose={() => setMenu(false)}>
-        {session ? <AppText variant="caption">절차 v{session.procedure.version}</AppText> : null}
+        {session ? (
+          <AppText variant="caption">
+            절차 {procedureVersionLabel(session.procedure.version)}
+          </AppText>
+        ) : null}
         <AppText>뜻을 선택한 뒤 하단 버튼으로 확정합니다. 뒤로 가면 선택 없이 취소합니다.</AppText>
         <AppText>
           음성 입력과 안내 재생 서비스는 아직 연결되지 않았습니다. 안내는 화면에서 확인할 수

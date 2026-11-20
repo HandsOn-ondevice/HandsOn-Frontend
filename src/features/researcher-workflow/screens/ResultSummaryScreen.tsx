@@ -1,3 +1,4 @@
+import { procedureVersionLabel } from './procedure-version-label';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -74,7 +75,7 @@ export function ResultSummaryScreen({
       >
         <FeedbackPanel
           title="결과를 제출했습니다"
-          subtitle={`${session.operatorId} · ${session.procedure.deviceId} · v${session.procedure.version}\n숙련자의 최종 검토를 기다립니다.`}
+          subtitle={`${session.operatorId} · ${session.procedure.deviceId} · ${procedureVersionLabel(session.procedure.version)}\n숙련자의 최종 검토를 기다립니다.`}
           tone="success"
           icon="check"
         />
@@ -128,7 +129,7 @@ export function ResultSummaryScreen({
             </AppText>
             <SurfaceCard
               title={`작업자 · ${session.operatorId} / 장치 ID · ${session.procedure.deviceId}`}
-              subtitle={`절차 버전 · v${session.procedure.version} / 소요 시간 · ${duration(session.createdAt, state.completion?.finishedAt)}`}
+              subtitle={`절차 버전 · ${procedureVersionLabel(session.procedure.version)} / 소요 시간 · ${duration(session.createdAt, state.completion?.finishedAt)}`}
             />
             <SectionHeader
               title={`조건별 측정 · ${state.review.validCount} / ${state.review.required}`}

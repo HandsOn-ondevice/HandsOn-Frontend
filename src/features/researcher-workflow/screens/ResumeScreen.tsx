@@ -1,3 +1,4 @@
+import { procedureVersionLabel } from './procedure-version-label';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -109,7 +110,10 @@ export function ResumeScreen({
               <AppText variant="caption" color={colors.text.secondary}>
                 {pausedAge.replace(/ 전$/, '')}간 일시정지됨
               </AppText>
-              <StatusBadge label={`v${session.procedure.version}`} tone="info" />
+              <StatusBadge
+                label={`${procedureVersionLabel(session.procedure.version)}`}
+                tone="info"
+              />
             </View>
             <HeroPanel
               tone="quiet"

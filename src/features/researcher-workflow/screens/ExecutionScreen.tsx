@@ -1,3 +1,4 @@
+import { procedureVersionLabel } from './procedure-version-label';
 import { useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -110,7 +111,9 @@ export function ExecutionScreen({
         ) : null}
         {session && state ? (
           <>
-            <AppText variant="caption">절차 v{session.procedure.version}</AppText>
+            <AppText variant="caption">
+              절차 {procedureVersionLabel(session.procedure.version)}
+            </AppText>
             {state.authorized && state.configured ? (
               <>
                 <StepProgress
