@@ -240,6 +240,13 @@ function HomeContents({
 }) {
   const drafts = data.procedures.filter((item) => item.status === 'draft');
   const pending = data.results.filter((item) => item.status === 'pending');
+  const recentApprovals =
+    data.recentWork.length === 0
+      ? data.procedures
+          .filter((item) => item.status === 'approved')
+          .sort((a, b) => (Date.parse(b.updatedLabel) || 0) - (Date.parse(a.updatedLabel) || 0))
+          .slice(0, 3)
+      : [];
   return (
     <>
       <SectionHeader title="검토 필요" />
@@ -263,31 +270,37 @@ function HomeContents({
         </>
       )}
       <SectionHeader title="최근 작업" />
-      {data.recentWork.length === 0 ? (
+      {recentApprovals.map((item) => (
+        <HomeProcedure
+          key={JSON.stringify([item.id, item.version])}
+          procedure={item}
+          onOpenTask={onOpenTask}
+        />
+      ))}
+      {data.recentWork.length === 0 && recentApprovals.length === 0 ? (
         <SurfaceCard subtitle="최근 작업이 없어요. 새 절차부터 시작해 보세요." />
-      ) : (
-        data.recentWork.map((item) => (
-          <Pressable
-            key={item.id}
-            accessibilityRole="button"
-            accessibilityLabel={`최근 작업, ${item.title}, ${item.summary}, ${item.updatedLabel}`}
-            onPress={() =>
-              onOpenTask(
-                item.kind === 'procedure'
-                  ? { kind: 'procedure', procedureId: item.procedureId }
-                  : { kind: 'result', resultId: item.resultId, procedureId: item.procedureId },
-              )
-            }
-            style={({ pressed }) => pressed && styles.pressed}
-          >
-            <SurfaceCard title={item.title} subtitle={item.summary}>
-              <AppText variant="caption" color={colors.text.secondary}>
-                {item.updatedLabel}
-              </AppText>
-            </SurfaceCard>
-          </Pressable>
-        ))
-      )}
+      ) : null}
+      {data.recentWork.map((item) => (
+        <Pressable
+          key={item.id}
+          accessibilityRole="button"
+          accessibilityLabel={`최근 작업, ${item.title}, ${item.summary}, ${item.updatedLabel}`}
+          onPress={() =>
+            onOpenTask(
+              item.kind === 'procedure'
+                ? { kind: 'procedure', procedureId: item.procedureId }
+                : { kind: 'result', resultId: item.resultId, procedureId: item.procedureId },
+            )
+          }
+          style={({ pressed }) => pressed && styles.pressed}
+        >
+          <SurfaceCard title={item.title} subtitle={item.summary}>
+            <AppText variant="caption" color={colors.text.secondary}>
+              {item.updatedLabel}
+            </AppText>
+          </SurfaceCard>
+        </Pressable>
+      ))}
     </>
   );
 }
