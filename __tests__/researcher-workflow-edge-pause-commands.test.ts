@@ -128,3 +128,47 @@ test('응답 유실 뒤 더 최신 개정이 조회되어도 같은 재개 요�
     [path],
   ]);
 });
+
+test('2.0 재개 응답을 잃으면 최신 커서가 바뀌어도 기존 확인을 포함한 같은 명령을 보낸다', async () => {
+  const confirmation = {
+    holdId: 'hold-1',
+    cursorId: cursor.cursorId,
+    conditionsConfirmed: true,
+    installationConfirmed: true,
+    confirmedAt: '2026-11-23T00:01:05Z',
+  } as const;
+  const context = { requestId: 'resume-v2-1', expectedRevision: 11 };
+  const payload = {
+    requestId: context.requestId,
+    body: JSON.stringify({ ...context, command: { type: 'resume', confirmation } }),
+  };
+  const advanced = {
+    ...resumed,
+    revision: 16,
+    execution: { ...resumed.execution, cursor: { ...cursor, cursorId: 'cursor-3' } },
+  };
+  const request = jest
+    .fn<EdgeSessionRequest>()
+    .mockRejectedValueOnce(new Error('response lost'))
+    .mockRejectedValueOnce(new Error('response lost again'))
+    .mockResolvedValueOnce(reply(advanced))
+    .mockResolvedValueOnce(reply(resumed, true))
+    .mockResolvedValueOnce(reply(advanced));
+  const repository = new EdgeWorkflowRepository(request);
+  repository.subscribe(sessionId, jest.fn());
+
+  const command = { ...resume, confirmation };
+  await expect(repository.executeCommand(sessionId, command, context)).rejects.toMatchObject({
+    code: 'OUTCOME_UNKNOWN',
+  });
+  await repository.getSession(sessionId);
+  await expect(repository.executeCommand(sessionId, command, context)).resolves.toEqual(advanced);
+
+  expect(request.mock.calls).toEqual([
+    [`${path}/commands`, payload],
+    [`${path}/commands`, payload],
+    [path],
+    [`${path}/commands`, payload],
+    [path],
+  ]);
+});

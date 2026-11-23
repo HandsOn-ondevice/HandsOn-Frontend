@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { AppText, Button, FeedbackPanel, Screen } from '@/design-system';
 import { EdgeResumeScreen } from '@/features/researcher-workflow/screens/EdgeResumeScreen';
 import { ResumeScreen } from '@/features/researcher-workflow/screens/ResumeScreen';
+import type { ExperimentSession } from '@/features/researcher-workflow/domain/models';
 import { selectResume } from '@/features/researcher-workflow/domain/resume';
 import { useWorkflowSession } from '@/features/researcher-workflow/state/useWorkflowSession';
 import { isEdgeWorkflowEnabled } from '@/features/researcher-workflow/state/workflow-repository';
@@ -19,8 +20,38 @@ export default function ResumeRoute() {
       pathname: '/researcher-workflow/[sessionId]/execution',
       params: { sessionId },
     });
-  const Resume = isEdgeWorkflowEnabled() ? EdgeResumeScreen : MockResumeRoute;
-  return <Resume key={sessionId} sessionId={sessionId} onBack={onBack} onExecution={onExecution} />;
+  if (isEdgeWorkflowEnabled()) {
+    return (
+      <EdgeResumeScreen
+        key={sessionId}
+        sessionId={sessionId}
+        onBack={onBack}
+        onContinue={(session: ExperimentSession) => {
+          if (session.phase === 'running') onExecution();
+          else {
+            router.dismissTo({
+              pathname: '/researcher-workflow/[sessionId]/preparation',
+              params: { sessionId, resume: '1' },
+            });
+          }
+        }}
+        onOtherHold={() =>
+          router.replace({
+            pathname: '/researcher-workflow/[sessionId]/recovery',
+            params: { sessionId },
+          })
+        }
+      />
+    );
+  }
+  return (
+    <MockResumeRoute
+      key={sessionId}
+      sessionId={sessionId}
+      onBack={onBack}
+      onExecution={onExecution}
+    />
+  );
 }
 
 function MockResumeRoute({

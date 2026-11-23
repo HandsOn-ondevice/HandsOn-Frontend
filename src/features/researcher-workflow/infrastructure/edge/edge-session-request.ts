@@ -93,6 +93,10 @@ function outcomeUnknown(error: unknown) {
 
 const edgeErrorCodes = [
   'REVISION_CONFLICT',
+  'RESUME_CONFIRMATION_REQUIRED',
+  'RESUME_CONFIRMATION_EXPIRED',
+  'RESUME_CONFIRMATION_MISMATCH',
+  'HOLD_ACTION_NOT_ALLOWED',
   'REQUEST_CONFLICT',
   'CHECK_NOT_EDITABLE',
   'INVALID_STATE',
@@ -109,6 +113,13 @@ const edgeErrorCodes = [
   'MEASUREMENTS_INCOMPLETE',
   'ALREADY_SUBMITTED',
 ] as const satisfies readonly WorkflowErrorCode[];
+
+const resumeErrorMessages: Partial<Record<WorkflowErrorCode, string>> = {
+  RESUME_CONFIRMATION_REQUIRED: '실험 조건과 장치 설치 상태를 다시 확인해 주세요.',
+  RESUME_CONFIRMATION_EXPIRED: '확인 유효시간이 지났어요. 두 항목을 다시 확인해 주세요.',
+  RESUME_CONFIRMATION_MISMATCH: '보류 상태가 바뀌었어요. 현재 상태를 다시 확인해 주세요.',
+  HOLD_ACTION_NOT_ALLOWED: '보류 상태가 바뀌었어요. 현재 상태를 다시 확인해 주세요.',
+};
 
 function toWorkflowError(reason: unknown, sessionId?: string) {
   if (reason instanceof WorkflowError) return reason;
@@ -127,11 +138,12 @@ function toWorkflowError(reason: unknown, sessionId?: string) {
   const error = payload?.error;
   if (status === 401 || status === 403)
     return new WorkflowError('EDGE_REJECTED', 'Edge 접근 권한을 확인해 주세요.');
-  const message =
-    typeof error?.message === 'string'
-      ? error.message
-      : 'Edge가 요청을 처리하지 못했어요. 다시 시도해 주세요.';
   const code = edgeErrorCodes.find((candidate) => candidate === error?.code);
+  const message =
+    (code && resumeErrorMessages[code]) ??
+    (typeof error?.message === 'string'
+      ? error.message
+      : 'Edge가 요청을 처리하지 못했어요. 다시 시도해 주세요.');
   let session: ExperimentSession | undefined;
   if (sessionId && payload?.session !== undefined) {
     try {
