@@ -1,14 +1,14 @@
 # US-04 장치·거리·조도에 따른 실행 시작 검증
 
-승인 절차를 선택해 준비를 끝낸 뒤 장치·센서 점검에서 첫 실행 회차까지 이어지는 시연 장면 6~9를 확인합니다. 준비 화면에서 확인한 세션 ID와 승인 버전을 점검·실행 화면 및 Edge 응답과 대조합니다. 조도는 센서 원시값인 ADC로 확인합니다. [이슈 #54](https://github.com/HandsOn-ondevice/HandsOn-Frontend/issues/54)
+승인 절차를 선택해 준비를 끝낸 뒤 장치·센서 점검에서 첫 실행 회차까지 이어지는 시연 장면 6~9를 확인합니다. 준비 화면의 세션 ID와 승인 버전을 점검 화면에서 대조하고 같은 세션이 실행으로 전환되는지 확인합니다. 조도는 센서 원시값인 ADC로 확인합니다. [이슈 #54](https://github.com/HandsOn-ondevice/HandsOn-Frontend/issues/54)
 
 ## 재실행
 
-HandsOn Edge를 시뮬레이션 모드로 `127.0.0.1:18054`에서 실행합니다. 대상 백엔드는 `d06b417`입니다. 테스트 전용 데이터 디렉터리를 사용하고 CORS에 `http://localhost:19054`를 허용합니다. Edge를 띄울 때 사용한 작업자·숙련자 테스트 토큰을 실행 셸의 `HANDSON_E2E_OPERATOR_TOKEN`, `HANDSON_E2E_EXPERT_TOKEN`에 설정합니다. 승인 버전 비교는 이 테스트 데이터에 새 절차와 승인 버전을 만듭니다. [HandsOn Edge 소스](https://github.com/HandsOn-ondevice/HandsOn-Backend/tree/d06b417c7c05742a239353019fbf9a31f37416b5)
+HandsOn Edge를 시뮬레이션 모드로 `127.0.0.1:18056`에서 실행합니다. 앱이 새 세션을 `workflowVersion: "2.0"`으로 생성하므로 API-10을 지원하는 백엔드 `67716a5`를 사용합니다. 테스트 전용 데이터 디렉터리를 사용하고 CORS에 `http://localhost:19056`을 허용합니다. Edge를 띄울 때 사용한 작업자·숙련자 테스트 토큰을 실행 셸의 `HANDSON_E2E_OPERATOR_TOKEN`, `HANDSON_E2E_EXPERT_TOKEN`에 설정합니다. 승인 버전 비교는 이 테스트 데이터에 새 절차와 승인 버전을 만듭니다. [HandsOn Edge 소스](https://github.com/HandsOn-ondevice/HandsOn-Backend/tree/67716a54ed80ea4f125d8241cf2c672fd73ba741)
 
 ```sh
-HANDSON_E2E_EDGE_START=1 EXPO_E2E_PORT=19054 \
-  EXPO_PUBLIC_HANDSON_EDGE_BASE_URL=http://127.0.0.1:18054 \
+HANDSON_E2E_EDGE_START=1 EXPO_E2E_PORT=19056 \
+  EXPO_PUBLIC_HANDSON_EDGE_BASE_URL=http://127.0.0.1:18056 \
   npm run test:e2e:ui -- e2e/edge-execution-start.spec.ts
 ```
 

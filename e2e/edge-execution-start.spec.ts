@@ -122,7 +122,9 @@ const test = base.extend<{
         ),
         button(page, '이 버전으로 준비 시작').click(),
       ]);
-      expect(response.status()).toBe(201);
+      expect(response.status(), 'Edge 세션 생성은 API-10의 workflowVersion 2.0을 사용합니다.').toBe(
+        201,
+      );
       const created = (await response.json()) as ExecutionStartSession;
       const id = created.sessionId;
       sessionId = id;
@@ -130,10 +132,12 @@ const test = base.extend<{
       expect(response.request().postDataJSON()).toMatchObject({
         procedureId: procedure.procedureId,
         procedureVersion: procedure.version,
+        workflowVersion: '2.0',
       });
       expect(created).toMatchObject({
         phase: 'preparing',
         dataOrigin: 'simulation',
+        workflowVersion: '2.0',
         procedure: {
           procedureId: procedure.procedureId,
           version: procedure.version,
