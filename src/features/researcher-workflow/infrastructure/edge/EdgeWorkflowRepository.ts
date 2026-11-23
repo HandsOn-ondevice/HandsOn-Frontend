@@ -29,6 +29,26 @@ type Creation = {
   result?: Promise<ExperimentSession>;
 };
 
+type ExecutionTransition = Extract<
+  WorkflowCommand,
+  { type: 'pauseExecution' | 'resumePausedExecution' }
+>;
+type EdgeCommand =
+  | Extract<
+      WorkflowCommand,
+      {
+        type:
+          | 'setPreparationCheck'
+          | 'completePreparation'
+          | 'startDeviceCheck'
+          | 'startExecution'
+          | 'requestVoiceClarification'
+          | 'resolveVoiceClarification'
+          | 'dismissVoiceClarification';
+      }
+    >
+  | { type: 'pause' | 'resume' };
+
 export class EdgeWorkflowRepository implements WorkflowRepository {
   private readonly reads = new Map<string, Promise<ExperimentSession>>();
   private readonly watched = new Map<string, WatchedSession>();
@@ -100,17 +120,53 @@ export class EdgeWorkflowRepository implements WorkflowRepository {
   }
 
   async executeCommand(sessionId: string, command: WorkflowCommand, context: CommandContext) {
-    if (
-      command.type !== 'setPreparationCheck' &&
-      command.type !== 'completePreparation' &&
-      command.type !== 'startDeviceCheck' &&
-      command.type !== 'startExecution' &&
-      command.type !== 'requestVoiceClarification' &&
-      command.type !== 'resolveVoiceClarification' &&
-      command.type !== 'dismissVoiceClarification'
-    ) {
-      throw new WorkflowError('INVALID_STATE', '이 단계의 Edge 명령은 아직 연결되지 않았어요.');
+    switch (command.type) {
+      case 'pauseExecution':
+      case 'resumePausedExecution':
+        await this.checkExecutionTransition(sessionId, command, context.expectedRevision);
+        return this.writeCommand(
+          sessionId,
+          { type: command.type === 'pauseExecution' ? 'pause' : 'resume' },
+          context,
+        );
+      case 'setPreparationCheck':
+      case 'completePreparation':
+      case 'startDeviceCheck':
+      case 'startExecution':
+      case 'requestVoiceClarification':
+      case 'resolveVoiceClarification':
+      case 'dismissVoiceClarification':
+        return this.writeCommand(sessionId, command, context);
+      default:
+        throw new WorkflowError('INVALID_STATE', '이 단계의 Edge 명령은 아직 연결되지 않았어요.');
     }
+  }
+
+  private async checkExecutionTransition(
+    sessionId: string,
+    command: ExecutionTransition,
+    expectedRevision: number,
+  ) {
+    const watched = this.watched.get(sessionId)?.latest;
+    const session =
+      watched && watched.revision >= expectedRevision ? watched : await this.getSession(sessionId);
+    if (session.revision < expectedRevision) {
+      throw new WorkflowError('REVISION_CONFLICT', '최신 세션을 조회한 뒤 다시 시도해 주세요.');
+    }
+    // An older revision can belong to a request the server has already applied.
+    // Edge replays that request by ID and rejects new commands with stale revisions.
+    if (session.revision > expectedRevision) return;
+
+    const canTransition =
+      command.type === 'pauseExecution'
+        ? session.phase === 'running'
+        : session.phase === 'held' && session.holdReason?.code === 'USER_PAUSED';
+    if (!canTransition || session.execution?.cursor?.cursorId !== command.cursorId) {
+      throw new WorkflowError('INVALID_STATE', '현재 작업 상태와 회차를 다시 확인해 주세요.');
+    }
+  }
+
+  private async writeCommand(sessionId: string, command: EdgeCommand, context: CommandContext) {
     const payload = { ...context, command };
     const { session, replayed } = await writeEdgeSession(
       this.request,

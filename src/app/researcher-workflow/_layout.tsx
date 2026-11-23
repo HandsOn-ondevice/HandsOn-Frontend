@@ -14,6 +14,9 @@ const edgeScreens = new Set([
   '[sessionId]/voice-clarification',
   '[sessionId]/recovery',
   '[sessionId]/remeasurement',
+  '[sessionId]/session-menu',
+  '[sessionId]/paused',
+  '[sessionId]/resume',
 ]);
 
 export default function ResearcherWorkflowLayout() {

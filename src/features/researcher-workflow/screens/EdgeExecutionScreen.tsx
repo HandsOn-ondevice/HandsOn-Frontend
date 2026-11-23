@@ -29,6 +29,8 @@ import { EdgeVoiceInput } from './EdgeVoiceInput';
 type Props = {
   sessionId: string;
   onBack: () => void;
+  onMenu: () => void;
+  onPause: () => void;
   onRecovery: () => void;
   onClarification: () => void;
   onHome: () => void;
@@ -71,6 +73,8 @@ export function EdgeExecutionScreen(props: Props) {
 function EdgeMeasurementContent({
   sessionId,
   onBack,
+  onMenu,
+  onPause,
   onRecovery,
   onClarification,
   onHome,
@@ -172,11 +176,17 @@ function EdgeMeasurementContent({
   const recovery = selectEdgeRecovery(session);
   const pendingVoice = session?.execution?.pendingVoice;
   const lastVoiceResolution = session?.execution?.voiceResolutions?.at(-1);
+  const userPaused = session?.phase === 'held' && session.holdReason?.code === 'USER_PAUSED';
 
   return (
     <SafeAreaView style={styles.root} edges={['top']} testID="execution-screen">
       <StatusBar tone="light" />
-      <AppBar title="핵심 실행 화면" mode="back" onBack={onBack} />
+      <AppBar
+        title="핵심 실행 화면"
+        mode="back"
+        onBack={onBack}
+        onMore={cursor ? onMenu : undefined}
+      />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {session ? <AppText variant="title">{session.procedure.title}</AppText> : null}
         {loading ? (
@@ -236,6 +246,17 @@ function EdgeMeasurementContent({
               subtitle="서버가 마지막 회차의 완료를 확인했습니다."
             />
             <Button label="연구생 홈으로" onPress={onHome} />
+          </>
+        ) : session?.phase === 'held' && !recovery ? (
+          <>
+            <FeedbackPanel
+              title={userPaused ? '실험이 일시정지되어 있습니다' : '실험이 보류되었습니다'}
+              subtitle={session.holdReason?.message}
+              tone="warning"
+            />
+            {userPaused ? (
+              <Button label="일시정지 기록 확인" variant="secondary" onPress={onPause} />
+            ) : null}
           </>
         ) : session && !recovery ? (
           <FeedbackPanel
