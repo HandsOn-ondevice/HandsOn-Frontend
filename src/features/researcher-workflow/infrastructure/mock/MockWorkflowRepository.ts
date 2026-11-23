@@ -2,6 +2,7 @@ import {
   beginResumeCheck,
   finishResumeCheck,
   confirmResumeSetup,
+  pauseMockExecution,
   resumeExecution,
 } from './resume-transitions';
 import {
@@ -25,8 +26,8 @@ import {
   type WorkflowCommand,
 } from '../../domain/models';
 import { transitionPreparation } from './transition-engine';
-import { mockProcedure } from './fixtures';
 import { createLedM02ResultFixture } from './led-m02-result-fixture';
+import { createLedM03PausedFixture } from './led-m03-paused-fixture';
 import { isMockWorkflowEnabled } from './mock-environment';
 import {
   beginDeviceCheck,
@@ -91,46 +92,11 @@ export class MockWorkflowRepository implements WorkflowRepository {
     this.cleanup = dependencies.cleanup ?? runMockCleanup;
     this.submit = dependencies.submit ?? runMockSubmission;
 
-    // S01의 합성 목록과 같은 ID를 가진 S04 재확인용 세션이다.
-    // 준비 확인 상태와 S06 측정 진행률을 혼용하지 않는다.
-    // 고정 fixture는 주입된 now/id를 소비하지 않아 새 세션 생성 계약을 유지한다.
-    const savedAt = '2026-11-12T00:34:00.000Z';
-    const session: ExperimentSession = {
-      sessionId: 'demo-session-led-m03',
-      operatorId: 'mock-researcher',
-      source: 'mock',
-      procedure: {
-        ...copy(mockProcedure),
-        procedureId: 'demo-procedure-led-output',
-        deviceCheck: mockProcedure.deviceCheck
-          ? { ...copy(mockProcedure.deviceCheck), deviceId: 'demo-orange-pi-5-plus' }
-          : undefined,
-      },
-      phase: 'preparing',
-      revision: 0,
-      createdAt: savedAt,
-      updatedAt: savedAt,
-      checks: mockProcedure.preparation.map((item) => ({
-        id: item.id,
-        checked: false,
-        confirmedAt: null,
-        evidenceId: null,
-      })),
-      evidence: [],
-      deviceChecks: [],
-      events: [
-        {
-          eventId: 'demo-session-led-m03-created',
-          requestId: 'demo-session-led-m03-initial',
-          type: 'sessionCreated',
-          occurredAt: savedAt,
-        },
-      ],
-    };
+    const session = createLedM03PausedFixture();
     this.sessions.set(session.sessionId, session);
     this.initialStaleReadings.set(
       session.sessionId,
-      new Date(Date.parse(savedAt) - 1).toISOString(),
+      new Date(Date.parse(session.createdAt) - 1).toISOString(),
     );
     const completedDemo = createLedM02ResultFixture();
     this.sessions.set(completedDemo.sessionId, completedDemo);
@@ -212,6 +178,19 @@ export class MockWorkflowRepository implements WorkflowRepository {
     return copy(session);
   }
 
+  /** 개발용 연구생 홈에서 최근 진행한 세션을 이어간다. */
+  getOngoingSession(): ExperimentSession | null {
+    this.assertDevelopmentEnvironment();
+    let ongoing: ExperimentSession | undefined;
+    for (const session of this.sessions.values()) {
+      if (['completed', 'submitted', 'cancelled'].includes(session.phase)) continue;
+      if (!ongoing || Date.parse(session.updatedAt) >= Date.parse(ongoing.updatedAt)) {
+        ongoing = session;
+      }
+    }
+    return ongoing ? copy(ongoing) : null;
+  }
+
   async executeCommand(sessionId: string, command: WorkflowCommand, context: CommandContext) {
     this.assertDevelopmentEnvironment();
     if (command.type === 'resumePausedExecution') {
@@ -271,7 +250,7 @@ export class MockWorkflowRepository implements WorkflowRepository {
     const next = isCompletionCommand(command)
       ? transitionCompletion(session, command, this.id(), metadata)
       : command.type === 'pauseExecution'
-        ? this.pauseExecution(session, command.cursorId, metadata)
+        ? pauseMockExecution(session, command.cursorId, metadata)
         : command.type === 'checkResume'
           ? beginResumeCheck(session, command, this.id(), metadata)
           : command.type === 'confirmResumeSetup'
@@ -341,37 +320,6 @@ export class MockWorkflowRepository implements WorkflowRepository {
     if (command.type === 'submitMockResult' && resolved !== session)
       this.scheduleSubmission(resolved, context.requestId);
     return copy(resolved);
-  }
-
-  private pauseExecution(
-    session: ExperimentSession,
-    cursorId: string,
-    metadata: { requestId: string; now: string; eventId: string },
-  ): ExperimentSession {
-    const cursor = session.execution?.cursor;
-    if (!cursor || cursor.cursorId !== cursorId) {
-      throw new WorkflowError('INVALID_STATE', '일시정지할 현재 회차를 확인해 주세요.');
-    }
-    if (session.phase === 'paused') return session;
-    if (!selectExecution(session).authorized) {
-      throw new WorkflowError('INVALID_STATE', '진행 중인 실험만 일시정지할 수 있습니다.');
-    }
-    return {
-      ...session,
-      phase: 'paused',
-      revision: session.revision + 1,
-      updatedAt: metadata.now,
-      events: [
-        ...session.events,
-        {
-          eventId: metadata.eventId,
-          requestId: metadata.requestId,
-          type: 'executionPaused',
-          occurredAt: metadata.now,
-          cursor,
-        },
-      ],
-    };
   }
 
   /** Mock 제어는 정식 Repository 명령·API 입력과 분리한다. 실행 중인 시나리오는 바꿀 수 없다. */

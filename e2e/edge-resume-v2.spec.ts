@@ -288,8 +288,21 @@ test('새 세션을 2.0으로 만든 뒤 연구생 홈을 거쳐 재개하고 �
     sessionId: held.sessionId,
     hold: held.hold,
   });
-  await expect(page).toHaveURL(screenPath(held, 'paused'));
-  await button(page, '바로 재개').click();
+  await expect(page).toHaveURL(({ pathname }) => pathname === screenPath(held, 'resume'));
+  const cursor = cursorOf(held);
+  const condition = procedure.execution.conditions.find(({ id }) => id === cursor.conditionId);
+  if (!condition) throw new Error('Held cursor does not match an approved condition.');
+  const resumeScreen = page.getByTestId('resume-screen');
+  await expect(
+    resumeScreen.getByText(`승인 버전 v${held.procedure.version.replace(/^v/, '')}`, {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    resumeScreen.getByText(`${condition.label} 조건 · ${cursor.trialIndex}회차부터 재개`, {
+      exact: true,
+    }),
+  ).toBeVisible();
   const send = button(page, '장치 점검하고 재개');
 
   // The browser clock is behind the Edge clock so the real server rejects confirmation as expired.

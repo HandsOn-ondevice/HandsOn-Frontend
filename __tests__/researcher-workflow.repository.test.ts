@@ -4,6 +4,7 @@ import type {
   WorkflowCommand,
 } from '../src/features/researcher-workflow/domain/models';
 import { selectPreparation } from '../src/features/researcher-workflow/domain/preparation';
+import { selectResume } from '../src/features/researcher-workflow/domain/resume';
 import { MockWorkflowRepository } from '../src/features/researcher-workflow/infrastructure/mock/MockWorkflowRepository';
 import { mockProcedure } from '../src/features/researcher-workflow/infrastructure/mock/fixtures';
 import { loadWorkEnvironments } from '../src/features/entry/entryEnvironment';
@@ -41,7 +42,7 @@ async function confirmOperatorChecks(repo: MockWorkflowRepository) {
 }
 
 describe('S04 Mock Repository 계약', () => {
-  test('S01의 기존 ID는 생성 요청 없이 조회되며 절차 버전·장치·저장 시각이 홈 예시와 일치한다', async () => {
+  test('S01 일시정지 예시와 워크플로가 같은 세션·승인 버전·측정 진행도를 사용한다', async () => {
     const [environment] = await loadWorkEnvironments();
     const home = await loadStudentHome(environment);
     const ongoing = home.ongoingSession!;
@@ -50,7 +51,7 @@ describe('S04 Mock Repository 계약', () => {
 
     expect(session.sessionId).toBe('demo-session-led-m03');
     expect(session.source).toBe('mock');
-    expect(session.procedure.title).toBe(ongoing.title.replace('\n', ' '));
+    expect(session.procedure.title).toBe(ongoing.title);
     expect(`v${session.procedure.version}`).toBe(ongoing.procedureVersion);
     expect(session.procedure.deviceId).toBe('LED-M03');
     expect(session.procedure.deviceCheck?.deviceId).toBe(ongoing.deviceId);
@@ -62,53 +63,50 @@ describe('S04 Mock Repository 계약', () => {
         hour12: false,
       }),
     ).toBe(ongoing.savedAtLabel);
-    // 홈의 측정 50%·2/3회차는 S04의 준비 체크 진행률이 아니다.
-    expect(session.phase).toBe('preparing');
-    expect(selectPreparation(session)).toMatchObject({
-      completed: 0,
-      total: 6,
-      canContinue: false,
+    expect(session.phase).toBe(ongoing.status);
+    expect(ongoing).toMatchObject({ conditionProgress: 50, completedCycles: 2, totalCycles: 3 });
+    const resume = selectResume(session);
+    expect(resume).toMatchObject({
+      paused: true,
+      cursor: { conditionId: 'output-50', trialIndex: 3 },
+      conditions: expect.arrayContaining([{ label: '50%', value: '2/3' }]),
+      canResume: false,
     });
-    expect(session.evidence).toEqual([]);
-    expect(session.deviceChecks).toEqual([]);
-    expect(session.events.map((event) => event.type)).toEqual(['sessionCreated']);
+    expect(resume.pause?.cursor).toEqual(resume.cursor);
+    expect(session.deviceChecks.at(-1)?.status).toBe('passed');
     await expect(repo.getSession('missing-session')).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
-  test('초기 세션의 체크·revision·근거를 재조회와 새 세션 생성 후에도 유지하고 S05로 제출한다', async () => {
+  test('준비 중인 세션의 체크·revision·근거를 재조회와 다른 세션 생성 후에도 유지하고 S05로 제출한다', async () => {
     const repo = new MockWorkflowRepository({ now: () => '2026-11-12T00:42:00.000Z' });
-    let session = await repo.getSession('demo-session-led-m03');
-    for (const item of session.procedure.preparation.filter((item) => item.owner === 'operator')) {
-      session = await send(repo, session, {
-        type: 'setPreparationCheck',
-        checkId: item.id,
-        checked: true,
-      });
-    }
-    await repo.createSession(input);
+    const session = await confirmOperatorChecks(repo);
+    await repo.createSession({ ...input, requestId: 'another-session' });
     expect(await repo.getSession(session.sessionId)).toEqual(session);
     expect(session.revision).toBe(5);
     expect(session.evidence).toHaveLength(5);
     const submitted = await send(repo, session, { type: 'completePreparation' });
-    expect(submitted.sessionId).toBe('demo-session-led-m03');
+    expect(submitted.sessionId).toBe(session.sessionId);
     expect(submitted.phase).toBe('awaitingDeviceCheck');
     expect(submitted.procedure).toEqual(session.procedure);
     expect(submitted.checks.find((item) => item.id === 'communication')?.checked).toBe(false);
   });
 
-  test('초기 세션의 반환 스냅샷과 Repository 인스턴스는 서로 격리된다', async () => {
+  test('일시정지 예시의 반환 스냅샷과 Repository 인스턴스는 서로 격리된다', async () => {
     const first = repository();
-    const session = await first.getSession('demo-session-led-m03');
+    const session = first.getOngoingSession()!;
     const mutable = session as unknown as { procedure: { version: string } };
     mutable.procedure.version = '9.9';
-    expect((await first.getSession(session.sessionId)).procedure.version).toBe('1.2');
-    await send(first, session, {
-      type: 'setPreparationCheck',
-      checkId: 'materials',
-      checked: true,
+    const actual = await first.getSession(session.sessionId);
+    expect(actual.procedure.version).toBe('1.2');
+    const resume = selectResume(actual);
+    await send(first, actual, {
+      type: 'checkResume',
+      target: 'connection',
+      pauseEventId: resume.pause!.eventId,
+      cursorId: resume.cursor!.cursorId,
     });
-    expect(selectPreparation(await first.getSession(session.sessionId)).completed).toBe(1);
-    expect(selectPreparation(await repository().getSession(session.sessionId)).completed).toBe(0);
+    expect((await first.getSession(actual.sessionId)).revision).toBeGreaterThan(actual.revision);
+    expect(await repository().getSession(actual.sessionId)).toEqual(actual);
     expect(mockProcedure.procedureId).toBe('mock-led-output');
     expect(mockProcedure.deviceCheck?.deviceId).toBe('mock-orange-pi-5-plus');
   });

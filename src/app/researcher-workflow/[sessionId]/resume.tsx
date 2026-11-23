@@ -9,12 +9,17 @@ import { useWorkflowSession } from '@/features/researcher-workflow/state/useWork
 import { isEdgeWorkflowEnabled } from '@/features/researcher-workflow/state/workflow-repository';
 
 export default function ResumeRoute() {
-  const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
-  const onBack = () =>
+  const { sessionId, fromHome } = useLocalSearchParams<{ sessionId: string; fromHome?: string }>();
+  const onBack = () => {
+    if (fromHome === '1') {
+      router.dismissTo('/student');
+      return;
+    }
     router.dismissTo({
       pathname: '/researcher-workflow/[sessionId]/paused',
       params: { sessionId },
     });
+  };
   const onExecution = () =>
     router.dismissTo({
       pathname: '/researcher-workflow/[sessionId]/execution',

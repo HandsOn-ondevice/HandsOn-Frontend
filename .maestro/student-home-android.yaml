@@ -16,7 +16,17 @@ name: Android 연구생 홈의 작업 진입과 빈 상태
 - takeScreenshot: s01-ongoing
 
 - tapOn: 이어서 진행
-- assertVisible: '준비 진행도 · 0 / 6 항목 완료'
+- assertVisible: 재개 전 재확인
+- assertVisible: 'v1\.2'
+- assertVisible: '(?s)50% 조건\s+3회차부터 재개합니다'
+- assertVisible:
+    text: 확인하고 재개
+    enabled: false
+- takeScreenshot: s11-from-student-home
+- tapOn: 뒤로가기
+- assertVisible: 이어서 진행
+- tapOn: 이어서 진행
+- assertVisible: 재개 전 재확인
 - back
 - assertVisible: 이어서 진행
 

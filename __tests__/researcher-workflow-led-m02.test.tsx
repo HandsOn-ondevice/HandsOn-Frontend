@@ -152,7 +152,7 @@ describe('LED-M02 초기 완료·제출 Mock 기록', () => {
     expect(repeated).toEqual(before);
   });
 
-  test('초기 데모 구성은 주입된 시계·ID·runner 및 M03와 새 세션의 초기 상태를 변경하지 않는다', async () => {
+  test('초기 데모 구성은 주입된 시계·ID·runner를 소비하지 않고 새 세션은 준비부터 시작한다', async () => {
     const now = jest.fn(() => '2026-11-20T00:00:00.000Z');
     const id = jest.fn(() => 'new-id');
     const inspect = jest.fn<NonNullable<MockDependencies['inspect']>>();
@@ -161,10 +161,8 @@ describe('LED-M02 초기 완료·제출 Mock 기록', () => {
     expect(id).not.toHaveBeenCalled();
     expect(inspect).not.toHaveBeenCalled();
     expect(await repository.getSession('demo-session-led-m03')).toMatchObject({
-      phase: 'preparing',
-      revision: 0,
-      evidence: [],
-      deviceChecks: [],
+      phase: 'paused',
+      execution: { cursor: { conditionId: 'output-50', trialIndex: 3 } },
     });
     const created = await repository.createSession({
       requestId: 'new-session',

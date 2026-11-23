@@ -189,6 +189,7 @@ test('합성 홈은 기존 세션과 승인 버전을 유지하며 빈 환경에
     environmentId: environment.id,
     procedureVersion: 'v1.2',
     status: 'paused',
+    phase: 'paused',
   });
   expect(repeatedHome.ongoingSession).toEqual(ongoingHome.ongoingSession);
   expect(emptyHome.ongoingSession).toBeNull();

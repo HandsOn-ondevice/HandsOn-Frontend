@@ -1,13 +1,7 @@
 import type { ExperimentSession } from '../../domain/models';
 import { cleanupRequirements, selectCleanup, selectResult } from '../../domain/completion';
 import { mockProcedure } from './fixtures';
-import { transitionPreparation, type TransitionMetadata } from './transition-engine';
-import {
-  beginDeviceCheck,
-  finishDeviceCheck,
-  startMockExecution,
-} from './device-check-transitions';
-import { buildMockDiagnostics } from './device-check-scenarios';
+import { createLedExecutionFixture } from './led-execution-fixture';
 import {
   beginExecutionSample,
   finishExecutionSample,
@@ -27,18 +21,6 @@ import { buildMockCleanupReport, buildMockSubmissionReport } from './completion-
 export function createLedM02ResultFixture(): ExperimentSession {
   const sessionId = 'demo-session-led-m02';
   const createdAt = '2026-11-18T07:46:00.000Z';
-  let sequence = 0;
-  const metadata = (): TransitionMetadata => {
-    const index = sequence++;
-    const prefix = `${sessionId}:${index}`;
-    return {
-      requestId: `${prefix}:request`,
-      eventId: `${prefix}:event`,
-      evidenceId: `${prefix}:evidence`,
-      now: new Date(Date.parse(createdAt) + index * 1000).toISOString(),
-    };
-  };
-  // Repository에 주입된 now/id/비동기 runner를 소비하지 않는 독립된 합성 데이터다.
   const procedure: typeof mockProcedure = {
     ...JSON.parse(JSON.stringify(mockProcedure)),
     procedureId: 'demo-procedure-led-output',
@@ -48,60 +30,9 @@ export function createLedM02ResultFixture(): ExperimentSession {
       item.id === 'device' ? { ...item, title: '장치 ID LED-M02 확인' } : { ...item },
     ),
   };
-  const initial = metadata();
-  let session: ExperimentSession = {
-    sessionId,
-    operatorId: 'mock-researcher',
-    source: 'mock',
-    procedure,
-    phase: 'preparing',
-    revision: 0,
-    createdAt,
-    updatedAt: createdAt,
-    checks: procedure.preparation.map((item) => ({
-      id: item.id,
-      checked: false,
-      confirmedAt: null,
-      evidenceId: null,
-    })),
-    evidence: [],
-    deviceChecks: [],
-    events: [
-      {
-        eventId: initial.eventId,
-        requestId: initial.requestId,
-        type: 'sessionCreated',
-        occurredAt: initial.now,
-      },
-    ],
-  };
-  for (const item of procedure.preparation.filter((item) => item.owner === 'operator'))
-    session = transitionPreparation(
-      session,
-      {
-        type: 'setPreparationCheck',
-        checkId: item.id,
-        checked: true,
-      },
-      metadata(),
-    );
-  session = transitionPreparation(session, { type: 'completePreparation' }, metadata());
-  const check = metadata();
-  const checkId = `${check.eventId}:check`;
-  session = beginDeviceCheck(session, checkId, check);
-  const checked = metadata();
-  session = finishDeviceCheck(
-    session,
-    checkId,
-    buildMockDiagnostics({
-      definition: procedure.deviceCheck!,
-      scenario: 'normal',
-      attemptId: checkId,
-      now: () => checked.now,
-    }),
-    checked,
-  );
-  session = startMockExecution(session, metadata());
+  const fixture = createLedExecutionFixture(sessionId, createdAt, procedure);
+  const { metadata } = fixture;
+  let session = fixture.session;
 
   const finishSample = (scenario: MockExecutionScenario) => {
     const attempt = session.execution!.attempts.at(-1)!;

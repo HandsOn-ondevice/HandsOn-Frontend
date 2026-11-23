@@ -131,10 +131,10 @@ test('배포 실패 후 확인을 유지하고 재시도한 버전을 홈과 승
   ).toBeVisible();
 
   await page.getByRole('button', { name: '이어서 진행', exact: true }).click();
-  await expect(page).toHaveURL('/researcher-workflow/demo-session-led-m03/preparation');
-  await page.getByRole('button', { name: '더 보기', exact: true }).click();
-  await expect(page.getByText('LED 출력 단계별 조도·소비전력 측정 · v1.2')).toBeVisible();
-  await page.getByRole('button', { name: '하단 시트 닫기', exact: true }).click();
+  await expect(page).toHaveURL(
+    ({ pathname }) => pathname === '/researcher-workflow/demo-session-led-m03/resume',
+  );
+  await expect(page.getByTestId('resume-screen').getByText('v1.2', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '뒤로가기', exact: true }).click();
 
   await page.getByRole('button', { name: '전체 보기', exact: true }).click();

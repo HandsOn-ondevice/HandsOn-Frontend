@@ -2,8 +2,8 @@ import { afterEach, beforeEach, expect, jest, test } from '@jest/globals';
 import { fireEvent, render } from '@testing-library/react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import ExecutionRoute from '@/app/researcher-workflow/[sessionId]/execution';
-import PauseRoute from '@/app/researcher-workflow/[sessionId]/paused';
 import PreparationRoute from '@/app/researcher-workflow/[sessionId]/preparation';
+import ResumeRoute from '@/app/researcher-workflow/[sessionId]/resume';
 import SessionMenuRoute from '@/app/researcher-workflow/[sessionId]/session-menu';
 import { EntrySelectionProvider } from '@/features/entry/EntrySelectionProvider';
 import type { WorkflowRepository } from '@/features/researcher-workflow/application/WorkflowRepository';
@@ -114,7 +114,7 @@ function setup(next = session) {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  jest.mocked(useLocalSearchParams).mockReturnValue({ sessionId, resume: '1' });
+  jest.mocked(useLocalSearchParams).mockReturnValue({ sessionId, fromHome: '1' });
 });
 afterEach(() => {
   jest.restoreAllMocks();
@@ -141,11 +141,6 @@ test.each([
   { phase: 'running', holdReason: null, destination: 'execution' },
   {
     phase: 'held',
-    holdReason: { code: 'USER_PAUSED', message: '일시정지' },
-    destination: 'paused',
-  },
-  {
-    phase: 'held',
     holdReason: { code: 'MEASUREMENT_ERROR', message: '측정 오류' },
     destination: 'recovery',
   },
@@ -169,32 +164,29 @@ test.each([
   },
 );
 
-test('홈에서 다시 연 Edge 사용자 일시정지에서 서버의 회차를 표시하고 홈과 재개 확인을 연다', async () => {
+test('홈에서 연 Edge 일시정지는 S11에서 저장된 승인 버전과 회차를 표시한다', async () => {
   jest.spyOn(workflowRepository, 'isEdgeWorkflowEnabled').mockReturnValue(true);
   const { repository, show } = setup(paused);
   const screen = await show();
 
   expect(jest.mocked(Redirect).mock.calls[0]?.[0]).toMatchObject({
-    href: { pathname: '/researcher-workflow/[sessionId]/paused', params: { sessionId } },
+    href: {
+      pathname: '/researcher-workflow/[sessionId]/resume',
+      params: { sessionId, fromHome: '1' },
+    },
   });
   await screen.rerender(
     <WorkflowProvider repository={repository}>
-      <PauseRoute />
+      <ResumeRoute />
     </WorkflowProvider>,
   );
 
-  expect(await screen.findByText('작업자가 일시정지했습니다.')).toBeVisible();
-  expect(screen.getByRole('header', { name: '실험 일시정지' })).toBeVisible();
-  expect(screen.getByText(`세션 ${sessionId}`)).toBeVisible();
-  expect(screen.getByText('다음 작업 · 20 cm 2회차')).toBeVisible();
-  expect(screen.getByText('완료한 측정 0회')).toBeVisible();
+  expect(await screen.findByText('재개 전 재확인')).toBeVisible();
+  expect(screen.getByText('20 cm 조건 · 2회차부터 재개')).toBeVisible();
+  expect(screen.getByText('승인 버전 v1.0.0')).toBeVisible();
+  expect(screen.getByRole('button', { name: '장치 점검하고 재개' })).toBeDisabled();
 
-  await fireEvent.press(screen.getByRole('button', { name: '바로 재개' }));
-  expect(router.push).toHaveBeenCalledWith({
-    pathname: '/researcher-workflow/[sessionId]/resume',
-    params: { sessionId },
-  });
-  await fireEvent.press(screen.getByRole('button', { name: '홈으로' }));
+  await fireEvent.press(screen.getByRole('button', { name: '뒤로가기' }));
   expect(router.dismissTo).toHaveBeenCalledWith('/student');
   expect(repository.getSession.mock.calls).toEqual([[sessionId], [sessionId]]);
   expect(repository.createSession).not.toHaveBeenCalled();

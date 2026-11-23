@@ -1,7 +1,39 @@
 import { WorkflowError, type ExperimentSession, type WorkflowCommand } from '../../domain/models';
 import type { DeviceDiagnosticsReport } from '../../domain/device-check';
+import { selectExecution } from '../../domain/execution';
 import { selectResume, resumeReportIssue } from '../../domain/resume';
 import type { TransitionMetadata } from './transition-engine';
+
+export function pauseMockExecution(
+  session: ExperimentSession,
+  cursorId: string,
+  meta: TransitionMetadata,
+): ExperimentSession {
+  const cursor = session.execution?.cursor;
+  if (!cursor || cursor.cursorId !== cursorId) {
+    throw new WorkflowError('INVALID_STATE', '일시정지할 현재 회차를 확인해 주세요.');
+  }
+  if (session.phase === 'paused') return session;
+  if (!selectExecution(session).authorized) {
+    throw new WorkflowError('INVALID_STATE', '진행 중인 실험만 일시정지할 수 있습니다.');
+  }
+  return {
+    ...session,
+    phase: 'paused',
+    revision: session.revision + 1,
+    updatedAt: meta.now,
+    events: [
+      ...session.events,
+      {
+        eventId: meta.eventId,
+        requestId: meta.requestId,
+        type: 'executionPaused',
+        occurredAt: meta.now,
+        cursor,
+      },
+    ],
+  };
+}
 
 function requirePause(session: ExperimentSession, pauseEventId: string, cursorId?: string) {
   const state = selectResume(session);

@@ -2,12 +2,12 @@ import { expect, test } from '@jest/globals';
 
 import { getStudentHomeDestination } from '../src/features/student-home/studentHomeRoutes';
 
-test('이어하기는 기존 세션 식별자만 전달하고 세션 설정을 새로 만들지 않는다', () => {
+test('이어하기는 기존 세션 식별자와 홈 진입점만 전달한다', () => {
   const sessionId = 'session/기존 작업?version=1#저장';
 
   expect(getStudentHomeDestination({ type: 'resume', sessionId })).toEqual({
     pathname: '/researcher-workflow/[sessionId]/preparation',
-    params: { sessionId },
+    params: { sessionId, fromHome: '1' },
   });
 });
 

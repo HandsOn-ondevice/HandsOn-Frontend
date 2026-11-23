@@ -34,54 +34,51 @@ async function start(repository: MockWorkflowRepository, session: ExperimentSess
   return { prepared, running: current };
 }
 
-describe('main의 준비 세션과 실행 기능 통합', () => {
-  test('S01 고정 세션과 새 세션 모두 S04·S05 기록을 유지한 채 S06 측정을 명시적으로 완료한다', async () => {
+describe('Mock 준비 세션과 실행 기능 통합', () => {
+  test('새 세션은 S04·S05 기록을 유지한 채 S06 측정을 명시적으로 완료한다', async () => {
     const repository = new MockWorkflowRepository({
       inspect: async (input) => buildMockDiagnostics(input),
       sample: async (input) => buildMockExecutionReport(input),
     });
-    const seeded = await repository.getSession('demo-session-led-m03');
-    expect(seeded.phase).toBe('preparing');
-    expect(seeded.execution).toBeUndefined();
-    const created = await repository.createSession({
+    const initial = await repository.createSession({
       requestId: 'integration-create',
       operatorId: 'researcher',
       procedure: mockProcedure,
     });
-    for (const initial of [seeded, created]) {
-      const { prepared, running } = await start(repository, initial);
-      expect(running.sessionId).toBe(initial.sessionId);
-      expect(running.procedure).toEqual(initial.procedure);
-      expect(running.checks).toEqual(prepared.checks);
-      expect(running.deviceChecks).toEqual(prepared.deviceChecks);
-      expect(running.evidence.slice(0, prepared.evidence.length)).toEqual(prepared.evidence);
-      expect(running.execution?.cursor?.trialIndex).toBe(1);
-      const cursor = running.execution!.cursor!;
-      await repository.executeCommand(
-        running.sessionId,
-        { type: 'requestExecutionSample', cursorId: cursor.cursorId },
-        { requestId: 'integration-sample', expectedRevision: running.revision },
-      );
-      await waitFor(async () =>
-        expect(selectExecution(await repository.getSession(running.sessionId)).canComplete).toBe(
-          true,
-        ),
-      );
-      const ready = await repository.getSession(running.sessionId);
-      expect(selectExecution(ready).completedCount).toBe(0);
-      const complete = await repository.executeCommand(
-        ready.sessionId,
-        {
-          type: 'completeExecutionStep',
-          cursorId: cursor.cursorId,
-          sampleAttemptId: selectExecution(ready).latest!.attemptId,
-        },
-        { requestId: 'integration-complete', expectedRevision: ready.revision },
-      );
-      expect(complete.phase).toBe('running');
-      expect(selectExecution(complete).completedCount).toBe(1);
-      expect(complete.checks).toEqual(prepared.checks);
-    }
+    expect(initial.phase).toBe('preparing');
+    expect(initial.execution).toBeUndefined();
+    const { prepared, running } = await start(repository, initial);
+    expect(running.sessionId).toBe(initial.sessionId);
+    expect(running.procedure).toEqual(initial.procedure);
+    expect(running.checks).toEqual(prepared.checks);
+    expect(running.deviceChecks).toEqual(prepared.deviceChecks);
+    expect(running.evidence.slice(0, prepared.evidence.length)).toEqual(prepared.evidence);
+    expect(running.execution?.cursor?.trialIndex).toBe(1);
+    const cursor = running.execution!.cursor!;
+    await repository.executeCommand(
+      running.sessionId,
+      { type: 'requestExecutionSample', cursorId: cursor.cursorId },
+      { requestId: 'integration-sample', expectedRevision: running.revision },
+    );
+    await waitFor(async () =>
+      expect(selectExecution(await repository.getSession(running.sessionId)).canComplete).toBe(
+        true,
+      ),
+    );
+    const ready = await repository.getSession(running.sessionId);
+    expect(selectExecution(ready).completedCount).toBe(0);
+    const complete = await repository.executeCommand(
+      ready.sessionId,
+      {
+        type: 'completeExecutionStep',
+        cursorId: cursor.cursorId,
+        sampleAttemptId: selectExecution(ready).latest!.attemptId,
+      },
+      { requestId: 'integration-complete', expectedRevision: ready.revision },
+    );
+    expect(complete.phase).toBe('running');
+    expect(selectExecution(complete).completedCount).toBe(1);
+    expect(complete.checks).toEqual(prepared.checks);
   });
 
   test('일반 배포는 Mock을 차단하고 Maestro fixture 빌드는 같은 준비·실행 계약을 허용한다', async () => {
@@ -120,7 +117,12 @@ describe('main의 준비 세션과 실행 기능 통합', () => {
       expect(screen.getByText('실험 서비스를 준비하고 있습니다.')).toBeTruthy();
       expect(screen.queryByText('실행 내용')).toBeNull();
       process.env.EXPO_PUBLIC_HANDSON_MAESTRO = '1';
-      const initial = await repository.getSession('demo-session-led-m03');
+      expect((await repository.getSession('demo-session-led-m03')).phase).toBe('paused');
+      const initial = await repository.createSession({
+        requestId: 'maestro-create',
+        operatorId: 'researcher',
+        procedure: mockProcedure,
+      });
       const { running } = await start(repository, initial);
       expect(running.execution?.cursor).toBeTruthy();
       const listener = jest.fn();
