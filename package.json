@@ -55,7 +55,8 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "doctor": "expo-doctor",
-    "export:android": "expo export --platform android"
+    "export:android": "expo export --platform android",
+    "verify:pr": "npm run doctor && npm run typecheck && npm run lint && npm run format:check && npm run test:ci && npm run export:android"
   },
   "private": true,
   "engines": {
