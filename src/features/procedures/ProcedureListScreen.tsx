@@ -21,6 +21,7 @@ export function ProcedureListScreen({
   const requestKey = JSON.stringify([environment.id, attempt]);
   const [result, setResult] = useState<{
     key: string;
+    repository: ProcedureRepository;
     lookup: ProcedureLookup<readonly ProcedureSummary[]>;
   }>();
 
@@ -28,10 +29,10 @@ export function ProcedureListScreen({
     let active = true;
     void repository.list(environment.id).then(
       (data) => {
-        if (active) setResult({ key: requestKey, lookup: { status: 'ready', data } });
+        if (active) setResult({ key: requestKey, repository, lookup: { status: 'ready', data } });
       },
       () => {
-        if (active) setResult({ key: requestKey, lookup: { status: 'error' } });
+        if (active) setResult({ key: requestKey, repository, lookup: { status: 'error' } });
       },
     );
     return () => {
@@ -43,7 +44,11 @@ export function ProcedureListScreen({
     <ProcedureListView
       key={environment.id}
       environment={environment}
-      lookup={result?.key === requestKey ? result.lookup : { status: 'loading' }}
+      lookup={
+        result?.key === requestKey && result.repository === repository
+          ? result.lookup
+          : { status: 'loading' }
+      }
       onBack={onBack}
       onRetry={() => setAttempt((previous) => previous + 1)}
       onConfirm={onConfirm}

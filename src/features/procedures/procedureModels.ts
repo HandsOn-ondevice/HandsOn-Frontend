@@ -3,12 +3,12 @@ export interface ProcedureSummary {
   id: string;
   code: string;
   title: string;
-  description: string;
+  description?: string;
   approvedVersion: string;
-  approvedBy: string;
-  estimatedMinutes: number;
-  stepCount: number;
-  category: 'led' | 'sensor';
+  approvedBy?: string;
+  estimatedMinutes?: number;
+  stepCount?: number;
+  category?: 'led' | 'sensor';
   lastUsedAt?: string;
 }
 
