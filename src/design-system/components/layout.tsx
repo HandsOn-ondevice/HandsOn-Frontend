@@ -257,6 +257,7 @@ export function SurfaceCard({
 export type ActionShelfLayout = 'single' | 'dual' | 'disabled' | 'dualDisabled';
 export interface ActionShelfProps {
   primary: string;
+  primaryTestID?: string;
   secondary?: string;
   onPrimary?: () => void;
   onSecondary?: () => void;
@@ -272,6 +273,7 @@ export interface ActionShelfProps {
 /** Figma 2081:696. All layouts reuse Button instead of making look-alike targets. */
 export function ActionShelf({
   primary,
+  primaryTestID,
   secondary,
   onPrimary,
   onSecondary,
@@ -308,6 +310,7 @@ export function ActionShelf({
       ) : null}
       <Button
         label={primary}
+        testID={primaryTestID}
         onPress={onPrimary}
         disabled={primaryDisabled}
         loading={loading}

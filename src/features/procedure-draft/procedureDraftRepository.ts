@@ -1,6 +1,7 @@
 import { File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 import { createDemoProcedureDraft } from './procedureDraftFixtures';
+import { isProcedureDraftStepCriteria, type ProcedureDraftStepCriteria } from './stepCriteria';
 
 export interface ProcedureDraftStepGroup {
   readonly id: string;
@@ -15,6 +16,7 @@ export interface ProcedureDraftStep {
   readonly description: string;
   readonly needsReview: boolean;
   readonly group?: ProcedureDraftStepGroup;
+  readonly criteria?: ProcedureDraftStepCriteria;
 }
 
 export interface ProcedureDraftPendingItem {
@@ -39,10 +41,17 @@ export interface ProcedureDraft {
 export interface ProcedureDraftRepository {
   load(environmentId: string, draftId: string): Promise<ProcedureDraft | null>;
   save(environmentId: string, draft: ProcedureDraft): Promise<ProcedureDraft>;
+  saveStepCriteria(
+    environmentId: string,
+    draftId: string,
+    stepId: string,
+    criteria: ProcedureDraftStepCriteria,
+  ): Promise<ProcedureDraft>;
   listSaved(environmentId: string): Promise<readonly ProcedureDraft[]>;
 }
 
 export { getDemoProcedureDraftId } from './procedureDraftFixtures';
+export type { ProcedureDraftStepCriteria } from './stepCriteria';
 
 function demoStorageKey(environmentId: string) {
   if (!environmentId.trim()) throw new Error('작업 환경을 선택해 주세요.');
@@ -86,7 +95,8 @@ function isStoredDraft(value: unknown): value is ProcedureDraft {
         typeof step.title === 'string' &&
         typeof step.description === 'string' &&
         typeof step.needsReview === 'boolean' &&
-        (step.group === undefined || isStepGroup(step.group)),
+        (step.group === undefined || isStepGroup(step.group)) &&
+        (step.criteria === undefined || isProcedureDraftStepCriteria(step.criteria)),
     ) &&
     isStringList(value.materials) &&
     isStringList(value.precautions) &&
@@ -143,6 +153,12 @@ function writeSavedDrafts(key: string, drafts: readonly ProcedureDraft[]) {
   staging.rename(currentName);
 }
 
+function storeDraft(key: string, saved: readonly ProcedureDraft[], draft: ProcedureDraft) {
+  const snapshot: ProcedureDraft = { ...draft, savedAt: new Date().toISOString() };
+  writeSavedDrafts(key, [snapshot, ...saved.filter(({ id }) => id !== draft.id)]);
+  return snapshot;
+}
+
 export const procedureDraftRepository: ProcedureDraftRepository = {
   async load(environmentId, draftId) {
     const saved = readSavedDrafts(demoStorageKey(environmentId));
@@ -154,9 +170,28 @@ export const procedureDraftRepository: ProcedureDraftRepository = {
   async save(environmentId, draft) {
     const key = demoStorageKey(environmentId);
     const saved = readSavedDrafts(key);
-    const snapshot: ProcedureDraft = { ...draft, savedAt: new Date().toISOString() };
-    writeSavedDrafts(key, [snapshot, ...saved.filter((item) => item.id !== draft.id)]);
-    return snapshot;
+    const previous = saved.find(({ id }) => id === draft.id);
+    const savedSteps = new Map(previous?.steps.map((step) => [step.id, step]));
+    // The draft editor may still have the snapshot from before opening the criteria editor.
+    const steps = draft.steps.map((step) => {
+      const criteria = savedSteps.get(step.id)?.criteria;
+      return criteria ? { ...step, criteria } : step;
+    });
+    return storeDraft(key, saved, { ...draft, steps });
+  },
+  async saveStepCriteria(environmentId, draftId, stepId, criteria) {
+    if (!isProcedureDraftStepCriteria(criteria)) throw new Error('기준값 형식을 확인해 주세요.');
+
+    const key = demoStorageKey(environmentId);
+    const saved = readSavedDrafts(key);
+    const draft = saved.find(({ id }) => id === draftId);
+    if (!draft) throw new Error('저장된 초안을 찾을 수 없어요.');
+    if (!draft.steps.some(({ id }) => id === stepId)) {
+      throw new Error('선택한 단계를 찾을 수 없어요.');
+    }
+
+    const steps = draft.steps.map((step) => (step.id === stepId ? { ...step, criteria } : step));
+    return storeDraft(key, saved, { ...draft, steps });
   },
   async listSaved(environmentId) {
     return readSavedDrafts(demoStorageKey(environmentId));

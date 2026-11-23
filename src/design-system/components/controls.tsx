@@ -439,6 +439,7 @@ export function CheckboxRow({
       accessibilityRole="checkbox"
       accessibilityLabel={title}
       accessibilityHint={subtitle}
+      aria-checked={checked}
       accessibilityState={{ checked, disabled: blocked }}
       disabled={blocked}
       onPress={() => {
