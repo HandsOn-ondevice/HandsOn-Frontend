@@ -3,6 +3,8 @@ import { Platform } from 'react-native';
 import type { ProcedureDraft } from '@/features/procedure-draft/procedureDraftRepository';
 import type { SavedRecording } from '@/features/recording/recordingSession';
 import { readSavedRecording } from '@/features/recording/recordingStorage';
+import { readWebRecording } from '@/features/recording/webRecording';
+import { edgeApiBaseUrl } from './edgeTranscription';
 
 export interface GenerateDraftRequest {
   recordingId: string;
@@ -22,6 +24,7 @@ export const demoTranscriptionEnvironmentId = 'demo-circuits';
 
 export async function readTranscriptionRecording(recordingId: string) {
   if (Platform.OS !== 'web') return readSavedRecording(recordingId);
+  if (edgeApiBaseUrl) return readWebRecording(recordingId);
   if (!demoEnabled || recordingId !== demoTranscriptionRecordingId) return null;
 
   const recording: SavedRecording = {
