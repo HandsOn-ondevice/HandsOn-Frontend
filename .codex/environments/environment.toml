@@ -1,0 +1,25 @@
+version = 1
+name = "HandsOn-Frontend"
+
+[setup]
+script = '''
+set -e
+cd "${CODEX_WORKTREE_PATH:-.}"
+
+required_node_version="$(cat .nvmrc)"
+if [ "$(node --version 2>/dev/null || true)" != "v$required_node_version" ]; then
+  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+  if [ ! -s "$NVM_DIR/nvm.sh" ]; then
+    printf 'Install Node %s before running this setup.\n' "$required_node_version" >&2
+    exit 1
+  fi
+  . "$NVM_DIR/nvm.sh"
+  nvm use --silent
+fi
+
+npm ci
+
+if [ ! -f .env.local ]; then
+  printf '%s\n' 'Fill in .env.local using .env.example to connect to Edge.'
+fi
+'''
