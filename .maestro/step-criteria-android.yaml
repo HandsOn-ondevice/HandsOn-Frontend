@@ -1,5 +1,5 @@
 appId: com.handson.frontend
-name: Android 단계별 기준과 오류 규칙 저장 및 복원
+name: Android 단계 기준 저장·복원 및 승인 버전 배포
 ---
 - launchApp:
     clearState: true
@@ -82,17 +82,31 @@ name: Android 단계별 기준과 오류 규칙 저장 및 복원
 - tapOn:
     id: step-criteria-save
 - extendedWaitUntil:
-    visible: 승인 검토
+    visible: 기준을 저장했습니다
     timeout: 10000
-- assertVisible: 기준을 저장했습니다
+- assertVisible: 최종 승인과 버전 배포
 - assertVisible: LED 출력 특성 측정 초안
 - assertVisible: 실장비 확인 기록됨
 - takeScreenshot: e05-approval-handoff
+- scrollUntilVisible:
+    element:
+      text: '(?s).*필수 기준 미확정 · 센서값 최신성 기준.*'
+    direction: DOWN
+- assertVisible:
+    id: release-approve
+    enabled: false
+- takeScreenshot: e06-approval-blocked
 
 - tapOn: 뒤로가기
 - assertVisible: 기준값과 오류 규칙 편집
 - tapOn: 뒤로가기
 - assertVisible: AI 절차 초안
+- scrollUntilVisible:
+    element: 7단계 전원 인가와 범위 확인
+    direction: DOWN
+- tapOn: 7단계 전원 인가와 범위 확인
+# Keep the selected power step while closing its group for the later sensor step selection.
+- tapOn: 7단계 전원 인가와 범위 확인
 - tapOn: 기준값 검토
 - extendedWaitUntil:
     visible: 기준값과 오류 규칙 편집
@@ -148,3 +162,113 @@ name: Android 단계별 기준과 오류 규칙 저장 및 복원
 - extendedWaitUntil:
     visible: 실장비 확인 기록됨
     timeout: 10000
+
+# Complete the remaining review step before approving the entire saved draft.
+- scrollUntilVisible:
+    element: 편집으로 돌아가기
+    direction: DOWN
+- tapOn: 편집으로 돌아가기
+- assertVisible: AI 절차 초안
+- scrollUntilVisible:
+    element: 7단계 전원 인가와 범위 확인
+    direction: DOWN
+- tapOn: 7단계 전원 인가와 범위 확인
+- scrollUntilVisible:
+    element: 8단계 센서값 갱신 확인 선택
+    direction: DOWN
+- tapOn: 8단계 센서값 갱신 확인 선택
+- tapOn: 기준값 검토
+- extendedWaitUntil:
+    visible: 기준값과 오류 규칙 편집
+    timeout: 10000
+- assertVisible: '.*센서값 갱신 확인.*'
+- scrollUntilVisible:
+    element:
+      id: step-criteria-freshness-limit
+    direction: DOWN
+- tapOn:
+    id: step-criteria-freshness-limit
+- inputText: '2'
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: step-criteria-verified
+    direction: UP
+- tapOn:
+    id: step-criteria-verified
+- tapOn:
+    id: step-criteria-save
+- extendedWaitUntil:
+    visible: 기준을 저장했습니다
+    timeout: 10000
+- assertVisible: 최종 승인과 버전 배포
+
+- tapOn: 미리보기
+- assertVisible: 절차 미리보기
+- scrollUntilVisible:
+    element: 핵심 기준
+    direction: DOWN
+- takeScreenshot: e06-procedure-preview
+- tapOn: 승인 검토로 돌아가기
+- assertVisible: 최종 승인과 버전 배포
+- assertVisible:
+    id: release-approve
+    enabled: false
+- scrollUntilVisible:
+    element:
+      id: release-equipment-confirmed
+    direction: DOWN
+- tapOn:
+    id: release-equipment-confirmed
+- assertVisible:
+    id: release-approve
+    enabled: false
+- scrollUntilVisible:
+    element:
+      id: release-review-confirmed
+    direction: DOWN
+- tapOn:
+    id: release-review-confirmed
+- assertVisible:
+    id: release-approve
+    enabled: true
+- tapOn:
+    id: release-approve
+- extendedWaitUntil:
+    visible: 'v1\.3 승인·배포 완료'
+    timeout: 10000
+- takeScreenshot: e06-release-complete
+- tapOn: 숙련자 홈으로
+- extendedWaitUntil:
+    visible: 숙련자 홈
+    timeout: 10000
+- tapOn: 절차
+- tapOn: 승인 절차
+- scrollUntilVisible:
+    element:
+      text: '(?s)LED 출력 특성 측정 초안, 승인,.*v1\.3.*'
+    direction: DOWN
+
+# Read the released version in the student catalog for the same environment.
+- tapOn: 내 정보
+- scrollUntilVisible:
+    element: 역할·작업 환경 변경
+    direction: DOWN
+- tapOn: 역할·작업 환경 변경
+- extendedWaitUntil:
+    visible: '연구실: 연구실을 선택해 주세요'
+    timeout: 10000
+- tapOn: 신규 연구생, 승인된 절차 실행
+- tapOn: '연구실: 연구실을 선택해 주세요'
+- tapOn: 전자회로 실험실
+- tapOn: 설정하고 계속
+- extendedWaitUntil:
+    visible: 승인 절차 선택
+    timeout: 10000
+- tapOn: 승인 절차 선택
+- assertVisible: 승인된 절차 1개
+- tapOn: '(?s)LED 출력 특성 측정 초안, 승인,.*v1\.3.*'
+- tapOn: 선택한 절차 확인
+- assertVisible: 절차 상세와 버전 고정
+- assertVisible: '.*승인 버전 v1\.3'
+- takeScreenshot: e06-released-student-detail

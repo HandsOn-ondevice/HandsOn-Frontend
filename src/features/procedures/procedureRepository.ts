@@ -1,3 +1,4 @@
+import { listDemoProcedureReleases } from '@/features/procedure-draft/procedureDraftRepository';
 import { demoProcedureCatalog, type DemoProcedureEntry } from './demoProcedures';
 import type { ProcedureDetail, ProcedureSummary } from './procedureModels';
 
@@ -50,20 +51,23 @@ export function createDemoProcedureRepository(
   };
 }
 
-const demoRepository = createDemoProcedureRepository();
-
-function requireDemoSource() {
-  if (__DEV__ || process.env.EXPO_PUBLIC_HANDSON_MAESTRO === '1') return;
-  throw new Error('절차 API가 아직 연결되지 않았습니다.');
+function demoRepositoryFor(environmentId: string) {
+  if (!__DEV__ && process.env.EXPO_PUBLIC_HANDSON_MAESTRO !== '1') {
+    throw new Error('절차 API가 아직 연결되지 않았습니다.');
+  }
+  const releases = listDemoProcedureReleases(environmentId);
+  const releasedIds = new Set(releases.map(({ procedure }) => procedure.id));
+  return createDemoProcedureRepository([
+    ...releases.map(({ procedure }) => ({
+      status: 'approved' as const,
+      environmentIds: [environmentId],
+      detail: procedure,
+    })),
+    ...demoProcedureCatalog.filter(({ detail }) => !releasedIds.has(detail.id)),
+  ]);
 }
 
 export const procedureRepository: ProcedureRepository = {
-  list: async (environmentId) => {
-    requireDemoSource();
-    return demoRepository.list(environmentId);
-  },
-  getDetail: async (selection) => {
-    requireDemoSource();
-    return demoRepository.getDetail(selection);
-  },
+  list: async (environmentId) => demoRepositoryFor(environmentId).list(environmentId),
+  getDetail: async (selection) => demoRepositoryFor(selection.environmentId).getDetail(selection),
 };
