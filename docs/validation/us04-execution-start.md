@@ -4,7 +4,7 @@
 
 ## 재실행
 
-HandsOn Edge를 시뮬레이션 모드로 `127.0.0.1:18056`에서 실행합니다. 앱이 새 세션을 `workflowVersion: "2.0"`으로 생성하므로 API-10을 지원하는 백엔드 `67716a5`를 사용합니다. 테스트 전용 데이터 디렉터리를 사용하고 CORS에 `http://localhost:19056`을 허용합니다. Edge를 띄울 때 사용한 작업자·숙련자 테스트 토큰을 실행 셸의 `HANDSON_E2E_OPERATOR_TOKEN`, `HANDSON_E2E_EXPERT_TOKEN`에 설정합니다. 승인 버전 비교는 이 테스트 데이터에 새 절차와 승인 버전을 만듭니다. [HandsOn Edge 소스](https://github.com/HandsOn-ondevice/HandsOn-Backend/tree/67716a54ed80ea4f125d8241cf2c672fd73ba741)
+HandsOn Edge를 시뮬레이션 모드로 `127.0.0.1:18056`에서 실행합니다. 새 세션의 `workflowVersion`과 `resumePolicyVersion`에 `"2.0"`을 지원하는 백엔드 `b2a8520`을 사용합니다. 테스트 전용 데이터 디렉터리를 사용하고 CORS에 `http://localhost:19056`을 허용합니다. Edge를 띄울 때 사용한 작업자·숙련자 테스트 토큰을 실행 셸의 `HANDSON_E2E_OPERATOR_TOKEN`, `HANDSON_E2E_EXPERT_TOKEN`에 설정합니다. 승인 버전 비교는 이 테스트 데이터에 새 절차와 승인 버전을 만듭니다. [HandsOn Edge 소스](https://github.com/HandsOn-ondevice/HandsOn-Backend/tree/b2a8520694aabe3147af0c2f962795db8d927935)
 
 ```sh
 HANDSON_E2E_EDGE_START=1 EXPO_E2E_PORT=19056 \
