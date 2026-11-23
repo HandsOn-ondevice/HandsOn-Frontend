@@ -28,6 +28,7 @@ export default function Procedure() {
     <ProcedureDetailScreen
       key={JSON.stringify([procedureId, approvedVersion, environmentId])}
       environment={selection.environment}
+      edgeToken={selection.edgeToken}
       procedureId={procedureId}
       approvedVersion={approvedVersion}
       onBack={() => {

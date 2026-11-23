@@ -2,6 +2,7 @@ import type { Href } from 'expo-router';
 
 export type StudentHomeDestination =
   | { type: 'procedures'; environmentId: string }
+  | { type: 'procedure'; environmentId: string; procedureId: string; approvedVersion: string }
   | { type: 'resume'; sessionId: string }
   | { type: 'result'; resultId: string; sessionId: string }
   | { type: 'history' }
@@ -12,6 +13,13 @@ export function getStudentHomeDestination(destination: StudentHomeDestination): 
   switch (destination.type) {
     case 'procedures':
       return { pathname: '/procedures', params: { environmentId: destination.environmentId } };
+    case 'procedure': {
+      const { environmentId, procedureId, approvedVersion } = destination;
+      return {
+        pathname: '/procedures/[procedureId]',
+        params: { environmentId, procedureId, approvedVersion },
+      };
+    }
     case 'resume':
       // Resume receives only the existing identity. It must not recreate session settings.
       return {

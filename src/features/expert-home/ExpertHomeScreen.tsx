@@ -22,6 +22,7 @@ import {
 } from '@/design-system';
 import type { WorkEnvironment } from '@/features/entry/entryEnvironment';
 import { reviewStatusLabels } from '@/features/expert-review/reviewData';
+import { isEdgeDataEnabled } from '@/lib/edgeApi';
 import type {
   ExpertHomeData,
   ExpertProcedure,
@@ -32,7 +33,8 @@ import { useExpertHome } from './useExpertHome';
 
 export type ExpertTask =
   | { kind: 'create' }
-  | { kind: 'procedure'; procedureId: string }
+  | { kind: 'draft'; draftId: string }
+  | { kind: 'procedure'; procedureId: string; version?: string }
   | { kind: 'result'; resultId: string; procedureId: string };
 
 interface ExpertHomeScreenProps {
@@ -58,6 +60,7 @@ export function ExpertHomeScreen({
   const pending = data?.results.filter((item) => item.status === 'pending') ?? [];
   const filteredResults = data?.results.filter((item) => item.status === resultFilter) ?? [];
   const count = drafts.length + pending.length;
+  const edge = isEdgeDataEnabled();
 
   function showProcedures(filter: string) {
     setProcedureFilter(filter);
@@ -99,10 +102,12 @@ export function ExpertHomeScreen({
             <SurfaceCard title="숙련 연구생" subtitle={environment.name}>
               <AppText>작업 유형 · {environment.workType}</AppText>
               <AppText>실행 장치 · {environment.deviceName}</AppText>
-              <AppText variant="caption" color={colors.text.secondary}>
-                현재 현황과 목록은 개발용 합성 데이터입니다. 실제 장치 연결 상태는 확인하지
-                않습니다.
-              </AppText>
+              {!edge ? (
+                <AppText variant="caption" color={colors.text.secondary}>
+                  현재 현황과 목록은 개발용 합성 데이터입니다. 실제 장치 연결 상태는 확인하지
+                  않습니다.
+                </AppText>
+              ) : null}
             </SurfaceCard>
             <Button label="역할·작업 환경 변경" variant="secondary" onPress={onChangeEnvironment} />
           </>
@@ -112,7 +117,9 @@ export function ExpertHomeScreen({
           <>
             <FeedbackPanel
               title="작업 현황을 불러오지 못했어요."
-              subtitle="잠시 후 다시 시도해 주세요. 새 절차 작성은 계속할 수 있어요."
+              subtitle={
+                state.detail ?? '잠시 후 다시 시도해 주세요. 새 절차 작성은 계속할 수 있어요.'
+              }
               tone="warning"
               icon="alert"
             />
@@ -172,7 +179,11 @@ export function ExpertHomeScreen({
                   />
                 ) : (
                   (procedureFilter === 'draft' ? drafts : approved).map((item) => (
-                    <HomeProcedure key={item.id} procedure={item} onOpenTask={onOpenTask} />
+                    <HomeProcedure
+                      key={JSON.stringify([item.id, item.version])}
+                      procedure={item}
+                      onOpenTask={onOpenTask}
+                    />
                   ))
                 )}
               </>
@@ -240,7 +251,11 @@ function HomeContents({
       ) : (
         <>
           {drafts.map((item) => (
-            <HomeProcedure key={item.id} procedure={item} onOpenTask={onOpenTask} />
+            <HomeProcedure
+              key={JSON.stringify([item.id, item.version])}
+              procedure={item}
+              onOpenTask={onOpenTask}
+            />
           ))}
           {pending.map((item) => (
             <HomeResult key={item.id} result={item} onOpenTask={onOpenTask} />
@@ -292,7 +307,12 @@ function HomeProcedure({
       meta={`${draft ? '초안' : '승인'} ${procedure.version}${draft ? ' · 실행 불가' : ''}`}
       detail={procedure.detail}
       state={procedure.status}
-      onPress={() => onOpenTask({ kind: 'procedure', procedureId: procedure.id })}
+      onPress={() => {
+        if (!isEdgeDataEnabled()) onOpenTask({ kind: 'procedure', procedureId: procedure.id });
+        else if (draft) onOpenTask({ kind: 'draft', draftId: procedure.id });
+        else
+          onOpenTask({ kind: 'procedure', procedureId: procedure.id, version: procedure.version });
+      }}
     />
   );
 }

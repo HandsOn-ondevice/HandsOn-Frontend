@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { isEdgeDataEnabled } from '@/lib/edgeApi';
+import { createEdgeProcedureRepository } from './edgeProcedureRepository';
 import type { WorkEnvironment } from '@/features/entry/entryEnvironment';
 import type { PreparationRequest } from './PreparationHandoffProvider';
 import { ProcedureDetailView } from './ProcedureDetailView';
@@ -16,6 +18,7 @@ interface ProcedureDetailScreenProps {
   onBack: () => void;
   onPrepare: (request: PreparationRequest) => void;
   repository?: ProcedureRepository;
+  edgeToken?: string;
 }
 
 function matchesSelection(detail: ProcedureDetail | null, selection: ProcedureSelection) {
@@ -30,8 +33,14 @@ export function ProcedureDetailScreen({
   approvedVersion,
   onBack,
   onPrepare,
-  repository = procedureRepository,
+  repository,
+  edgeToken,
 }: ProcedureDetailScreenProps) {
+  const edge = isEdgeDataEnabled();
+  const source = useMemo(
+    () => repository ?? (edge ? createEdgeProcedureRepository(edgeToken) : procedureRepository),
+    [edge, edgeToken, repository],
+  );
   const [attempt, setAttempt] = useState(0);
   const requestKey = JSON.stringify([procedureId, approvedVersion, environment.id, attempt]);
   const generation = useRef(0);
@@ -54,7 +63,7 @@ export function ProcedureDetailScreen({
     const currentGeneration = ++generation.current;
     busy.current = false;
     const selection = { procedureId, approvedVersion, environmentId: environment.id };
-    void repository.getDetail(selection).then(
+    void source.getDetail(selection).then(
       (detail) => {
         if (currentGeneration !== generation.current) return;
         setResult({
@@ -71,17 +80,18 @@ export function ProcedureDetailScreen({
     return () => {
       generation.current = currentGeneration + 1;
     };
-  }, [approvedVersion, environment.id, procedureId, repository, requestKey]);
+  }, [approvedVersion, environment.id, procedureId, source, requestKey]);
 
   async function prepare() {
-    if (busy.current || lookup.status !== 'ready' || !lookup.data || currentStart?.blocked) return;
+    if (edge || busy.current || lookup.status !== 'ready' || !lookup.data || currentStart?.blocked)
+      return;
     busy.current = true;
     const currentGeneration = generation.current;
     setStart({ key: requestKey, pending: true });
     const selection = { procedureId, approvedVersion, environmentId: environment.id };
     try {
       // Recheck the chosen version; the real session API must validate atomically at creation.
-      const detail = await repository.getDetail(selection);
+      const detail = await source.getDetail(selection);
       if (currentGeneration !== generation.current) return;
       if (!matchesSelection(detail, selection)) {
         setStart({
@@ -118,7 +128,11 @@ export function ProcedureDetailScreen({
       onStart={() => void prepare()}
       starting={currentStart?.pending}
       startError={currentStart?.error}
-      blockedReason={currentStart?.blocked}
+      blockedReason={
+        edge
+          ? '이 화면에서는 승인 절차를 조회할 수 있어요. 새 세션 시작은 준비 중이에요.'
+          : currentStart?.blocked
+      }
     />
   );
 }

@@ -3,6 +3,7 @@ import {
   procedureDraftRepository,
 } from '@/features/procedure-draft/procedureDraftRepository';
 import { getDemoHomeReviews, type ReviewStatus } from '@/features/expert-review/reviewData';
+import { EdgeApiError, getEdge, isEdgeDataEnabled } from '@/lib/edgeApi';
 
 export interface ExpertProcedure {
   readonly id: string;
@@ -38,13 +39,14 @@ export type ExpertRecentWork = {
 );
 
 export interface ExpertHomeData {
+  readonly dataOrigin?: 'simulation' | 'hardware';
   readonly displayName: string;
   readonly procedures: readonly ExpertProcedure[];
   readonly results: readonly ExpertResult[];
   readonly recentWork: readonly ExpertRecentWork[];
 }
 
-export type LoadExpertHome = (environmentId: string) => Promise<ExpertHomeData>;
+export type LoadExpertHome = (environmentId: string, edgeToken?: string) => Promise<ExpertHomeData>;
 
 function createDemoHome(environmentId: string): ExpertHomeData {
   const procedureId = (name: string) => `${environmentId}:procedure:${name}`;
@@ -120,8 +122,20 @@ function createDemoHome(environmentId: string): ExpertHomeData {
   };
 }
 
-export const loadExpertHome: LoadExpertHome = async (environmentId) => {
+export const loadExpertHome: LoadExpertHome = async (environmentId, edgeToken) => {
   if (!environmentId.trim()) throw new Error('작업 환경을 선택해 주세요.');
+  if (isEdgeDataEnabled()) {
+    const data = await getEdge<ExpertHomeData>('/home/expert', { environmentId }, edgeToken);
+    if (
+      typeof data?.displayName !== 'string' ||
+      !Array.isArray(data.procedures) ||
+      !Array.isArray(data.results) ||
+      !Array.isArray(data.recentWork)
+    ) {
+      throw new EdgeApiError('invalid-response');
+    }
+    return data;
+  }
   if (__DEV__ || process.env.EXPO_PUBLIC_HANDSON_MAESTRO === '1') {
     const demo = createDemoHome(environmentId);
     const savedDrafts = await procedureDraftRepository.listSaved(environmentId);

@@ -1,22 +1,32 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { WorkEnvironment } from '@/features/entry/entryEnvironment';
 import { ProcedureListView } from './ProcedureListView';
 import type { ProcedureLookup, ProcedureSummary } from './procedureModels';
 import { procedureRepository, type ProcedureRepository } from './procedureRepository';
+import { createEdgeProcedureRepository } from './edgeProcedureRepository';
+import { isEdgeDataEnabled } from '@/lib/edgeApi';
 
 interface ProcedureListScreenProps {
   environment: WorkEnvironment;
   onBack: () => void;
   onConfirm: (procedure: ProcedureSummary) => void;
   repository?: ProcedureRepository;
+  edgeToken?: string;
 }
 
 export function ProcedureListScreen({
   environment,
   onBack,
   onConfirm,
-  repository = procedureRepository,
+  repository,
+  edgeToken,
 }: ProcedureListScreenProps) {
+  const source = useMemo(
+    () =>
+      repository ??
+      (isEdgeDataEnabled() ? createEdgeProcedureRepository(edgeToken) : procedureRepository),
+    [edgeToken, repository],
+  );
   const [attempt, setAttempt] = useState(0);
   const requestKey = JSON.stringify([environment.id, attempt]);
   const [result, setResult] = useState<{
@@ -26,7 +36,7 @@ export function ProcedureListScreen({
 
   useEffect(() => {
     let active = true;
-    void repository.list(environment.id).then(
+    void source.list(environment.id).then(
       (data) => {
         if (active) setResult({ key: requestKey, lookup: { status: 'ready', data } });
       },
@@ -37,7 +47,7 @@ export function ProcedureListScreen({
     return () => {
       active = false;
     };
-  }, [environment.id, repository, requestKey]);
+  }, [environment.id, source, requestKey]);
 
   return (
     <ProcedureListView
