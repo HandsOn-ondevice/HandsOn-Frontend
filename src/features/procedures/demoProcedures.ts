@@ -8,7 +8,7 @@ export interface DemoProcedureEntry {
 
 const environmentIds = ['demo-embedded-iot'];
 
-export const demoLedProcedure: ProcedureDetail = {
+export const demoLedProcedure = {
   id: 'demo-led-characteristics',
   code: 'LED-M03',
   title: 'LED 출력 단계별\n조도·소비전력 특성 측정',
@@ -38,7 +38,7 @@ export const demoLedProcedure: ProcedureDetail = {
     '배선이나 LED 모듈을 변경하기 전 전원을 차단하세요.',
     '과전류가 감지되거나 센서값이 갱신되지 않으면 측정을 보류하세요.',
   ],
-};
+} satisfies ProcedureDetail;
 
 const sensor: ProcedureDetail = {
   id: 'demo-i2c-address-check',
