@@ -86,18 +86,35 @@ test('확정 전사문, Edge 녹음 ID, 환경 ID를 보내고 서버 초안 ID�
 
 test('PATCH 응답 유실 후 인증을 갱신해도 같은 요청 ID와 초안 revision으로 저장한다', async () => {
   const steps = [{ ...serverDraft.steps[0], needsReview: false }];
+  const materials = ['LED', '저항'];
+  const precautions = ['전원 차단 후 배선'];
   const fetch = jest
     .spyOn(globalThis, 'fetch')
     .mockResolvedValueOnce(json(serverDraft))
     .mockRejectedValueOnce(new TypeError('Connection interrupted'))
     .mockResolvedValueOnce(json({ error: { code: 'UNAUTHORIZED' } }, 401))
     .mockResolvedValueOnce(
-      json({ ...serverDraft, revision: 1, steps, pendingItems: [], execution }),
+      json({
+        ...serverDraft,
+        revision: 1,
+        steps,
+        materials,
+        precautions,
+        pendingItems: [],
+        execution,
+      }),
     );
   const repository = createEdgeDraftRepository(baseUrl, token);
   const draft = await repository.load(environmentId, draftId);
   if (!draft?.edge) throw new Error('Missing Edge draft');
-  const edited = { ...draft, steps, pendingItems: [], edge: { ...draft.edge, execution } };
+  const edited = {
+    ...draft,
+    steps,
+    materials,
+    precautions,
+    pendingItems: [],
+    edge: { ...draft.edge, execution },
+  };
 
   await expect(repository.save(environmentId, edited)).rejects.toMatchObject({ kind: 'network' });
   await expect(
@@ -109,6 +126,8 @@ test('PATCH 응답 유실 후 인증을 갱신해도 같은 요청 ID와 초안 
     id: draftId,
     edge: { revision: 1, execution },
     steps,
+    materials,
+    precautions,
   });
 
   const [path, first] = fetch.mock.calls[1];
@@ -121,6 +140,8 @@ test('PATCH 응답 유실 후 인증을 갱신해도 같은 요청 ID와 초안 
     expectedRevision: 0,
     steps,
     pendingItems: [],
+    materials,
+    precautions,
     execution,
   });
   expect(last?.headers).toEqual(first?.headers);
@@ -171,4 +192,24 @@ test('승인 충돌을 구분하고 최신 revision과 사유를 보내 승인�
     expectedRevision: 1,
     reason,
   });
+});
+
+test('실행 기준을 정하기 전에도 준비물을 저장하고 명시적인 빈 목록을 전송한다', async () => {
+  const fetch = jest
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValueOnce(
+      json({ ...serverDraft, materials: ['기존 LED'], precautions: ['기존 주의'] }),
+    )
+    .mockResolvedValueOnce(json({ ...serverDraft, revision: 1 }));
+  const repository = createEdgeDraftRepository(baseUrl, token);
+  const draft = await repository.load(environmentId, draftId);
+  if (!draft) throw new Error('Missing Edge draft');
+  const saved = await repository.save(environmentId, { ...draft, materials: [], precautions: [] });
+  const payload = JSON.parse(String(fetch.mock.calls[1][1]?.body));
+  expect(payload).toEqual(
+    expect.objectContaining({ materials: [], precautions: [], expectedRevision: 0 }),
+  );
+  expect(payload).not.toHaveProperty('execution');
+  expect(saved.materials).toEqual([]);
+  expect(saved.precautions).toEqual([]);
 });
