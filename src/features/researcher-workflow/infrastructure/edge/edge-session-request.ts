@@ -1,25 +1,34 @@
-import { WorkflowError, type ExperimentSession } from '../../domain/models';
+import { WorkflowError, type ExperimentSession, type WorkflowErrorCode } from '../../domain/models';
+import { parseEdgeSession } from './edge-session';
+
+type EdgeSessionPost =
+  { requestId: string; body: string } | { heartbeat: true; signal?: AbortSignal };
 
 export type EdgeSessionRequest = (
   path: `/sessions${string}`,
-  write?: { requestId: string; body: string },
+  post?: EdgeSessionPost,
 ) => Promise<{ body: unknown; replayed: boolean }>;
 
 class EdgeSessionHttpError extends Error {
   constructor(
     readonly status: number,
     readonly body: unknown,
-    readonly stored: boolean,
+    readonly replay: string | null,
   ) {
     super('Edge session request failed');
   }
 }
 
 export function createEdgeSessionRequest(baseUrl: string, token?: string): EdgeSessionRequest {
-  return async (path, write) => {
+  return async (path, post) => {
     const origin = parseOrigin(baseUrl);
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 10_000);
+    const abort = () => controller.abort();
+    const abortSignal = post && 'heartbeat' in post ? post.signal : undefined;
+    const write = post && 'requestId' in post ? post : undefined;
+    if (abortSignal?.aborted) abort();
+    abortSignal?.addEventListener('abort', abort, { once: true });
+    const timer = setTimeout(abort, 10_000);
     try {
       const headers: Record<string, string> = { Accept: 'application/json' };
       if (token) headers.Authorization = `Bearer ${token}`;
@@ -28,7 +37,7 @@ export function createEdgeSessionRequest(baseUrl: string, token?: string): EdgeS
         headers['Idempotency-Key'] = write.requestId;
       }
       const response = await fetch(`${origin}/api/v1${path}`, {
-        method: write ? 'POST' : 'GET',
+        method: post ? 'POST' : 'GET',
         credentials: 'omit',
         headers,
         body: write?.body,
@@ -39,12 +48,13 @@ export function createEdgeSessionRequest(baseUrl: string, token?: string): EdgeS
         throw new EdgeSessionHttpError(
           response.status,
           await response.json().catch(() => null),
-          replay !== null,
+          replay,
         );
       }
       return { body: await response.json(), replayed: replay === 'true' };
     } finally {
       clearTimeout(timer);
+      abortSignal?.removeEventListener('abort', abort);
     }
   };
 }
@@ -76,10 +86,30 @@ class EdgeConfigurationError extends WorkflowError {
 
 function outcomeUnknown(error: unknown) {
   if (error instanceof EdgeConfigurationError) return false;
-  return !(error instanceof EdgeSessionHttpError) || (error.status >= 500 && !error.stored);
+  if (error instanceof WorkflowError && error.code === 'WORKFLOW_VERSION_REQUIRED') return false;
+  return !(error instanceof EdgeSessionHttpError) || (error.status >= 500 && error.replay === null);
 }
 
-function toWorkflowError(reason: unknown) {
+const edgeErrorCodes = [
+  'REVISION_CONFLICT',
+  'REQUEST_CONFLICT',
+  'CHECK_NOT_EDITABLE',
+  'INVALID_STATE',
+  'INVALID_PROCEDURE',
+  'PREPARATION_INCOMPLETE',
+  'WORKFLOW_VERSION_REQUIRED',
+  'CLEANUP_OUTPUT_FAILED',
+  'CLEANUP_OUTPUT_REQUIRED',
+  'CLEANUP_OUTPUT_EXPIRED',
+  'CLEANUP_CHECK_ORDER',
+  'CLEANUP_INCOMPLETE',
+  'CLEANUP_CHECK_IRREVERSIBLE',
+  'CLEANUP_DEVICE_RELEASED',
+  'MEASUREMENTS_INCOMPLETE',
+  'ALREADY_SUBMITTED',
+] as const satisfies readonly WorkflowErrorCode[];
+
+function toWorkflowError(reason: unknown, sessionId?: string) {
   if (reason instanceof WorkflowError) return reason;
   if (!(reason instanceof EdgeSessionHttpError)) {
     return new WorkflowError(
@@ -89,25 +119,35 @@ function toWorkflowError(reason: unknown) {
   }
 
   const { status, body } = reason;
-  const error = (body as { error?: { code?: unknown; message?: unknown } } | null)?.error;
+  const payload = body as {
+    session?: unknown;
+    error?: { code?: unknown; message?: unknown; details?: { resultId?: unknown } };
+  } | null;
+  const error = payload?.error;
   if (status === 401 || status === 403)
     return new WorkflowError('EDGE_REJECTED', 'Edge 접근 권한을 확인해 주세요.');
   const message =
     typeof error?.message === 'string'
       ? error.message
       : 'Edge가 요청을 처리하지 못했어요. 다시 시도해 주세요.';
-  if (
-    error?.code === 'REVISION_CONFLICT' ||
-    error?.code === 'REQUEST_CONFLICT' ||
-    error?.code === 'CHECK_NOT_EDITABLE' ||
-    error?.code === 'INVALID_STATE' ||
-    error?.code === 'INVALID_PROCEDURE' ||
-    error?.code === 'PREPARATION_INCOMPLETE'
-  ) {
-    return new WorkflowError(error.code, message);
+  const code = edgeErrorCodes.find((candidate) => candidate === error?.code);
+  let session: ExperimentSession | undefined;
+  if (sessionId && payload?.session !== undefined) {
+    try {
+      session = parseEdgeSession(payload.session, sessionId);
+    } catch {
+      // The caller can recover from an invalid error snapshot using a fresh GET.
+    }
   }
-  if (status === 404) return new WorkflowError('NOT_FOUND', message);
-  return new WorkflowError('EDGE_REJECTED', message);
+  const resultId =
+    code === 'ALREADY_SUBMITTED' && typeof error?.details?.resultId === 'string'
+      ? error.details.resultId
+      : undefined;
+  return new WorkflowError(code ?? (status === 404 ? 'NOT_FOUND' : 'EDGE_REJECTED'), message, {
+    session,
+    resultId,
+    replayed: reason.replay === 'true',
+  });
 }
 
 export async function readEdgeSession(request: EdgeSessionRequest, path: `/sessions${string}`) {
@@ -123,6 +163,7 @@ export async function writeEdgeSession(
   path: `/sessions${string}`,
   payload: { requestId: string },
   parse: (value: unknown) => ExperimentSession,
+  options: { sessionId?: string; retryUnknown?: boolean } = {},
 ) {
   const write = { requestId: payload.requestId, body: JSON.stringify(payload) };
   for (let attempt = 0; ; attempt += 1) {
@@ -130,8 +171,8 @@ export async function writeEdgeSession(
       const { body, replayed } = await request(path, write);
       return { session: parse(body), replayed };
     } catch (reason) {
-      if (!outcomeUnknown(reason)) throw toWorkflowError(reason);
-      if (attempt === 1) {
+      if (!outcomeUnknown(reason)) throw toWorkflowError(reason, options.sessionId);
+      if (attempt === 1 || options.retryUnknown === false) {
         throw new WorkflowError(
           'OUTCOME_UNKNOWN',
           'Edge의 응답을 확인하지 못했어요. 같은 요청을 다시 시도해 주세요.',
