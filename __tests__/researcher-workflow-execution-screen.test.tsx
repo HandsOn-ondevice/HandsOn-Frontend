@@ -45,11 +45,14 @@ async function setup(
   await send({ type: 'startExecution' });
   const onClarification = jest.fn();
   const onRecovery = jest.fn();
+  const onDeviceCheck = jest.fn();
+  const onPause = jest.fn();
   const view = () => (
     <WorkflowProvider repository={repository}>
       <ExecutionScreen
         sessionId={session.sessionId}
-        onBack={() => {}}
+        onDeviceCheck={onDeviceCheck}
+        onPause={onPause}
         onClarification={onClarification}
         onRecovery={onRecovery}
       />
@@ -57,10 +60,32 @@ async function setup(
   );
   const screen = await render(view());
   await screen.findByText('유효 측정 0 / 15회');
-  return { repository, session, screen, view, onClarification, onRecovery };
+  return { repository, session, screen, view, onClarification, onRecovery, onDeviceCheck, onPause };
 }
 
 describe('S06 화면 조작과 재진입', () => {
+  test('상단 뒤로가기의 일시정지 저장이 실패하면 실행 화면에서 다시 시도한다', async () => {
+    const { repository, session, screen, onDeviceCheck, onPause } = await setup();
+    const command = jest
+      .spyOn(repository, 'executeCommand')
+      .mockRejectedValueOnce(new Error('일시정지 기록을 저장하지 못했습니다.'));
+    const back = () => screen.getByRole('button', { name: '뒤로가기' });
+
+    await fireEvent.press(back());
+    await screen.findByText('일시정지 기록을 저장하지 못했습니다.');
+    expect(onPause).not.toHaveBeenCalled();
+    expect(onDeviceCheck).not.toHaveBeenCalled();
+    expect((await repository.getSession(session.sessionId)).phase).toBe('running');
+
+    await fireEvent.press(back());
+    await waitFor(() => expect(onPause).toHaveBeenCalledTimes(1));
+    expect(command).toHaveBeenCalledTimes(2);
+    const saved = await repository.getSession(session.sessionId);
+    expect(saved.phase).toBe('paused');
+    expect(saved.execution?.cursor).toEqual(session.execution?.cursor);
+    expect(onDeviceCheck).not.toHaveBeenCalled();
+  });
+
   test('응답 확인 뒤 명시적 완료로 진행하고 재진입 시 이전 회차를 보존한다', async () => {
     const { repository, session, screen, view } = await setup();
     expect(screen.getByText('LED 출력 특성 측정')).toBeTruthy();

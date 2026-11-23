@@ -216,6 +216,7 @@ export function useWorkflowSession(sessionId: string) {
     execute,
     heartbeat,
     canRetryCommand: retryable !== null,
+    retryCommandType: retryable?.command.type,
     retryCommand: () => {
       if (retryable) return send(retryable);
     },

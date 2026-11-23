@@ -5,6 +5,14 @@ import {
   type DiagnosticIssue,
 } from './device-check';
 import type { ExperimentSession } from './models';
+import { currentEdgeHold } from './edge-hold';
+
+export function isUserPaused(session: ExperimentSession | null | undefined) {
+  return session?.source === 'api'
+    ? session.phase === 'held' &&
+        (currentEdgeHold(session)?.reasonCode ?? session.holdReason?.code) === 'USER_PAUSED'
+    : session?.phase === 'paused';
+}
 
 export type ResumeCheckTarget = 'connection' | 'voltage';
 
