@@ -139,7 +139,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-테스트가 `http://localhost:8081`의 Expo 웹 서버를 자동으로 시작하고 종료합니다. 같은 저장소의 개발 서버가 이미 해당 주소에서 실행 중이면 재사용합니다. 앱을 먼저 열어 확인하려면 별도 터미널에서 아래 명령을 실행하고 브라우저로 해당 주소에 접속합니다.
+테스트가 `http://localhost:8081`의 Expo 웹 서버를 자동으로 시작하고 종료합니다. 같은 저장소의 개발 서버가 이미 해당 주소에서 실행 중이면 재사용합니다. 그 서버가 Edge에 연결되어 있다면 기본 fixture 검사는 `EXPO_E2E_PORT=8082 npm run test:e2e`처럼 비어 있는 포트에서 실행합니다. 앱을 먼저 열어 확인하려면 별도 터미널에서 아래 명령을 실행하고 브라우저로 해당 주소에 접속합니다.
 
 ```sh
 npm run web -- --localhost --port 8081
