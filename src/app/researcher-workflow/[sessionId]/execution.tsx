@@ -11,8 +11,20 @@ export default function ExecutionRoute() {
       pathname: '/researcher-workflow/[sessionId]/device-check',
       params: { sessionId },
     });
+  const onRecovery = () =>
+    router.push({
+      pathname: '/researcher-workflow/[sessionId]/recovery',
+      params: { sessionId },
+    });
   if (isEdgeWorkflowEnabled()) {
-    return <EdgeExecutionScreen key={sessionId} sessionId={sessionId} onBack={onBack} />;
+    return (
+      <EdgeExecutionScreen
+        key={sessionId}
+        sessionId={sessionId}
+        onBack={onBack}
+        onRecovery={onRecovery}
+      />
+    );
   }
 
   return (
@@ -27,12 +39,7 @@ export default function ExecutionRoute() {
           })
         }
         onBack={onBack}
-        onRecovery={() =>
-          router.push({
-            pathname: '/researcher-workflow/[sessionId]/recovery',
-            params: { sessionId },
-          })
-        }
+        onRecovery={onRecovery}
         onRemeasurement={() =>
           router.push({
             pathname: '/researcher-workflow/[sessionId]/remeasurement',
