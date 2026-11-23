@@ -37,7 +37,14 @@ type EdgeCommand =
   | Extract<
       WorkflowCommand,
       {
-        type: 'setPreparationCheck' | 'completePreparation' | 'startDeviceCheck' | 'startExecution';
+        type:
+          | 'setPreparationCheck'
+          | 'completePreparation'
+          | 'startDeviceCheck'
+          | 'startExecution'
+          | 'requestVoiceClarification'
+          | 'resolveVoiceClarification'
+          | 'dismissVoiceClarification';
       }
     >
   | { type: 'pause' | 'resume' };
@@ -126,6 +133,9 @@ export class EdgeWorkflowRepository implements WorkflowRepository {
       case 'completePreparation':
       case 'startDeviceCheck':
       case 'startExecution':
+      case 'requestVoiceClarification':
+      case 'resolveVoiceClarification':
+      case 'dismissVoiceClarification':
         return this.writeCommand(sessionId, command, context);
       default:
         throw new WorkflowError('INVALID_STATE', '이 단계의 Edge 명령은 아직 연결되지 않았어요.');

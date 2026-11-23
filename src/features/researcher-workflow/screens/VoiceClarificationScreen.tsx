@@ -30,7 +30,8 @@ export function VoiceClarificationScreen({
   sessionId: string;
   onBack: () => void;
 }) {
-  const { session, loading, pending, error, refresh, execute } = useWorkflowSession(sessionId);
+  const { session, loading, pending, error, refresh, execute, canRetryCommand, retryCommand } =
+    useWorkflowSession(sessionId);
   const state = session ? selectVoiceClarification(session) : null;
   const request = state?.request;
   const [selection, setSelection] = useState<{ commandId: string; choice: VoiceChoice } | null>(
@@ -39,7 +40,7 @@ export function VoiceClarificationScreen({
   const [menu, setMenu] = useState(false);
   const choice = selection?.commandId === request?.commandId ? selection?.choice : undefined;
   const cancel = async () => {
-    if (loading || pending) return;
+    if (loading || pending || canRetryCommand) return;
     if (request && state?.canCancel) {
       const next = await execute({
         type: 'dismissVoiceClarification',
@@ -53,7 +54,7 @@ export function VoiceClarificationScreen({
       onBack();
       return;
     }
-    if (!state?.valid || !choice || pending) return;
+    if (!state?.valid || !choice || pending || canRetryCommand) return;
     const next = await execute({
       type: 'resolveVoiceClarification',
       commandId: request.commandId,
@@ -71,6 +72,7 @@ export function VoiceClarificationScreen({
       <AppBar
         title="모호한 음성 확인"
         mode="back"
+        navigationDisabled={pending || canRetryCommand}
         onBack={() => {
           void cancel();
         }}
@@ -89,18 +91,25 @@ export function VoiceClarificationScreen({
         {loading ? (
           <AppText accessibilityLiveRegion="polite">확인 요청을 불러오고 있습니다.</AppText>
         ) : null}
-        {error ? (
+        {error || canRetryCommand ? (
           <>
             <FeedbackPanel
               title="음성 확인을 처리하지 못했습니다"
-              subtitle={error}
+              subtitle={error ?? '같은 요청을 다시 시도해 서버 상태를 확인해 주세요.'}
               tone="danger"
               icon="alert"
             />
             <Button
-              label="요청 다시 불러오기"
+              label={canRetryCommand ? '같은 요청 다시 시도' : '요청 다시 불러오기'}
               variant="secondary"
-              onPress={refresh}
+              onPress={async () => {
+                if (!canRetryCommand) {
+                  refresh();
+                  return;
+                }
+                const next = await retryCommand();
+                if (next && !next.execution?.pendingVoice) onBack();
+              }}
               disabled={pending}
             />
           </>
@@ -130,7 +139,7 @@ export function VoiceClarificationScreen({
                         ? 'retry'
                         : 'back'
                   }
-                  disabled={!state?.valid || pending}
+                  disabled={!state?.valid || pending || canRetryCommand}
                   onPress={() => setSelection({ commandId: request.commandId, choice: value })}
                 />
               ))}
@@ -165,7 +174,9 @@ export function VoiceClarificationScreen({
         safeArea
         primary="현재 작업으로 돌아가기"
         loading={pending}
-        disabled={loading || pending || (!!request && (!state?.valid || !choice))}
+        disabled={
+          loading || pending || canRetryCommand || (!!request && (!state?.valid || !choice))
+        }
         onPrimary={() => {
           void confirm();
         }}
@@ -178,8 +189,9 @@ export function VoiceClarificationScreen({
         ) : null}
         <AppText>뜻을 선택한 뒤 하단 버튼으로 확정합니다. 뒤로 가면 선택 없이 취소합니다.</AppText>
         <AppText>
-          음성 입력과 안내 재생 서비스는 아직 연결되지 않았습니다. 안내는 화면에서 확인할 수
-          있습니다. 다시 측정은 현재 회차의 응답을 새로 확인하며 작업을 자동으로 완료하지 않습니다.
+          {session?.source === 'api'
+            ? '명령 텍스트를 Edge에서 해석합니다. 안내는 화면에 표시합니다. 다시 측정하면 현재 회차의 응답을 새로 확인합니다.'
+            : '음성 입력과 안내 재생 서비스는 아직 연결되지 않았습니다. 안내는 화면에서 확인할 수 있습니다. 다시 측정은 현재 회차의 응답을 새로 확인하며 작업을 자동으로 완료하지 않습니다.'}
         </AppText>
         <AppText>
           현재 작업이나 측정값이 바뀌면 선택을 확정할 수 없습니다. 뒤로 가면 선택 없이 취소합니다.

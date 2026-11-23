@@ -276,7 +276,7 @@ async function verifyStudent(page: Page, edge: ReturnType<typeof isolatedEdge>, 
   expect(body.session.sessionId).toBe(result.sessionId);
   expect(body.dataOrigin).toBe('simulation');
   const { condition, attempts, mean, unit, readings } = conditionData(body);
-  await expect(page.getByText('제출한 결과', { exact: true })).toBeVisible();
+  await expect(page.getByText('실험 결과', { exact: true })).toBeVisible();
   await expect(
     page.getByRole('heading', { name: body.session.procedure.title, exact: true }),
   ).toBeVisible();
