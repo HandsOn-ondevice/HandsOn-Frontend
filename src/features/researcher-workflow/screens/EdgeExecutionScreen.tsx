@@ -36,6 +36,7 @@ type Props = {
   onRecovery: () => void;
   onClarification: () => void;
   onHome: () => void;
+  onReview?: () => void;
   renderCompletion: (
     phase: 'awaitingCleanup' | 'readyToSubmit' | 'completed',
     outputFailed: boolean,
@@ -84,6 +85,7 @@ function EdgeMeasurementContent({
   onRecovery,
   onClarification,
   onHome,
+  onReview,
   renderCompletion,
   base,
   request,
@@ -164,11 +166,12 @@ function EdgeMeasurementContent({
 
   const cursor = session?.phase === 'running' ? session.execution?.cursor : null;
   const activeCursor = session?.execution?.cursor;
+  const returnToReview = session?.phase === 'awaitingCleanup' ? onReview : undefined;
   const attempt = session?.execution?.attempts
     .slice()
     .reverse()
     .find((item) =>
-      session.phase === 'completed'
+      session.phase === 'completed' || returnToReview
         ? item.status === 'valid'
         : item.cursor.cursorId === activeCursor?.cursorId,
     );
@@ -213,7 +216,7 @@ function EdgeMeasurementContent({
     session &&
     !pending &&
     !canRetryCommand &&
-    (session.phase === 'awaitingCleanup' ||
+    ((session.phase === 'awaitingCleanup' && !returnToReview) ||
       session.phase === 'readyToSubmit' ||
       (session.phase === 'completed' && session.workflowVersion === '2.0'))
   ) {
@@ -283,6 +286,16 @@ function EdgeMeasurementContent({
                 }
               }}
             />
+          </>
+        ) : returnToReview ? (
+          <>
+            <FeedbackPanel
+              title="측정 기록 확인"
+              subtitle={
+                attempt ? '이 실험의 마지막 유효 측정입니다.' : '저장된 유효 측정이 없습니다.'
+              }
+            />
+            <Button label="누락·이상 검토" onPress={returnToReview} />
           </>
         ) : session?.phase === 'completed' ? (
           <>

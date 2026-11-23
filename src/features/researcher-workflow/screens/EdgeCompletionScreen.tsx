@@ -18,6 +18,7 @@ import {
 } from '@/features/expert-review/ReviewLayout';
 import { loadEdgeResult } from '@/features/expert-review/edgeResultRepository';
 import { cleanupRequirements } from '../domain/completion';
+import { selectEdgeCompletionReview } from '../domain/edge-completion-review';
 import { useWorkflowSession } from '../state/useWorkflowSession';
 import { recordedTime, UnavailableCompletion } from './CompletionParts';
 
@@ -44,17 +45,21 @@ export function EdgeCompletionScreen({
   stage,
   resultId,
   conditionId,
+  onReviewBack,
 }: {
   sessionId: string;
   stage: Stage;
   resultId?: string;
   conditionId?: string;
+  onReviewBack?: () => void;
 }) {
   const resource = useWorkflowSession(sessionId);
   const { loading, error, session } = resource;
   const retryingSubmit = stage === 'results' && resource.canRetryCommand;
   const back =
-    stage === 'cleanup' ? () => router.replace(workflowRoute('review', sessionId)) : home;
+    stage === 'cleanup'
+      ? () => router.replace(workflowRoute('review', sessionId))
+      : (onReviewBack ?? home);
 
   if (loading || !session || (resultId !== undefined && resultId !== sessionId)) {
     return (
@@ -128,8 +133,11 @@ export function EdgeCompletionScreen({
       </ReviewLayout>
     );
   }
-  if (stage === 'cleanup')
+  const review = session.phase === 'awaitingCleanup' ? selectEdgeCompletionReview(session) : null;
+  if (stage === 'cleanup') {
+    if (review && !review.allValid) return <Redirect href={workflowRoute('review', sessionId)} />;
     return <EdgeCleanup sessionId={sessionId} resource={resource} onBack={back} />;
+  }
 
   return (
     <EdgePreview
@@ -137,6 +145,8 @@ export function EdgeCompletionScreen({
       sessionId={sessionId}
       conditionId={conditionId}
       resource={resource}
+      review={stage === 'review' ? review : null}
+      onBack={back}
     />
   );
 }
@@ -239,11 +249,15 @@ function EdgePreview({
   sessionId,
   conditionId,
   resource,
+  review,
+  onBack,
 }: {
   stage: Exclude<Stage, 'cleanup'>;
   sessionId: string;
   conditionId?: string;
   resource: Resource;
+  review: ReturnType<typeof selectEdgeCompletionReview> | null;
+  onBack: () => void;
 }) {
   const { selection } = useEntrySelection();
   const procedureId = resource.session?.procedure.procedureId;
@@ -260,7 +274,6 @@ function EdgePreview({
   const { query, retry } = useReviewQuery(load);
   const data = query.status === 'ready' ? query.data : null;
   const detail = stage === 'measurement-details';
-  const review = stage === 'review';
   const showReview = () =>
     router.dismissTo(
       workflowRoute(
@@ -275,22 +288,28 @@ function EdgePreview({
   return (
     <ReviewLayout
       title={titles[stage]}
-      onBack={detail ? showReview : home}
+      onBack={detail ? showReview : onBack}
       footer={
         detail ? (
           <ActionShelf safeArea primary="전체 결과로 돌아가기" onPrimary={showReview} />
+        ) : review ? (
+          data && review.allValid ? (
+            <ActionShelf
+              safeArea
+              primary="장치 정리로 이동"
+              onPrimary={() => router.replace(workflowRoute('cleanup', sessionId))}
+            />
+          ) : undefined
         ) : (
           <ActionShelf
             safeArea
             loading={pending}
             disabled={!data && !canRetryCommand}
-            primary={review ? '장치 정리로 이동' : canRetryCommand ? '다시 시도' : '결과 제출'}
+            primary={canRetryCommand ? '다시 시도' : '결과 제출'}
             onPrimary={
-              review
-                ? () => router.replace(workflowRoute('cleanup', sessionId))
-                : canRetryCommand
-                  ? () => void retryCommand()
-                  : () => void execute({ type: 'submitResult' })
+              canRetryCommand
+                ? () => void retryCommand()
+                : () => void execute({ type: 'submitResult' })
             }
           />
         )
@@ -303,6 +322,18 @@ function EdgePreview({
         <AppText variant="caption">Edge 장치 시뮬레이션</AppText>
       ) : null}
       {error ? <CommandError message={error} /> : null}
+      {review && !review.allValid ? (
+        <FeedbackPanel
+          title={
+            review.firstIssue
+              ? `${review.firstIssue.label} 조건 ${review.firstIssue.trialIndex}회차를 확인해 주세요`
+              : '유효 측정 기록을 확인해 주세요'
+          }
+          subtitle="필수 회차의 유효 측정과 근거가 모두 있어야 장치 정리로 이동할 수 있습니다."
+          tone="warning"
+          icon="alert"
+        />
+      ) : null}
       {!data ? (
         <ReviewQueryFeedback
           subject={detail ? '측정 근거' : '결과'}
