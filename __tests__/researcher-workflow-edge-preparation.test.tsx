@@ -15,6 +15,7 @@ import * as workflowRepository from '@/features/researcher-workflow/state/workfl
 
 jest.mock('expo-router', () => ({
   Redirect: jest.fn(() => null),
+  useFocusEffect: jest.fn(),
   useLocalSearchParams: jest.fn(),
   router: {
     canGoBack: jest.fn(() => false),

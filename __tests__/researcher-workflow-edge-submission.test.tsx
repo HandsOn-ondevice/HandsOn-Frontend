@@ -91,7 +91,9 @@ function response(status: number, body: unknown, replay: string | null = null) {
   } as unknown as Response;
 }
 
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => {
+  jest.restoreAllMocks();
+});
 
 test('새 세션은 2.0으로 생성하고 이미 완료된 1.0 세션도 읽는다', async () => {
   const created = {

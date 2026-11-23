@@ -20,6 +20,7 @@ type Command =
 
 type CreateBody = {
   requestId: string;
+  workflowVersion: '2.0';
   procedureId: string;
   procedureVersion: string;
   workProfileId: string;
@@ -31,6 +32,7 @@ type Cursor = { cursorId: string; conditionId: string; trialIndex: number };
 
 type Session = {
   sessionId: string;
+  workflowVersion?: '1.0' | '2.0';
   phase: string;
   revision: number;
   holdReason?: { code: string; message: string } | null;
@@ -143,6 +145,7 @@ function isolatedEdge(request: APIRequestContext) {
         headers: { ...operatorHeaders, 'Idempotency-Key': requestId },
         data: {
           requestId,
+          workflowVersion: '2.0',
           procedureId: procedure.procedureId,
           procedureVersion: procedure.version,
           workProfileId: procedure.workProfileId,
@@ -225,7 +228,7 @@ test('모바일 S03~S06에서 실제 Edge의 재전송, 점검 판정과 첫 회
         await route.fulfill({ response });
         return;
       }
-      if (req.method() !== 'POST') {
+      if (req.method() !== 'POST' || path.endsWith('/heartbeat')) {
         await route.continue();
         return;
       }
@@ -281,6 +284,7 @@ test('모바일 S03~S06에서 실제 Edge의 재전송, 점검 판정과 첫 회
     ]);
     const create = creates[0];
     expect(create.body).toMatchObject({
+      workflowVersion: '2.0',
       procedureId: procedure.procedureId,
       procedureVersion: procedure.version,
       workProfileId: procedure.workProfileId,
@@ -289,6 +293,7 @@ test('모바일 S03~S06에서 실제 Edge의 재전송, 점검 판정과 첫 회
     expect(creates[1].body).toEqual(create.body);
     expect(creates.map(({ key }) => key)).toEqual([create.body.requestId, create.body.requestId]);
     const created = create.data!;
+    expect(created.workflowVersion).toBe('2.0');
     expect(creates[1].data?.sessionId).toBe(created.sessionId);
     const sessionPath = `${sessionsPath}/${created.sessionId}`;
     const commandPath = `${sessionPath}/commands`;
