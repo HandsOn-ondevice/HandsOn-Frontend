@@ -3,9 +3,12 @@ import {
   listDemoProcedureReleases,
   procedureDraftRepository,
 } from '@/features/procedure-draft/procedureDraftRepository';
+import type { EdgeAccess } from '@/features/entry/entryEnvironment';
+import { loadEdgeReviewStatus } from '@/features/expert-review/edgeResultRepository';
 import { getDemoHomeReviews, type ReviewStatus } from '@/features/expert-review/reviewData';
 import { getUnresolvedDraftItems } from '@/features/procedure-release/procedureReleaseRules';
 import { demoLedProcedure } from '@/features/procedures/demoProcedures';
+import { createEdgeApi, EdgeApiError } from '@/lib/edgeApi';
 
 export interface ExpertProcedure {
   readonly id: string;
@@ -48,6 +51,41 @@ export interface ExpertHomeData {
 }
 
 export type LoadExpertHome = (environmentId: string) => Promise<ExpertHomeData>;
+
+export async function loadEdgeExpertHome(
+  environmentId: string,
+  edge: EdgeAccess,
+): Promise<ExpertHomeData> {
+  const data = (await createEdgeApi(edge).get(
+    `/home/expert?environmentId=${encodeURIComponent(environmentId)}`,
+  )) as ExpertHomeData | null;
+  if (
+    typeof data?.displayName !== 'string' ||
+    !Array.isArray(data.procedures) ||
+    !Array.isArray(data.results) ||
+    !data.results.every(
+      (item) =>
+        typeof item?.id === 'string' &&
+        typeof item.procedureId === 'string' &&
+        ['pending', 'reviewed', 'remeasurementRequested'].includes(item.status),
+    ) ||
+    !Array.isArray(data.recentWork)
+  )
+    throw new EdgeApiError({ kind: 'invalid-response' });
+
+  // The Edge home reports both decisions as reviewed. The result holds the actual decision.
+  const results = await Promise.all(
+    data.results.map(async (item: ExpertResult) =>
+      item.status === 'reviewed'
+        ? {
+            ...item,
+            status: await loadEdgeReviewStatus(edge, environmentId, item.id, item.procedureId),
+          }
+        : item,
+    ),
+  );
+  return { ...data, results };
+}
 
 function createDemoHome(environmentId: string): ExpertHomeData {
   const procedureId = (name: string) => `${environmentId}:procedure:${name}`;

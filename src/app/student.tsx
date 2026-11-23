@@ -1,19 +1,26 @@
+import { useCallback } from 'react';
 import { Redirect, useRouter } from 'expo-router';
-import type { WorkEnvironment } from '@/features/entry/entryEnvironment';
+import type { EntrySelection, WorkEnvironment } from '@/features/entry/entryEnvironment';
 import { useEntrySelection } from '@/features/entry/EntrySelectionProvider';
 import { StudentHomeScreen } from '@/features/student-home/StudentHomeScreen';
 import { getStudentHomeDestination } from '@/features/student-home/studentHomeRoutes';
+import { loadEdgeStudentHome, loadStudentHome } from '@/features/student-home/studentHomeData';
 import { useStudentHome } from '@/features/student-home/useStudentHome';
 
 export default function StudentHome() {
   const { selection } = useEntrySelection();
   if (selection?.role !== 'student') return <Redirect href="/" />;
-  return <SelectedStudentHome environment={selection.environment} />;
+  return <SelectedStudentHome selection={selection} />;
 }
 
-function SelectedStudentHome({ environment }: { environment: WorkEnvironment }) {
+function SelectedStudentHome({ selection: { environment, edge } }: { selection: EntrySelection }) {
   const router = useRouter();
-  const { lookup, reload } = useStudentHome(environment);
+  const loadHome = useCallback(
+    (selected: WorkEnvironment) =>
+      edge ? loadEdgeStudentHome(selected, edge) : loadStudentHome(selected),
+    [edge],
+  );
+  const { lookup, reload } = useStudentHome(environment, loadHome);
 
   return (
     <StudentHomeScreen
