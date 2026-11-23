@@ -1,6 +1,10 @@
 import { expect, test } from '@playwright/test';
 import type { ExperimentSession } from '../src/features/researcher-workflow/domain/models';
 import { edgeMeasurementSession, firstCursor, sampleFor } from '../test/edge-measurement-fixture';
+import {
+  enterEdgeMeasurementFixture,
+  openEdgeMeasurementFixtureScreen,
+} from './edge/measurement-fixture-entry';
 
 const origin = 'http://127.0.0.1:19996';
 const initial = edgeMeasurementSession();
@@ -147,7 +151,8 @@ test('S08 retries the same command and recovers the original held attempt withou
     await route.fulfill({ headers, json: snapshot });
   });
 
-  await page.goto(executionPath);
+  await enterEdgeMeasurementFixture(page, origin);
+  await openEdgeMeasurementFixtureScreen(page, executionPath);
   await page.getByRole('button', { name: '센서 오류와 작업 보류 확인' }).click();
   await expect(page).toHaveURL(recoveryPath);
   const recoveryScreen = page.getByTestId('edge-recovery-screen');
@@ -195,7 +200,7 @@ test('S08 retries the same command and recovers the original held attempt withou
     revision: 13,
     holdReason: { code: 'USER_PAUSED', message: '작업자가 일시정지했습니다.' },
   };
-  await page.goto(recoveryPath);
+  await openEdgeMeasurementFixtureScreen(page, recoveryPath);
   await expect(page.getByText('복구할 측정 오류가 없습니다')).toBeVisible();
   await expect(recover).toHaveCount(0);
 });
@@ -216,7 +221,8 @@ test('S08 keeps the same 45-second deadline across navigation and serializes GET
     if (reads === 2) await pending;
     await route.fulfill({ headers, json: recoveryState(8, 1, 'checking') });
   });
-  await page.goto(recoveryPath);
+  await enterEdgeMeasurementFixture(page, origin);
+  await openEdgeMeasurementFixtureScreen(page, recoveryPath);
   const waiting = page.getByText('센서 재확인 결과를 기다리고 있습니다.');
   await expect(waiting).toBeVisible();
   await expect.poll(() => reads).toBe(2);

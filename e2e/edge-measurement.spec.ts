@@ -6,6 +6,10 @@ import {
   nextCursor,
   sampleFor,
 } from '../test/edge-measurement-fixture';
+import {
+  enterEdgeMeasurementFixture,
+  openEdgeMeasurementFixtureScreen,
+} from './edge/measurement-fixture-entry';
 
 const fixtureOrigin = 'http://127.0.0.1:19996';
 const initial = edgeMeasurementSession();
@@ -125,7 +129,8 @@ test('displays Edge measurements, replays the same request, and completes each s
     await route.fulfill({ headers, json: snapshot });
   });
 
-  await page.goto(executionPath);
+  await enterEdgeMeasurementFixture(page, fixtureOrigin);
+  await openEdgeMeasurementFixtureScreen(page, executionPath);
   const sample = page.getByRole('button', { name: '현재 회차 측정값 확인' });
   const complete = page.getByRole('button', { name: '완료 요청' });
   await expect(page.getByText('회차 ID ' + firstCursor.cursorId)).toBeVisible();
@@ -223,7 +228,8 @@ test('serializes polling and preserves the same deadline across navigation', asy
     });
   });
 
-  await page.goto(executionPath);
+  await enterEdgeMeasurementFixture(page, fixtureOrigin);
+  await openEdgeMeasurementFixtureScreen(page, executionPath);
   const waiting = page.getByText('측정 응답을 기다리고 있습니다.');
   await expect(waiting).toBeVisible();
   await expect.poll(() => reads).toBe(2);
@@ -240,10 +246,7 @@ test('serializes polling and preserves the same deadline across navigation', asy
   await page.clock.fastForward(2_400);
   expect(reads).toBe(readsAway);
 
-  await page.evaluate((path) => {
-    history.pushState({}, '', path);
-    dispatchEvent(new PopStateEvent('popstate'));
-  }, executionPath);
+  await openEdgeMeasurementFixtureScreen(page, executionPath);
   await expect(waiting).toBeVisible();
   await page.clock.fastForward(20_000);
   await expect(page.getByText('측정 결과 대기 시간이 지났습니다')).toBeVisible();

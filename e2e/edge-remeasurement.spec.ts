@@ -6,6 +6,10 @@ import {
   nextCursor,
   sampleFor,
 } from '../test/edge-measurement-fixture';
+import {
+  enterEdgeMeasurementFixture,
+  openEdgeMeasurementFixtureScreen,
+} from './edge/measurement-fixture-entry';
 
 const origin = 'http://127.0.0.1:19996';
 const initial = edgeMeasurementSession();
@@ -155,7 +159,8 @@ test('S09 uses the recovered cursor and completes only the fresh attempt through
     }
   });
 
-  await page.goto(screenPath + '/execution');
+  await enterEdgeMeasurementFixture(page, origin);
+  await openEdgeMeasurementFixtureScreen(page, screenPath + '/execution');
   await page.getByRole('button', { name: '센서 오류와 작업 보류 확인' }).click();
   await page.getByRole('button', { name: '센서 다시 확인' }).click();
   await page.getByRole('button', { name: '같은 회차 재측정으로 이동' }).click();
@@ -227,7 +232,8 @@ test('S09 serializes reads and retains its 45-second deadline on re-entry', asyn
     if (reads === 2) await blockedRead;
     await route.fulfill({ headers, json: sampling });
   });
-  await page.goto(screenPath + '/remeasurement');
+  await enterEdgeMeasurementFixture(page, origin);
+  await openEdgeMeasurementFixtureScreen(page, screenPath + '/remeasurement');
   const screen = page.getByTestId('edge-remeasurement-screen');
   const waiting = screen.getByText('재측정 응답을 기다리고 있습니다.');
   await expect(waiting).toBeVisible();
