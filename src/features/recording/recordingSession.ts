@@ -15,6 +15,10 @@ export interface SavedRecording {
   environment: RecordingEnvironment;
 }
 
+export function createRecordingId() {
+  return `recording-${Date.now()}-${Math.random().toString(36).slice(2, 10).padEnd(8, '0')}`;
+}
+
 export interface RecordingSnapshot {
   status:
     | 'idle'
