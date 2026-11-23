@@ -9,6 +9,7 @@ import type {
 import type { ExecutionDefinition, ExecutionState, ExecutionCursor } from './execution';
 import type { VoiceChoice } from './voice-clarification';
 import type { CleanupCheckId, CompletionState } from './completion';
+import type { EdgeHold, ResumeConfirmation } from './edge-hold';
 
 export type PreparationCheckId =
   'materials' | 'device' | 'powerOff' | 'wiring' | 'distance' | 'communication';
@@ -203,6 +204,8 @@ export interface ExperimentSession {
   readonly deviceChecks: readonly DeviceCheckAttempt[];
   readonly pendingJob?: { readonly kind: string; readonly attemptId: string } | null;
   readonly holdReason?: DiagnosticIssue | null;
+  readonly resumePolicyVersion?: '1.0' | '2.0';
+  readonly hold?: EdgeHold | null;
   readonly execution?: ExecutionState;
   readonly resumeChecks?: readonly ResumeCheckAttempt[];
   readonly completion?: CompletionState;
@@ -252,12 +255,17 @@ export type WorkflowCommand =
       readonly confirmed: boolean;
     }
   | { readonly type: 'resumeExecution'; readonly pauseEventId: string; readonly cursorId: string }
-  | { readonly type: 'resumePausedExecution'; readonly cursorId: string }
+  | {
+      readonly type: 'resumePausedExecution';
+      readonly cursorId: string | null;
+      readonly confirmation?: ResumeConfirmation;
+    }
   | { readonly type: 'requestExecutionSample'; readonly cursorId: string }
   | {
       readonly type: 'requestRecovery';
       readonly cursorId: string;
       readonly blockedAttemptId: string;
+      readonly confirmation?: ResumeConfirmation;
     }
   | {
       readonly type: 'requestRecoveryRemeasurement';
@@ -293,6 +301,10 @@ export type WorkflowErrorCode =
   | 'CHECK_NOT_EDITABLE'
   | 'PREPARATION_INCOMPLETE'
   | 'REVISION_CONFLICT'
+  | 'RESUME_CONFIRMATION_REQUIRED'
+  | 'RESUME_CONFIRMATION_MISMATCH'
+  | 'RESUME_CONFIRMATION_EXPIRED'
+  | 'HOLD_ACTION_NOT_ALLOWED'
   | 'REQUEST_CONFLICT'
   | 'WORKFLOW_VERSION_REQUIRED'
   | 'CLEANUP_OUTPUT_FAILED'

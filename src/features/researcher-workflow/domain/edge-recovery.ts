@@ -1,3 +1,4 @@
+import { currentEdgeHold } from './edge-hold';
 import type { ExperimentSession } from './models';
 
 const nonMeasurementHolds = new Set([
@@ -11,28 +12,32 @@ const nonMeasurementHolds = new Set([
 export function selectEdgeRecovery(session: ExperimentSession | null) {
   if (session?.source !== 'api' || !session.execution?.cursor) return;
   const { cursor, attempts, recoveries } = session.execution;
-  const hold = 'holdReason' in session ? session.holdReason : undefined;
-  const holdCode = hold && typeof hold === 'object' && 'code' in hold ? hold.code : undefined;
-  if (typeof holdCode === 'string' && nonMeasurementHolds.has(holdCode)) return;
+  const strict = session.resumePolicyVersion === '2.0';
+  const hold = currentEdgeHold(session);
+  if (strict) {
+    if (session.phase === 'held' && !hold?.allowedCommands.includes('requestRecovery')) return;
+    if (
+      session.phase === 'running' &&
+      session.hold?.nextSampleCommand !== 'requestRecoveryRemeasurement'
+    )
+      return;
+  } else if (session.holdReason?.code && nonMeasurementHolds.has(session.holdReason.code)) {
+    return;
+  }
 
-  const latest = attempts
-    .slice()
-    .reverse()
-    .find((item) => item.cursor.cursorId === cursor.cursorId);
-  const recovery = recoveries
-    ?.slice()
-    .reverse()
-    .find(
-      (item) =>
-        item.cursor.cursorId === cursor.cursorId && item.sampleAttemptId === latest?.attemptId,
-    );
-  const blocked = recovery
-    ? attempts.find((item) => item.attemptId === recovery.blockedAttemptId)
-    : latest;
+  const latest = attempts.findLast((item) => item.cursor?.cursorId === cursor.cursorId);
+  const recovery = recoveries?.findLast(
+    (item) =>
+      item.cursor?.cursorId === cursor.cursorId && item.sampleAttemptId === latest?.attemptId,
+  );
+  const blocked =
+    recovery && (!strict || recovery.status !== 'failed')
+      ? attempts.find((item) => item.attemptId === recovery.blockedAttemptId)
+      : latest;
   if (
     !blocked ||
-    blocked.cursor.cursorId !== cursor.cursorId ||
-    blocked.purpose === 'recoveryCheck' ||
+    blocked.cursor?.cursorId !== cursor.cursorId ||
+    (!strict && blocked.purpose === 'recoveryCheck') ||
     (blocked.status !== 'held' && blocked.status !== 'error')
   )
     return;

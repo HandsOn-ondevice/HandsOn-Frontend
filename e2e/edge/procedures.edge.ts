@@ -65,6 +65,7 @@ const session = {
   executionMode: 'simulation',
   schemaVersion: '1.0',
   workflowVersion: '2.0',
+  resumePolicyVersion: '2.0',
   procedure,
   phase: 'preparing',
   revision: 0,
@@ -76,6 +77,7 @@ const session = {
   deviceChecks: [],
   pendingJob: null,
   holdReason: null,
+  hold: null,
   cleanup: {
     attempts: [],
     checks: ['powerOff', 'cables', 'storage'].map((id) => ({
@@ -328,6 +330,7 @@ for (const viewport of [
       procedureVersion: procedure.version,
       workProfileId: profileId,
       operatorId,
+      resumePolicyVersion: '2.0',
     });
     expect(api.creates.slice(1)).toEqual([api.creates[0], api.creates[0]]);
     expect(api.sessionsByKey.size).toBe(1);

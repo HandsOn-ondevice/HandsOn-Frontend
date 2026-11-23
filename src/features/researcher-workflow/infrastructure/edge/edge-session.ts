@@ -23,6 +23,25 @@ function isTimestamp(value: unknown): value is string {
   return typeof value === 'string' && Number.isFinite(Date.parse(value));
 }
 
+function isHold(value: unknown) {
+  return (
+    isRecord(value) &&
+    isText(value.holdId) &&
+    isTimestamp(value.heldAt) &&
+    isText(value.reasonCode) &&
+    isText(value.bootId) &&
+    (value.cursorId === null || isText(value.cursorId)) &&
+    isList(value.allowedCommands, isText) &&
+    (value.nextSampleCommand === null ||
+      value.nextSampleCommand === 'requestExecutionSample' ||
+      value.nextSampleCommand === 'requestRecoveryRemeasurement') &&
+    typeof value.requiresConfirmation === 'boolean' &&
+    Number.isInteger(value.confirmationValidityMs) &&
+    Number(value.confirmationValidityMs) > 0 &&
+    (value.resolvedAt === null || isTimestamp(value.resolvedAt))
+  );
+}
+
 function isDiagnostics(value: unknown) {
   return (
     isRecord(value) &&
@@ -262,6 +281,11 @@ export function parseEdgeSession(value: unknown, sessionId?: string): Experiment
       value.workflowVersion !== '1.0' &&
       value.workflowVersion !== '2.0') ||
     (value.holdReason != null && !isIssue(value.holdReason)) ||
+    (value.resumePolicyVersion != null &&
+      value.resumePolicyVersion !== '1.0' &&
+      value.resumePolicyVersion !== '2.0') ||
+    (value.hold != null && !isHold(value.hold)) ||
+    (value.phase === 'held' && value.resumePolicyVersion === '2.0' && value.hold == null) ||
     !Number.isInteger(value.revision) ||
     Number(value.revision) < 0 ||
     (value.pendingJob !== null &&
