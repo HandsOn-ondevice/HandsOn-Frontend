@@ -7,19 +7,18 @@ const verifyEdge = process.env.EXPO_E2E_EDGE === '1';
 const verifyResults = process.env.HANDSON_E2E_EDGE_RESULTS === '1';
 const verifyDrafts = process.env.HANDSON_E2E_EDGE_DRAFTS === '1';
 const verifySubmission = process.env.HANDSON_E2E_EDGE_SUBMISSION === '1';
+const verifyApproval = process.env.HANDSON_E2E_EDGE_APPROVAL === '1';
 const verifyStart = process.env.HANDSON_E2E_EDGE_START === '1';
 const startSpec = 'edge-execution-start.spec.ts';
-const edgeSuite = verifySubmission
-  ? { spec: 'edge-submission.spec.ts', folder: '/edge-submission' }
-  : verifyResults
-    ? { spec: 'edge-results.spec.ts', folder: '/edge-results' }
-    : verifyEdge
-      ? { spec: 'edge-connection.spec.ts', folder: '/edge' }
-      : verifyDrafts
-        ? { spec: 'edge-drafts.spec.ts', folder: '/edge-drafts' }
-        : verifyStart
-          ? { spec: startSpec, folder: '/edge-execution-start' }
-          : undefined;
+const edgeSuites = [
+  { enabled: verifySubmission, spec: 'edge-submission.spec.ts', folder: '/edge-submission' },
+  { enabled: verifyApproval, spec: 'edge-approval.spec.ts', folder: '/edge-approval' },
+  { enabled: verifyResults, spec: 'edge-results.spec.ts', folder: '/edge-results' },
+  { enabled: verifyEdge, spec: 'edge-connection.spec.ts', folder: '/edge' },
+  { enabled: verifyDrafts, spec: 'edge-drafts.spec.ts', folder: '/edge-drafts' },
+  { enabled: verifyStart, spec: startSpec, folder: '/edge-execution-start' },
+];
+const edgeSuite = edgeSuites.find(({ enabled }) => enabled);
 const useEdgeServer =
   Boolean(edgeSuite) ||
   process.env.HANDSON_E2E_EDGE_HOME === '1' ||
@@ -31,15 +30,7 @@ const artifactsDir = `artifacts/playwright${edgeSuite?.folder ?? ''}`;
 export default defineConfig({
   testDir: './e2e',
   testMatch: edgeSuite?.spec,
-  testIgnore: edgeSuite
-    ? undefined
-    : [
-        'edge-connection.spec.ts',
-        'edge-drafts.spec.ts',
-        'edge-results.spec.ts',
-        'edge-submission.spec.ts',
-        startSpec,
-      ],
+  testIgnore: edgeSuite ? undefined : edgeSuites.map(({ spec }) => spec),
   workers: edgeSuite?.spec === startSpec ? 1 : undefined,
   outputDir: `${artifactsDir}/test-results`,
   reporter: [['list'], ['html', { outputFolder: `${artifactsDir}/report`, open: 'never' }]],
