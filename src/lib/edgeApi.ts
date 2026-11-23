@@ -116,18 +116,27 @@ export function createEdgeApi({ baseUrl, token }: { baseUrl?: string; token?: st
     }
   }
 
+  function write<Payload extends { requestId: string }>(
+    method: 'POST' | 'PATCH',
+    path: `/${string}`,
+    payload: Payload,
+    signal?: AbortSignal,
+  ) {
+    return request(method, path, signal, payload);
+  }
+
   return {
     get(path: `/${string}`, signal?: AbortSignal) {
       return request('GET', path, signal);
     },
-    write<Payload extends { requestId: string }>(
-      method: 'POST' | 'PATCH',
+    post<Payload extends { requestId: string }>(
       path: `/${string}`,
       payload: Payload,
       signal?: AbortSignal,
     ) {
-      return request(method, path, signal, payload);
+      return write('POST', path, payload, signal);
     },
+    write,
   };
 }
 

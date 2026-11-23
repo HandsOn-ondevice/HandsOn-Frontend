@@ -26,9 +26,20 @@ async function openRecording(page: Page) {
   } catch {
     throw new Error('Edge 접속 토큰을 입력하지 못했습니다.');
   }
+  const readEnvironments = page.waitForResponse(
+    (response) =>
+      response.url() === `${edgeBaseUrl}/api/v1/environments` &&
+      response.request().method() === 'GET',
+  );
   await page.getByRole('button', { name: '작업 환경 불러오기', exact: true }).click();
+  const response = await readEnvironments;
+  expect(response.ok()).toBe(true);
+  const environments = (await response.json()) as { id: string; name: string }[];
+  const selected = environments.find(({ id }) => id === environmentId);
+  if (!selected) throw new Error(`작업 환경 ${environmentId}가 응답에 없습니다.`);
+
   await page.getByRole('button', { name: /^연구실: / }).click();
-  const environment = page.getByRole('radio', { name: '지급 키트 실습실', exact: true });
+  const environment = page.getByRole('radio', { name: selected.name, exact: true });
   await environment.click();
   await expect(environment).toBeHidden();
   await page.getByRole('button', { name: '설정하고 계속' }).click();

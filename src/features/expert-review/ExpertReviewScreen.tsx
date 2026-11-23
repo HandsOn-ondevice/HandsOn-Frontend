@@ -14,6 +14,7 @@ import {
   spacing,
 } from '@/design-system';
 import { ReviewLayout, ReviewQueryFeedback, useReviewQuery } from './ReviewLayout';
+import { ResultConditions } from './ResultConditions';
 import {
   expertReviewRepository,
   type ExpertReviewRepository,
@@ -22,15 +23,16 @@ import {
 } from './reviewData';
 
 type Decision = ReviewOutcome['status'];
-type SubmitState = { status: 'idle' } | { status: 'sending' | 'failed'; decision: Decision };
+type SubmitState = { status: 'idle' } | { status: 'sending' | 'failed'; request: ReviewOutcome };
 
 type ScreenProps = {
   environmentId: string;
   resultId: string;
   procedureId: string;
   onBack: () => void;
-  onOpenEvidence: (conditionId: string) => void;
+  onOpenEvidence: (conditionId: string, result: Pick<ReviewResult, 'id' | 'procedureId'>) => void;
   repository?: ExpertReviewRepository;
+  lockFailedSubmission?: boolean;
 };
 
 const reviewTitle = '연구생 결과 검토';
@@ -42,6 +44,7 @@ export function ExpertReviewScreen({
   onBack,
   onOpenEvidence,
   repository = expertReviewRepository,
+  lockFailedSubmission = false,
 }: ScreenProps) {
   const load = useCallback(
     () => repository.loadResult(environmentId, resultId, procedureId),
@@ -52,8 +55,9 @@ export function ExpertReviewScreen({
     <ResultReview
       result={query.data}
       onBack={onBack}
-      onOpenEvidence={onOpenEvidence}
+      onOpenEvidence={(conditionId) => onOpenEvidence(conditionId, query.data)}
       submit={(outcome) => repository.submitReview(environmentId, resultId, outcome)}
+      lockFailedSubmission={lockFailedSubmission}
     />
   ) : (
     <ReviewLayout title={reviewTitle} onBack={onBack}>
@@ -67,11 +71,13 @@ function ResultReview({
   onBack,
   onOpenEvidence,
   submit,
+  lockFailedSubmission,
 }: {
   result: ReviewResult;
   onBack: () => void;
   onOpenEvidence: (conditionId: string) => void;
   submit: (outcome: ReviewOutcome) => Promise<ReviewOutcome>;
+  lockFailedSubmission: boolean;
 }) {
   const [comment, setComment] = useState('');
   const [outcome, setOutcome] = useState<ReviewOutcome>();
@@ -80,22 +86,29 @@ function ResultReview({
   const inFlight = useRef(false);
   const status = outcome?.status ?? result.status;
   const sending = submission.status === 'sending';
+  const retryRequired = lockFailedSubmission && submission.status === 'failed';
+  const trimmedComment = comment.trim();
+  const actionsDisabled = sending || retryRequired || !trimmedComment;
 
-  async function send(decision: Decision) {
-    if (status !== 'pending' || inFlight.current) return;
+  async function send(request: ReviewOutcome) {
+    if (status !== 'pending' || !request.comment || inFlight.current) return;
     inFlight.current = true;
     Keyboard.dismiss();
-    setSubmission({ status: 'sending', decision });
+    setSubmission({ status: 'sending', request });
     try {
-      const saved = await submit({ status: decision, comment: comment.trim() });
+      const saved = await submit(request);
       setOutcome(saved);
       setShowOutcome(true);
       setSubmission({ status: 'idle' });
     } catch {
-      setSubmission({ status: 'failed', decision });
+      setSubmission({ status: 'failed', request });
     } finally {
       inFlight.current = false;
     }
+  }
+
+  function submitDecision(decision: Decision) {
+    if (!actionsDisabled) void send({ status: decision, comment: trimmedComment });
   }
 
   if (showOutcome && outcome) {
@@ -159,25 +172,25 @@ function ResultReview({
                   label="저장 다시 시도"
                   variant="secondary"
                   icon="retry"
-                  onPress={() => void send(submission.decision)}
+                  onPress={() => void send(submission.request)}
                 />
               </View>
             ) : null}
             <ActionShelf
               primary="검토 완료"
               secondary="재측정 요청"
-              onPrimary={() => void send('reviewed')}
-              onSecondary={() => void send('remeasurementRequested')}
-              disabled={sending}
-              secondaryDisabled={sending}
-              loading={sending && submission.decision === 'reviewed'}
-              secondaryLoading={sending && submission.decision === 'remeasurementRequested'}
+              onPrimary={() => submitDecision('reviewed')}
+              onSecondary={() => submitDecision('remeasurementRequested')}
+              disabled={actionsDisabled}
+              secondaryDisabled={actionsDisabled}
+              loading={sending && submission.request.status === 'reviewed'}
+              secondaryLoading={sending && submission.request.status === 'remeasurementRequested'}
             />
           </>
         ) : undefined
       }
     >
-      <View style={styles.intro}>
+      <View style={styles.intro} testID="expert-review-summary">
         <AppText variant="caption" color={colors.text.secondary}>
           {result.studentName} · {result.deviceName} · {result.approvedVersion}
         </AppText>
@@ -211,22 +224,33 @@ function ResultReview({
         />
       </View>
       {result.issue ? <IssueSummary issue={result.issue} onOpenEvidence={onOpenEvidence} /> : null}
-      <ResultChart
-        title="조건별 조도 평균"
-        meta={increasing ? '증가 추세' : '조건을 눌러 상세 보기'}
-        items={result.conditions}
-        unit={result.unit}
-        highlightedIndex={highlightedIndex}
-        onItemPress={(index) => onOpenEvidence(result.conditions[index].id)}
-      />
+      {result.metricLabel ? (
+        <ResultConditions result={result} onOpenCondition={onOpenEvidence} />
+      ) : (
+        <ResultChart
+          title="조건별 조도 평균"
+          meta={increasing ? '증가 추세' : '조건을 눌러 상세 보기'}
+          items={result.conditions}
+          unit={result.unit}
+          highlightedIndex={highlightedIndex}
+          onItemPress={(index) => onOpenEvidence(result.conditions[index].id)}
+        />
+      )}
       {status === 'pending' ? (
         <TextField
           label="검토 의견"
           multiline
           value={comment}
-          onChange={setComment}
+          onChange={(value) => {
+            setComment(value);
+            if (submission.status === 'failed' && value.trim() !== submission.request.comment) {
+              setSubmission({ status: 'idle' });
+            }
+          }}
+          support="검토 결정을 저장하려면 의견을 입력해 주세요."
           placeholder="예: 센서 복구 과정과 재측정값을 확인함"
-          disabled={sending}
+          maxLength={1000}
+          disabled={sending || retryRequired}
         />
       ) : (
         <SurfaceCard title="검토 의견">

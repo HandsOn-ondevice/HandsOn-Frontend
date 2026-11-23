@@ -4,27 +4,28 @@ const port = process.env.EXPO_E2E_PORT ?? '8081';
 const host = process.env.EXPO_E2E_HOST ?? 'localhost';
 const baseURL = `http://${host}:${port}`;
 const verifyEdge = process.env.EXPO_E2E_EDGE === '1';
-const verifyEdgeDrafts = process.env.HANDSON_E2E_EDGE_DRAFTS === '1';
+const verifyResults = process.env.HANDSON_E2E_EDGE_RESULTS === '1';
+const verifyDrafts = process.env.HANDSON_E2E_EDGE_DRAFTS === '1';
+const edgeSuite = verifyResults
+  ? { spec: 'edge-results.spec.ts', folder: '/edge-results' }
+  : verifyEdge
+    ? { spec: 'edge-connection.spec.ts', folder: '/edge' }
+    : verifyDrafts
+      ? { spec: 'edge-drafts.spec.ts', folder: '/edge-drafts' }
+      : undefined;
 const useEdgeServer =
-  verifyEdge ||
-  verifyEdgeDrafts ||
+  Boolean(edgeSuite) ||
   process.env.HANDSON_E2E_EDGE_HOME === '1' ||
   process.env.HANDSON_E2E_EDGE_SESSION === '1' ||
   process.env.HANDSON_E2E_LIVE_EDGE === '1';
-const artifactsDir = verifyEdge
-  ? 'artifacts/playwright/edge'
-  : verifyEdgeDrafts
-    ? 'artifacts/playwright/edge-drafts'
-    : 'artifacts/playwright';
+const artifactsDir = `artifacts/playwright${edgeSuite?.folder ?? ''}`;
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: verifyEdge
-    ? 'edge-connection.spec.ts'
-    : verifyEdgeDrafts
-      ? 'edge-drafts.spec.ts'
-      : undefined,
-  testIgnore: verifyEdge ? undefined : 'edge-connection.spec.ts',
+  testMatch: edgeSuite?.spec,
+  testIgnore: edgeSuite
+    ? undefined
+    : ['edge-connection.spec.ts', 'edge-drafts.spec.ts', 'edge-results.spec.ts'],
   outputDir: `${artifactsDir}/test-results`,
   reporter: [['list'], ['html', { outputFolder: `${artifactsDir}/report`, open: 'never' }]],
   use: {
@@ -39,8 +40,8 @@ export default defineConfig({
     env: {
       CI: '1',
       HANDSON_E2E_EDGE_TOKEN: '',
-      HANDSON_E2E_EXPERT_TOKEN: '',
       HANDSON_E2E_OPERATOR_TOKEN: '',
+      HANDSON_E2E_EXPERT_TOKEN: '',
       ...(!useEdgeServer && { EXPO_PUBLIC_HANDSON_EDGE_BASE_URL: '' }),
     },
   },

@@ -6,7 +6,7 @@ export interface ProcedureSummary {
   description?: string;
   approvedVersion: string;
   approvedBy?: string;
-  estimatedMinutes: number | null;
+  estimatedMinutes?: number | null;
   stepCount?: number;
   category?: 'led' | 'sensor';
   lastUsedAt?: string;

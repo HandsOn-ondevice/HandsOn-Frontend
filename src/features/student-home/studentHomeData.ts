@@ -67,7 +67,7 @@ export const loadStudentHome: LoadStudentHome = async (environment, edgeToken) =
     title: procedure.title,
     version: procedure.approvedVersion,
     equipmentLabel: procedure.code,
-    stepCount: procedure.stepCount,
+    stepCount: procedure.stepCount ?? procedure.steps.length,
   }));
 
   if (environment.id === 'demo-circuits') {

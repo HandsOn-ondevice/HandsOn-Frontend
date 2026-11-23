@@ -20,6 +20,7 @@ const sourceLabels = { human: '작업자', sensor: '센서', program: '프로그
 
 const recordStyles = {
   valid: { icon: 'check', color: colors.text.action, background: colors.status.successBg },
+  confirmed: { icon: 'check', color: colors.text.action, background: colors.status.successBg },
   invalid: { icon: 'alert', color: colors.status.danger, background: colors.status.dangerBg },
   held: { icon: 'pause', color: colors.status.warning, background: colors.status.warningBg },
   recovered: { icon: 'retry', color: colors.text.action, background: colors.status.infoBg },
@@ -30,10 +31,12 @@ export function EvidenceView({
   evidence,
   condition,
   unit,
+  omitUnavailableMetrics = false,
 }: {
   evidence: ConditionEvidence;
   condition: ReviewCondition;
   unit: string;
+  omitUnavailableMetrics?: boolean;
 }) {
   const { calculation, measurements, history, deviationPercent } = evidence;
   const records = [...measurements, ...history].sort((first, second) =>
@@ -43,7 +46,7 @@ export function EvidenceView({
     { title: '전압 평균', value: evidence.voltageAverage?.toFixed(2), unit: 'V' },
     { title: '전류 평균', value: evidence.currentAverage?.toFixed(0), unit: 'mA' },
     { title: '전력 평균', value: evidence.powerAverage?.toFixed(0), unit: 'mW' },
-  ];
+  ].filter((metric) => !omitUnavailableMetrics || metric.value !== undefined);
 
   return (
     <View style={styles.content}>
@@ -60,18 +63,20 @@ export function EvidenceView({
         title={condition.value === null ? '—' : `${condition.value.toFixed(1)} ${unit}`}
         subtitle={deviationPercent === null ? '반복 평균' : `반복 평균 · 편차 ${deviationPercent}%`}
       />
-      <View style={styles.metrics}>
-        {metrics.map((metric) => (
-          <MetricTile
-            key={metric.unit}
-            title={metric.title}
-            value={metric.value ?? '—'}
-            meta={metric.unit}
-            tone="neutral"
-            style={styles.metric}
-          />
-        ))}
-      </View>
+      {metrics.length ? (
+        <View style={styles.metrics}>
+          {metrics.map((metric) => (
+            <MetricTile
+              key={metric.unit}
+              title={metric.title}
+              value={metric.value ?? '—'}
+              meta={metric.unit}
+              tone="neutral"
+              style={styles.metric}
+            />
+          ))}
+        </View>
+      ) : null}
       <View style={styles.timeline}>
         <AppText variant="label" accessibilityRole="header">
           회차별 기록

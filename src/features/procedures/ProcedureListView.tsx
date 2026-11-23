@@ -34,6 +34,13 @@ function selectionKey(procedure: ProcedureSummary) {
   return JSON.stringify([procedure.id, procedure.approvedVersion]);
 }
 
+function procedureMeta({ approvedVersion, stepCount, estimatedMinutes }: ProcedureSummary) {
+  const parts = [approvedVersion];
+  if (stepCount !== undefined) parts.push(`${stepCount}단계`);
+  if (typeof estimatedMinutes === 'number') parts.push(`약 ${estimatedMinutes}분`);
+  return parts.join(' · ');
+}
+
 export function ProcedureListView({
   environment,
   lookup,
@@ -131,13 +138,7 @@ export function ProcedureListView({
             key={selectionKey(procedure)}
             title={procedure.title}
             subtitle={procedure.description}
-            meta={[
-              procedure.approvedVersion,
-              procedure.stepCount === undefined ? null : `${procedure.stepCount}단계`,
-              procedure.estimatedMinutes === null ? null : `약 ${procedure.estimatedMinutes}분`,
-            ]
-              .filter(Boolean)
-              .join(' · ')}
+            meta={procedureMeta(procedure)}
             detail={procedure.approvedBy ? `승인자 · ${procedure.approvedBy}` : undefined}
             state={selectionKey(procedure) === selectedKey ? 'selected' : 'approved'}
             onPress={() => setSelectedKey(selectionKey(procedure))}

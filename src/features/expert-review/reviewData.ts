@@ -43,6 +43,7 @@ export interface ReviewResult {
   readonly unresolvedCount: number;
   readonly remeasurementCount: number;
   readonly unit: string;
+  readonly metricLabel?: string;
   readonly conditions: readonly ReviewCondition[];
   readonly issue?: {
     readonly conditionId: string;
@@ -73,7 +74,7 @@ export interface EvidenceEvent {
   readonly timestamp: string;
   readonly detail: string;
   readonly source: string;
-  readonly kind: 'held' | 'recovered' | 'remeasured';
+  readonly kind: 'confirmed' | 'held' | 'recovered' | 'remeasured';
   readonly sourceKind: EvidenceKind;
 }
 
@@ -89,6 +90,12 @@ export interface ConditionEvidence {
 
 export interface ExpertReviewRepository {
   loadResult(environmentId: string, resultId: string, procedureId: string): Promise<ReviewResult>;
+  loadCondition?(
+    environmentId: string,
+    resultId: string,
+    procedureId: string,
+    conditionId: string,
+  ): Promise<{ result: ReviewResult; condition: ReviewCondition; evidence: ConditionEvidence }>;
   loadEvidence(
     environmentId: string,
     resultId: string,

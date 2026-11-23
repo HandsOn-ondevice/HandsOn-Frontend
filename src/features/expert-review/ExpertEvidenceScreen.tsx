@@ -20,6 +20,9 @@ export function ExpertEvidenceScreen({
   repository?: ExpertReviewRepository;
 }) {
   const load = useCallback(async () => {
+    if (repository.loadCondition) {
+      return repository.loadCondition(environmentId, resultId, procedureId, conditionId);
+    }
     const result = await repository.loadResult(environmentId, resultId, procedureId);
     const condition = result.conditions.find(({ id }) => id === conditionId);
     if (!condition) throw new Error('선택한 측정 조건을 찾을 수 없어요.');
@@ -40,6 +43,7 @@ export function ExpertEvidenceScreen({
           condition={query.data.condition}
           evidence={query.data.evidence}
           unit={query.data.result.unit}
+          omitUnavailableMetrics={query.data.result.metricLabel !== undefined}
         />
       ) : (
         <ReviewQueryFeedback

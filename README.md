@@ -46,7 +46,7 @@ Edge 홈은 선택한 환경의 응답을 표시하며 조회 실패 시 다시 
 
 연구생 홈의 **전체 보기** 또는 **실험** 탭에서 `/procedures?environmentId=...`(S02)로 이동합니다. 목록에서 절차를 선택하면 `/procedures/[procedureId]`(S03)에서 선택한 승인 버전의 상세를 볼 수 있습니다. Edge 홈의 승인 절차 카드는 해당 승인 버전의 상세로 바로 연결됩니다.
 
-Edge에서 S03의 **이 버전으로 준비 시작**을 누르면 선택한 승인 버전으로 세션을 생성하고 반환된 ID로 준비 화면을 엽니다. fixture에서는 `/procedures/preparation`에서 절차 식별자·승인 버전·작업 환경을 확인할 수 있습니다. [Edge 세션 검증 기록](docs/validation/api-04-edge-session.md) · [S02–S03 fixture 검증 기록](docs/validation/s02-s03-procedures.md)
+Edge에서 S03의 **이 버전으로 준비 시작**을 누르면 선택한 절차 ID와 승인 버전으로 세션을 생성합니다. S04는 `/researcher-workflow/[sessionId]/preparation`에서 같은 세션을 조회하고 실험 준비 정보에 고정된 버전을 표시합니다. fixture에서는 `/procedures/preparation`에서 절차 식별자·승인 버전·작업 환경을 확인할 수 있습니다. [S02–S04 Edge 검증 기록](docs/validation/s02-s04-edge-api.md) · [Edge 세션 검증 기록](docs/validation/api-04-edge-session.md) · [S02–S03 fixture 검증 기록](docs/validation/s02-s03-procedures.md)
 
 최근 결과는 `/results/[resultId]?sessionId=...`, 이력과 장치는 `/history`, `/devices`로 연결합니다. 세 경로에서 준비 중 안내와 홈 복귀를 제공합니다. 이어하기는 기존 세션을 같은 ID로 조회해 서버 상태에 맞는 화면을 엽니다.
 
@@ -158,6 +158,8 @@ npx playwright show-report artifacts/playwright/report
 ```
 
 설정은 `playwright.config.ts`, 테스트는 `e2e/`에서 관리합니다. Jest는 기존 `__tests__/`만 실행합니다. 자세한 사용법은 [Playwright 실행 가이드](https://playwright.dev/docs/running-tests)를 참고합니다.
+
+모바일 웹에서 승인 절차 조회와 세션 생성 재시도를 확인하려면 `npm run test:e2e -- --config playwright.procedures.config.ts`를 실행합니다. 이 검사는 기본 8082 포트에서 Expo 서버를 실행하고 Edge 요청에 테스트 응답을 반환합니다.
 
 ## GitHub Flow
 

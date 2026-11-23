@@ -1,10 +1,19 @@
+import { useMemo } from 'react';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEntrySelection } from '@/features/entry/EntrySelectionProvider';
 import { ExpertEvidenceScreen } from '@/features/expert-review/ExpertEvidenceScreen';
+import { createEdgeResultRepository } from '@/features/expert-review/edgeResultRepository';
+import { isEdgeDataEnabled } from '@/lib/edgeApi';
 
 export default function ResultEvidence() {
   const router = useRouter();
   const { selection } = useEntrySelection();
+  const edgeToken = selection?.edgeToken;
+  const useEdge = isEdgeDataEnabled();
+  const repository = useMemo(
+    () => (useEdge ? createEdgeResultRepository(edgeToken) : undefined),
+    [edgeToken, useEdge],
+  );
   const { resultId, procedureId, conditionId } = useLocalSearchParams<{
     resultId?: string;
     procedureId?: string;
@@ -27,6 +36,7 @@ export default function ResultEvidence() {
       resultId={resultId}
       procedureId={procedureId}
       conditionId={conditionId}
+      repository={repository}
       onBack={() => {
         if (router.canGoBack()) router.back();
         else {
