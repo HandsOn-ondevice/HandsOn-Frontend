@@ -1,4 +1,5 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import { enterMockStudentHome, startMockPreparation } from './helpers/mock-researcher-workflow';
 
 async function pauseFromMenu(page: Page) {
   const execution = page.getByTestId('execution-screen');
@@ -14,12 +15,8 @@ async function pauseFromMenu(page: Page) {
 }
 
 async function enterExecution(page: Page) {
-  await page.goto('/');
-  await page.getByRole('radio', { name: '신규 연구생, 승인된 절차 실행' }).click();
-  await page.getByRole('button', { name: /^연구실: / }).click();
-  await page.getByRole('radio', { name: '지능형 임베디드·IoT 센서 연구실', exact: true }).click();
-  await page.getByRole('button', { name: '설정하고 계속' }).click();
-  await page.getByRole('button', { name: '이어서 진행', exact: true }).click();
+  await enterMockStudentHome(page);
+  const route = await startMockPreparation(page);
   for (const name of [
     '필수 준비물 7개 확인',
     '장치 ID LED-M03 확인',
@@ -33,7 +30,8 @@ async function enterExecution(page: Page) {
   await page.getByRole('button', { name: '장치·센서 점검 시작', exact: true }).click();
   await expect(page.getByRole('button', { name: '실험 측정 시작', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: '실험 측정 시작', exact: true }).click();
-  await expect(page).toHaveURL('/researcher-workflow/demo-session-led-m03/execution');
+  await expect(page).toHaveURL(`${route}/execution`);
+  return route;
 }
 
 const connectionCard = (page: Page) =>
@@ -66,13 +64,13 @@ for (const viewport of [
   { width: 360, height: 800 },
   { width: 412, height: 920 },
 ]) {
-  test(`${viewport.width}×${viewport.height} S01 이어하기·S10 보관·홈 재진입·S11 확인·같은 회차 재개`, async ({
+  test(`${viewport.width}×${viewport.height} S10 보관 후 S01에서 S11로 바로 이동해 같은 회차를 재개한다`, async ({
     page,
   }, testInfo) => {
     await page.setViewportSize(viewport);
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await enterExecution(page);
+    const route = await enterExecution(page);
     const sample = page.getByRole('button', { name: '현재 회차 측정값 확인', exact: true });
     const complete = page.getByRole('button', { name: '완료 요청', exact: true });
     await sample.click();
@@ -80,7 +78,7 @@ for (const viewport of [
     await complete.click();
     await expect(page.getByText('“0% 조건 2회차 완료했어”', { exact: true })).toBeVisible();
     await pauseFromMenu(page);
-    await expect(page).toHaveURL(/\/demo-session-led-m03\/paused$/);
+    await expect(page).toHaveURL(`${route}/paused`);
     await expect(page.getByText('진행 상태를 안전하게 저장했어요', { exact: true })).toBeVisible();
     await expect(page.getByText('다음 작업 · 0% 2회차', { exact: true })).toBeVisible();
     await expect(page.getByText('완료 근거 5건 유지', { exact: true })).toBeVisible();
@@ -97,9 +95,10 @@ for (const viewport of [
     await page.getByRole('button', { name: '홈으로', exact: true }).click();
     await expect(page).toHaveURL('/student');
     await page.getByRole('button', { name: '이어서 진행', exact: true }).click();
-    await expect(page).toHaveURL(/\/demo-session-led-m03\/paused$/);
-    await page.getByRole('button', { name: '바로 재개', exact: true }).click();
-    await expect(page).toHaveURL(/\/demo-session-led-m03\/resume$/);
+    await expect(page).toHaveURL(({ pathname }) => pathname === `${route}/resume`);
+    const resume = page.getByTestId('resume-screen');
+    await expect(resume.getByText('v1.2', { exact: true })).toBeVisible();
+    await expect(resume.getByText(/0% 조건\s+2회차부터 재개합니다/)).toBeVisible();
     await expect(page.getByRole('button', { name: '확인하고 재개', exact: true })).toBeDisabled();
     await expect(page.getByText('공급 전압 확인 필요', { exact: true })).toBeAttached();
     await capture(
@@ -140,7 +139,7 @@ for (const viewport of [
       /^같은 회차에서 새 측정 응답을 확인합니다\.$/,
     );
     await page.getByRole('button', { name: '확인하고 재개', exact: true }).click();
-    await expect(page).toHaveURL(/\/demo-session-led-m03\/execution$/);
+    await expect(page).toHaveURL(`${route}/execution`);
     await expect(page.getByText('유효 측정 1 / 15회', { exact: true })).toBeAttached();
     await expect(page.getByText('“0% 조건 2회차 완료했어”', { exact: true })).toBeVisible();
     await expect(complete).toBeDisabled();
@@ -159,11 +158,11 @@ test('S11 실패 응답은 재개를 차단하며 재시도와 재진입에도 �
   await page.setViewportSize({ width: 412, height: 920 });
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await enterExecution(page);
+  const route = await enterExecution(page);
   await pauseFromMenu(page);
   await page.getByRole('button', { name: '바로 재개', exact: true }).click();
   async function scenario(current: string, next: string) {
-    await expect(page).toHaveURL(/\/demo-session-led-m03\/resume$/);
+    await expect(page).toHaveURL(`${route}/resume`);
     const more = page
       .getByTestId('resume-screen')
       .getByRole('button', { name: '더 보기', exact: true });

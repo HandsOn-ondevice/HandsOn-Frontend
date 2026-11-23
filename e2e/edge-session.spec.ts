@@ -442,6 +442,9 @@ test('모바일에서 일시정지 후 점검을 통과하면 실제 Edge의 같
     });
 
     await expect(page).toHaveURL(`${screenPath}/paused`);
+    await expect(
+      page.getByTestId('pause-screen').getByText('작업자가 일시정지했습니다.', { exact: true }),
+    ).toBeVisible();
     await expect(page.getByText('완료한 측정 1회', { exact: true })).toBeVisible();
     const home = button(page, '홈으로');
     await checkLayout(page, home);
@@ -462,10 +465,18 @@ test('모바일에서 일시정지 후 점검을 통과하면 실제 Edge의 같
       sessionId,
       holdReason: { code: 'USER_PAUSED' },
     });
-    await expect(page).toHaveURL(`${screenPath}/paused`);
-    await expect(page.getByText('작업자가 일시정지했습니다.', { exact: true })).toBeVisible();
-    await button(page, '바로 재개').click();
-    await expect(page).toHaveURL(`${screenPath}/resume`);
+    await expect(page).toHaveURL(({ pathname }) => pathname === `${screenPath}/resume`);
+    const resumeScreen = page.getByTestId('resume-screen');
+    await expect(
+      resumeScreen.getByText(`승인 버전 v${paused.procedure.version.replace(/^v/, '')}`, {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      resumeScreen.getByText(`${condition.label} 조건 · ${cursor.trialIndex}회차부터 재개`, {
+        exact: true,
+      }),
+    ).toBeVisible();
 
     const confirmation = page.getByRole('checkbox', { name: /작업 환경을 재확인했어요/ });
     const resume = button(page, '장치 점검하고 재개');

@@ -1,15 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
+import { enterMockStudentHome } from './helpers/mock-researcher-workflow';
 
 test.use({ viewport: { width: 412, height: 920 } });
 
 const iotEnvironment = '지능형 임베디드·IoT 센서 연구실';
 
 async function enterStudentHome(page: Page) {
-  await page.goto('/');
-  await page.getByRole('radio', { name: '신규 연구생, 승인된 절차 실행' }).click();
-  await page.getByRole('button', { name: /^연구실: / }).click();
-  await page.getByRole('radio', { name: iotEnvironment, exact: true }).click();
-  await page.getByRole('button', { name: '설정하고 계속' }).click();
+  await enterMockStudentHome(page);
   await expect(page.getByRole('button', { name: '이어서 진행' })).toBeVisible();
 }
 
@@ -19,28 +16,21 @@ async function returnHome(page: Page) {
   await expect(page.getByRole('button', { name: '이어서 진행' })).toBeVisible();
 }
 
-test('기존 세션과 최근 결과 식별자를 유지하며 홈의 작업 경로로 이동한다', async ({
+test('일시정지 예시와 최근 결과의 식별자를 유지하며 홈의 작업 경로로 이동한다', async ({
   page,
 }, testInfo) => {
   await enterStudentHome(page);
 
+  await expect(page.getByText(/일시정지 · .* 저장\s+50% 조건 · 2 \/ 3회차/)).toBeVisible();
   await page.getByRole('button', { name: '이어서 진행' }).click();
-  await expect(page).toHaveURL('/researcher-workflow/demo-session-led-m03/preparation');
-  await expect(page.getByText('준비 진행도 · 0 / 6 항목 완료')).toBeVisible();
-  await expect(page.getByText('실험 세션을 찾을 수 없습니다')).toHaveCount(0);
-  await page.getByRole('checkbox', { name: '필수 준비물 7개 확인', exact: true }).click();
-  await expect(page.getByText('준비 진행도 · 1 / 6 항목 완료')).toBeVisible();
-  await returnHome(page);
-  await page.getByRole('button', { name: '이어서 진행' }).click();
-  await expect(page).toHaveURL('/researcher-workflow/demo-session-led-m03/preparation');
-  await expect(page.getByText('준비 진행도 · 1 / 6 항목 완료')).toBeVisible();
-  const materials = page.getByRole('checkbox', { name: '필수 준비물 7개 확인', exact: true });
-  await expect(materials).toContainText('작업자 확인 ·');
-  await materials.click();
-  await expect(page.getByText('준비 진행도 · 0 / 6 항목 완료')).toBeVisible();
-  await materials.click();
-  await expect(page.getByText('준비 진행도 · 1 / 6 항목 완료')).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath('s01-s04-resume.png') });
+  await expect(page).toHaveURL(
+    ({ pathname }) => pathname === '/researcher-workflow/demo-session-led-m03/resume',
+  );
+  const resume = page.getByTestId('resume-screen');
+  await expect(resume.getByText('v1.2', { exact: true })).toBeVisible();
+  await expect(resume.getByText(/50% 조건\s+3회차부터 재개합니다/)).toBeVisible();
+  await expect(resume.getByRole('button', { name: '확인하고 재개', exact: true })).toBeDisabled();
+  await page.screenshot({ path: testInfo.outputPath('s01-s11-resume.png') });
   await returnHome(page);
 
   await page.getByRole('button', { name: '전체 보기' }).click();

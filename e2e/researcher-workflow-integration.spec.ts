@@ -1,21 +1,29 @@
 import { expect, test } from '@playwright/test';
+import { enterMockStudentHome, startMockPreparation } from './helpers/mock-researcher-workflow';
 
 for (const viewport of [
   { width: 360, height: 800 },
   { width: 412, height: 920 },
 ]) {
-  test(`${viewport.width}px S01 이어하기에서 같은 세션의 S04·S05·S06을 연결하고 회차를 보존한다`, async ({
+  test(`${viewport.width}px 준비 중인 세션을 S01에서 이어 S04·S05·S06을 연결하고 회차를 보존한다`, async ({
     page,
   }, testInfo) => {
     await page.setViewportSize(viewport);
-    await page.goto('/');
-    await page.getByRole('radio', { name: '신규 연구생, 승인된 절차 실행' }).click();
-    await page.getByRole('button', { name: /^연구실: / }).click();
-    await page.getByRole('radio', { name: '지능형 임베디드·IoT 센서 연구실', exact: true }).click();
-    await page.getByRole('button', { name: '설정하고 계속' }).click();
+    await enterMockStudentHome(page);
+    const route = await startMockPreparation(page);
+    await expect(page.getByText('준비 진행도 · 0 / 6 항목 완료')).toBeVisible();
+    const materials = page.getByRole('checkbox', { name: '필수 준비물 7개 확인', exact: true });
+    await materials.click();
+    await expect(page.getByText('준비 진행도 · 1 / 6 항목 완료')).toBeVisible();
+    await page.goBack();
+    await expect(page).toHaveURL('/researcher-workflow');
+    await page.goBack();
+    await expect(page).toHaveURL('/student');
     await page.getByRole('button', { name: '이어서 진행', exact: true }).click();
-    const route = '/researcher-workflow/demo-session-led-m03';
-    await expect(page).toHaveURL(`${route}/preparation`);
+    await expect(page).toHaveURL(({ pathname }) => pathname === `${route}/preparation`);
+    await expect(page.getByText('준비 진행도 · 1 / 6 항목 완료')).toBeVisible();
+    await expect(materials).toContainText('작업자 확인 ·');
+    await materials.click();
     await expect(page.getByText('준비 진행도 · 0 / 6 항목 완료')).toBeVisible();
     for (const label of [
       '필수 준비물 7개 확인',
