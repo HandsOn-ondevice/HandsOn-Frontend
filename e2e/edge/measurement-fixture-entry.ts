@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { measurementSessionId } from '../../test/edge-measurement-fixture';
 
 const environment = {
   id: 'kit-lab',
@@ -28,6 +29,25 @@ const entryResponses = {
 };
 
 export async function enterEdgeMeasurementFixture(page: Page, origin: string) {
+  await page.route(`${origin}/api/v1/sessions/${measurementSessionId}/heartbeat`, async (route) => {
+    const request = route.request();
+    const headers = {
+      'access-control-allow-origin': '*',
+      'access-control-allow-headers': 'authorization',
+      'access-control-allow-methods': 'POST, OPTIONS',
+    };
+    if (request.method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, headers });
+      return;
+    }
+    expect(request.method()).toBe('POST');
+    expect(await request.headerValue('authorization')).toBe(`Bearer ${token}`);
+    expect(request.postData()).toBeNull();
+    await route.fulfill({
+      headers,
+      json: { sessionId: measurementSessionId, receivedAt: new Date().toISOString() },
+    });
+  });
   await page.route(
     (url) => url.origin === origin && Object.hasOwn(entryResponses, url.pathname),
     async (route) => {

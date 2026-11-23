@@ -51,10 +51,16 @@ export function useWorkflowSession(sessionId: string) {
   const [reload, setReload] = useState(0);
   const [retry, setRetry] = useState<CommandAttempt | null>(null);
   const busy = useRef(false);
+  const canReadAfterHeartbeat = useRef(false);
   const lifetime = useRef<{ active: boolean }>({ active: false });
   const pendingSubmission = useRef<PendingSubmission | null>(null);
   const session = resource.sessionId === sessionId ? resource.session : null;
   const retryable = retry?.sessionId === sessionId ? retry : null;
+  const heartbeatOwnsRead = session?.phase === 'running' && session.pendingJob?.kind !== 'sample';
+
+  useEffect(() => {
+    canReadAfterHeartbeat.current = heartbeatOwnsRead;
+  }, [heartbeatOwnsRead]);
 
   useEffect(() => {
     const scope = { active: true };
@@ -192,7 +198,10 @@ export function useWorkflowSession(sessionId: string) {
       try {
         await repository.heartbeat(sessionId, signal);
       } finally {
-        if (!signal?.aborted) await repository.getSession(sessionId);
+        // A pending measurement has its own poller and deadline.
+        if (!signal?.aborted && canReadAfterHeartbeat.current && !busy.current) {
+          await repository.getSession(sessionId);
+        }
       }
     },
     [repository, sessionId],
