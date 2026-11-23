@@ -1,8 +1,7 @@
 import type { ExperimentSession } from './models';
 
 export function needsEdgeRemeasurement(session: ExperimentSession | null) {
-  const execution = session?.execution;
-  return !!execution && 'needsRemeasurement' in execution && execution.needsRemeasurement === true;
+  return session?.execution?.needsRemeasurement === true;
 }
 
 export function selectEdgeRemeasurement(session: ExperimentSession | null) {
@@ -31,6 +30,10 @@ export function selectEdgeRemeasurement(session: ExperimentSession | null) {
   const canRequest = !!(
     session.phase === 'running' &&
     required &&
+    (session.resumePolicyVersion !== '2.0' ||
+      (session.hold?.resolvedAt &&
+        session.hold.cursorId === cursor.cursorId &&
+        session.hold.nextSampleCommand === 'requestRecoveryRemeasurement')) &&
     !session.pendingJob &&
     !session.execution.pendingVoice &&
     latest?.purpose === 'recoveryCheck' &&

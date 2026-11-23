@@ -16,6 +16,15 @@ export default function RecoveryRoute() {
         key={sessionId}
         sessionId={sessionId}
         onBack={onBack}
+        onContinue={(session) => {
+          if (session.phase === 'running') onBack();
+          else {
+            router.dismissTo({
+              pathname: '/researcher-workflow/[sessionId]/preparation',
+              params: { sessionId, resume: '1' },
+            });
+          }
+        }}
         onRemeasurement={() =>
           router.push({
             pathname: '/researcher-workflow/[sessionId]/remeasurement',
