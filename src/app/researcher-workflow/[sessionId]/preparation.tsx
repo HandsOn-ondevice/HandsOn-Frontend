@@ -1,47 +1,57 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import { useEntrySelection } from '@/features/entry/EntrySelectionProvider';
-import { EdgePreparationScreen } from '@/features/researcher-workflow/screens/EdgePreparationScreen';
+import { AppBar, Button, FeedbackPanel, Screen, StatusBar } from '@/design-system';
+import type { ExperimentSession } from '@/features/researcher-workflow/domain/models';
 import { PreparationScreen } from '@/features/researcher-workflow/screens/PreparationScreen';
-import { useWorkflowSession } from '@/features/researcher-workflow/state/useWorkflowSession';
-import { isEdgeDataEnabled } from '@/lib/edgeApi';
+import { isEdgeWorkflowEnabled } from '@/features/researcher-workflow/state/workflow-repository';
+
+function getContinuationPath(session: ExperimentSession) {
+  switch (session.phase) {
+    case 'running':
+      return '/researcher-workflow/[sessionId]/execution';
+    case 'paused':
+      return '/researcher-workflow/[sessionId]/paused';
+    case 'held':
+      return session.holdReason?.code === 'USER_PAUSED'
+        ? '/researcher-workflow/[sessionId]/paused'
+        : '/researcher-workflow/[sessionId]/recovery';
+    case 'awaitingDeviceCheck':
+    case 'readyToExecute':
+      return '/researcher-workflow/[sessionId]/device-check';
+  }
+}
 
 export default function PreparationRoute() {
-  const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
-  return isEdgeDataEnabled() ? (
-    <EdgePreparationRoute key={sessionId} sessionId={sessionId} />
-  ) : (
-    <MockPreparationRoute sessionId={sessionId} />
-  );
-}
+  const { sessionId, resume } = useLocalSearchParams<{ sessionId: string; resume?: string }>();
+  const edge = isEdgeWorkflowEnabled();
+  const onBack = () =>
+    router.canGoBack() ? router.back() : router.replace(edge ? '/student' : '/researcher-workflow');
+  const onHome = () => router.dismissTo('/student');
 
-function EdgePreparationRoute({ sessionId }: { sessionId: string }) {
-  const { selection } = useEntrySelection();
-  if (selection?.role !== 'student') return <Redirect href="/" />;
-
-  return (
-    <EdgePreparationScreen
-      sessionId={sessionId}
-      token={selection.edgeToken}
-      onBack={() => (router.canGoBack() ? router.back() : router.replace('/student'))}
-      onHome={() => router.dismissTo('/student')}
-    />
-  );
-}
-
-function MockPreparationRoute({ sessionId }: { sessionId: string }) {
-  const { session } = useWorkflowSession(sessionId);
-  if (session?.phase === 'paused')
-    return (
-      <Redirect
-        href={{ pathname: '/researcher-workflow/[sessionId]/paused', params: { sessionId } }}
-      />
-    );
   return (
     <PreparationScreen
       key={sessionId}
       sessionId={sessionId}
-      onBack={() => (router.canGoBack() ? router.back() : router.replace('/researcher-workflow'))}
-      onHome={() => router.dismissTo('/student')}
+      onBack={onBack}
+      onHome={onHome}
+      renderResume={(session) => {
+        if (session.source === 'api' ? resume !== '1' : session.phase !== 'paused') return null;
+        const pathname = getContinuationPath(session);
+        if (pathname) return <Redirect href={{ pathname, params: { sessionId } }} />;
+        if (session.phase === 'completed' || session.phase === 'cancelled') {
+          return (
+            <Screen scroll>
+              <StatusBar />
+              <AppBar title="실험 준비 체크" mode="back" onBack={onBack} />
+              <FeedbackPanel
+                title="이미 종료된 실험 세션이에요."
+                subtitle="연구생 홈에서 진행 중인 실험을 다시 확인해 주세요."
+              />
+              <Button label="연구생 홈으로" onPress={onHome} />
+            </Screen>
+          );
+        }
+        return null;
+      }}
       onDeviceCheck={() =>
         router.push({
           pathname: '/researcher-workflow/[sessionId]/device-check',

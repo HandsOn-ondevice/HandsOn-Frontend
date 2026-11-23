@@ -1,5 +1,5 @@
 import type { UserRole } from '@/design-system';
-import { EdgeApiError, getEdge, isEdgeDataEnabled } from '@/lib/edgeApi';
+import { createEdgeApi, EdgeApiError } from '@/lib/edgeApi';
 
 const kitEnvironmentId = 'kit-lab';
 const kitWorkProfileId = 'kit-distance-v1';
@@ -18,7 +18,16 @@ export interface EntrySelection {
   edgeToken?: string;
 }
 
-export type LoadWorkEnvironments = (token?: string) => Promise<readonly WorkEnvironment[]>;
+type EdgeWorkProfile = WorkEnvironment & { environmentId: string; profileVersion: string };
+
+type EnvironmentRequest = {
+  token?: string;
+  signal?: AbortSignal;
+};
+
+export type LoadWorkEnvironments = (
+  options?: EnvironmentRequest,
+) => Promise<readonly WorkEnvironment[]>;
 
 const demoEnvironments: readonly WorkEnvironment[] = [
   {
@@ -35,28 +44,71 @@ const demoEnvironments: readonly WorkEnvironment[] = [
   },
 ];
 
-export const loadWorkEnvironments: LoadWorkEnvironments = async (token) => {
-  if (isEdgeDataEnabled()) {
-    const [environments, profiles] = await Promise.all([
-      getEdge<readonly WorkEnvironment[]>('/environments', undefined, token),
-      getEdge<readonly { id: string; profileVersion: string; environmentId: string }[]>(
-        '/work-profiles',
-        undefined,
-        token,
-      ),
-    ]);
-    if (!Array.isArray(environments) || !Array.isArray(profiles)) {
-      throw new EdgeApiError('invalid-response');
-    }
-    // Edge v0.1.0 restricts session creation to this work profile and draft creation to kit-lab.
-    const environment = environments.find(({ id }) => id === kitEnvironmentId);
-    const profile = profiles.find(
-      ({ id, environmentId }) => id === kitWorkProfileId && environmentId === kitEnvironmentId,
-    );
-    return environment && profile
-      ? [{ ...environment, workProfile: { id: profile.id, version: profile.profileVersion } }]
-      : [];
+function isWorkEnvironment(value: unknown): value is WorkEnvironment {
+  if (!value || typeof value !== 'object') return false;
+  const { id, name, workType, deviceName } = value as Partial<WorkEnvironment>;
+  return [id, name, workType, deviceName].every(
+    (field) => typeof field === 'string' && field.trim().length > 0,
+  );
+}
+
+function isEdgeWorkProfile(value: unknown): value is EdgeWorkProfile {
+  if (!isWorkEnvironment(value)) return false;
+  const { environmentId, profileVersion } = value as Partial<EdgeWorkProfile>;
+  return [environmentId, profileVersion].every(
+    (field) => typeof field === 'string' && field.trim().length > 0,
+  );
+}
+
+export const loadWorkEnvironments: LoadWorkEnvironments = async (options) => {
+  const baseUrl = process.env.EXPO_PUBLIC_HANDSON_EDGE_BASE_URL?.trim();
+  if (process.env.EXPO_PUBLIC_HANDSON_MAESTRO === '1' || (__DEV__ && !baseUrl)) {
+    return demoEnvironments;
   }
-  if (__DEV__ || process.env.EXPO_PUBLIC_HANDSON_MAESTRO === '1') return demoEnvironments;
-  throw new Error('작업 환경 조회가 아직 연결되지 않았습니다.');
+  return loadEdgeWorkEnvironments({ baseUrl, ...options });
 };
+
+export async function loadEdgeWorkEnvironments({
+  baseUrl,
+  token,
+  signal,
+}: EnvironmentRequest & { baseUrl?: string }): Promise<readonly WorkEnvironment[]> {
+  const edge = createEdgeApi({ baseUrl, token });
+  const health = await edge.get('/system/health', signal);
+  if ((health as { api?: unknown } | null)?.api !== 'alive') {
+    throw new EdgeApiError({ kind: 'invalid-response' });
+  }
+
+  const profiles = await edge.get('/work-profiles', signal);
+  if (!Array.isArray(profiles) || !profiles.every(isEdgeWorkProfile)) {
+    throw new EdgeApiError({ kind: 'invalid-response' });
+  }
+  if (new Set(profiles.map(({ id }) => id)).size !== profiles.length) {
+    throw new EdgeApiError({ kind: 'invalid-response' });
+  }
+
+  const environments = await edge.get('/environments', signal);
+  if (!Array.isArray(environments) || !environments.every(isWorkEnvironment)) {
+    throw new EdgeApiError({ kind: 'invalid-response' });
+  }
+  if (new Set(environments.map(({ id }) => id)).size !== environments.length) {
+    throw new EdgeApiError({ kind: 'invalid-response' });
+  }
+
+  // Edge v0.1.0 accepts this work profile for session creation and kit-lab for drafts.
+  const profile = profiles.find(
+    ({ id, environmentId }) => id === kitWorkProfileId && environmentId === kitEnvironmentId,
+  );
+  const environment = environments.find(({ id }) => id === kitEnvironmentId);
+  if (!profile || !environment) return [];
+  const { id, name, workType, deviceName } = environment;
+  return [
+    {
+      id,
+      name,
+      workType,
+      deviceName,
+      workProfile: { id: profile.id, version: profile.profileVersion },
+    },
+  ];
+}

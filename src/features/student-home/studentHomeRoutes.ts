@@ -9,7 +9,10 @@ export type StudentHomeDestination =
   | { type: 'devices' };
 
 /** Local handoff paths; destination screens and server contracts are separate work. */
-export function getStudentHomeDestination(destination: StudentHomeDestination): Href {
+export function getStudentHomeDestination(
+  destination: StudentHomeDestination,
+  resumeFromEdgeHome = false,
+): Href {
   switch (destination.type) {
     case 'procedures':
       return { pathname: '/procedures', params: { environmentId: destination.environmentId } };
@@ -24,7 +27,9 @@ export function getStudentHomeDestination(destination: StudentHomeDestination): 
       // Resume receives only the existing identity. It must not recreate session settings.
       return {
         pathname: '/researcher-workflow/[sessionId]/preparation',
-        params: { sessionId: destination.sessionId },
+        params: resumeFromEdgeHome
+          ? { sessionId: destination.sessionId, resume: '1' }
+          : { sessionId: destination.sessionId },
       };
     case 'result':
       return {

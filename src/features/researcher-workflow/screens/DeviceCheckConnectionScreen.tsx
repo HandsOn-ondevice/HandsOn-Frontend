@@ -29,19 +29,26 @@ export function DeviceCheckConnectionScreen({
   onBack: () => void;
   onExecution: () => void;
 }) {
-  const { session, loading, pending, error, refresh, execute } = useWorkflowSession(sessionId);
+  const { session, loading, pending, error, refresh, execute, canRetryCommand, retryCommand } =
+    useWorkflowSession(sessionId);
   const controls = useMockDeviceCheckControls();
   const [details, setDetails] = useState(false);
   const state = session ? selectDeviceCheck(session) : null;
   const attempt = state?.latest;
   const definition = session?.procedure.deviceCheck;
-  const locked = pending || loading || state?.checking === true;
+  const locked = pending || loading || canRetryCommand || state?.checking === true;
+  const inactive =
+    session?.source === 'api' &&
+    (session.phase === 'cancelled' || session.phase === 'completed' || session.phase === 'held');
   const subtitle =
     session?.source === 'mock'
       ? 'Mock 환경 · 실제 장비 연결·측정 아님'
       : '장치 서비스 응답 · 점검 시점의 기록';
-  const title =
-    !state || session?.phase === 'preparing'
+  const title = inactive
+    ? session.phase === 'held'
+      ? '실험 세션이 보류되었습니다'
+      : '종료된 실험 세션입니다'
+    : !state || session?.phase === 'preparing'
       ? 'S04 준비 확인이 필요합니다'
       : state.checking
         ? '장치·센서 점검 중입니다'
@@ -83,12 +90,23 @@ export function DeviceCheckConnectionScreen({
               label="점검 상태 다시 불러오기"
               variant="secondary"
               onPress={refresh}
-              disabled={locked}
+              disabled={pending || loading}
             />
           </>
         ) : null}
+        {canRetryCommand ? (
+          <Button
+            label="이전 요청 다시 시도"
+            variant="secondary"
+            disabled={pending || loading}
+            onPress={() => void retryCommand()}
+          />
+        ) : null}
         {session && state ? (
           <>
+            {session.dataOrigin === 'simulation' ? (
+              <AppText variant="caption">Edge 시뮬레이션 · 센서값은 모의 데이터입니다.</AppText>
+            ) : null}
             <FeedbackPanel
               title={title}
               subtitle={
@@ -102,6 +120,9 @@ export function DeviceCheckConnectionScreen({
               tone={attempt?.status === 'failed' ? 'danger' : state.canStart ? 'success' : 'info'}
               icon={attempt?.status === 'failed' ? 'alert' : state.canStart ? 'check' : 'device'}
             />
+            {session.source === 'api' && attempt ? (
+              <AppText variant="caption">점검 ID {attempt.attemptId}</AppText>
+            ) : null}
             {definition ? (
               <DeviceCheckResults sensors={definition.sensors} attempt={attempt} />
             ) : (
@@ -171,9 +192,11 @@ export function DeviceCheckConnectionScreen({
           작업자 확인과 센서 응답은 별도 근거로 기록합니다. 통신 점검 성공 후에만 실험 시작 상태로
           전환할 수 있습니다.
         </AppText>
-        <AppText>
-          Mock 상태는 앱 재시작 시 초기화됩니다. 실제 API·장치 서비스는 연결하지 않았습니다.
-        </AppText>
+        {session?.source === 'mock' ? (
+          <AppText>
+            Mock 상태는 앱 재시작 시 초기화됩니다. 실제 API·장치 서비스는 연결하지 않았습니다.
+          </AppText>
+        ) : null}
         <AppText>
           표시값은 점검 시점의 기록입니다. 실시간 센서 감시·안전 범위 판정은 수행하지 않습니다.
         </AppText>

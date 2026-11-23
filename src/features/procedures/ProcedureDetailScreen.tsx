@@ -16,7 +16,8 @@ interface ProcedureDetailScreenProps {
   procedureId: string;
   approvedVersion: string;
   onBack: () => void;
-  onPrepare: (request: PreparationRequest) => void;
+  onPrepare: (request: PreparationRequest, sessionId?: string) => void;
+  startSession?: (request: PreparationRequest) => Promise<string>;
   repository?: ProcedureRepository;
   edgeToken?: string;
 }
@@ -33,13 +34,15 @@ export function ProcedureDetailScreen({
   approvedVersion,
   onBack,
   onPrepare,
+  startSession,
   repository,
   edgeToken,
 }: ProcedureDetailScreenProps) {
-  const edge = isEdgeDataEnabled();
   const source = useMemo(
-    () => repository ?? (edge ? createEdgeProcedureRepository(edgeToken) : procedureRepository),
-    [edge, edgeToken, repository],
+    () =>
+      repository ??
+      (isEdgeDataEnabled() ? createEdgeProcedureRepository(edgeToken) : procedureRepository),
+    [edgeToken, repository],
   );
   const [attempt, setAttempt] = useState(0);
   const requestKey = JSON.stringify([procedureId, approvedVersion, environment.id, attempt]);
@@ -83,14 +86,26 @@ export function ProcedureDetailScreen({
   }, [approvedVersion, environment.id, procedureId, source, requestKey]);
 
   async function prepare() {
-    if (edge || busy.current || lookup.status !== 'ready' || !lookup.data || currentStart?.blocked)
-      return;
+    if (busy.current || lookup.status !== 'ready' || !lookup.data || currentStart?.blocked) return;
     busy.current = true;
     const currentGeneration = generation.current;
     setStart({ key: requestKey, pending: true });
     const selection = { procedureId, approvedVersion, environmentId: environment.id };
+    const request = Object.freeze({
+      procedureId,
+      approvedVersion,
+      environment: Object.freeze({ ...environment }),
+    });
     try {
-      // Recheck the chosen version; the real session API must validate atomically at creation.
+      if (startSession) {
+        // 세션 생성 API가 선택한 버전의 승인 상태를 검증하고 세션을 생성한다.
+        const sessionId = await startSession(request);
+        if (currentGeneration !== generation.current) return;
+        onPrepare(request, sessionId);
+        setStart({ key: requestKey });
+        return;
+      }
+
       const detail = await source.getDetail(selection);
       if (currentGeneration !== generation.current) return;
       if (!matchesSelection(detail, selection)) {
@@ -100,19 +115,17 @@ export function ProcedureDetailScreen({
         });
         return;
       }
-      onPrepare(
-        Object.freeze({
-          procedureId,
-          approvedVersion,
-          environment: Object.freeze({ ...environment }),
-        }),
-      );
+      onPrepare(request);
       setStart({ key: requestKey });
-    } catch {
+    } catch (reason) {
       if (currentGeneration === generation.current) {
         setStart({
           key: requestKey,
-          error: '시작 가능 여부를 확인하지 못했어요. 다시 시도해 주세요.',
+          error: startSession
+            ? reason instanceof Error
+              ? reason.message
+              : '실험 세션을 시작하지 못했어요. 다시 시도해 주세요.'
+            : '시작 가능 여부를 확인하지 못했어요. 다시 시도해 주세요.',
         });
       }
     } finally {
@@ -128,11 +141,7 @@ export function ProcedureDetailScreen({
       onStart={() => void prepare()}
       starting={currentStart?.pending}
       startError={currentStart?.error}
-      blockedReason={
-        edge
-          ? '이 화면에서는 승인 절차를 조회할 수 있어요. 새 세션 시작은 준비 중이에요.'
-          : currentStart?.blocked
-      }
+      blockedReason={currentStart?.blocked}
     />
   );
 }

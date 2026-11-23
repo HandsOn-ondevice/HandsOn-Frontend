@@ -10,6 +10,7 @@ name: Android 역할별 홈 진입과 시스템 뒤로 가기
 - tapOn: 신규 연구생, 승인된 절차 실행
 - tapOn: '연구실: 연구실을 선택해 주세요'
 - tapOn: 전자회로 실험실
+- assertVisible: '프로필 ID · demo-circuits'
 - takeScreenshot: s00-student
 - tapOn: 설정하고 계속
 - assertVisible:

@@ -6,6 +6,7 @@ import { StudentHomeScreen } from '@/features/student-home/StudentHomeScreen';
 import { getStudentHomeDestination } from '@/features/student-home/studentHomeRoutes';
 import { useStudentHome } from '@/features/student-home/useStudentHome';
 import { loadStudentHome } from '@/features/student-home/studentHomeData';
+import { isEdgeDataEnabled } from '@/lib/edgeApi';
 
 export default function StudentHome() {
   const { selection } = useEntrySelection();
@@ -34,7 +35,9 @@ function SelectedStudentHome({
       environment={environment}
       lookup={lookup}
       onReload={reload}
-      onNavigate={(destination) => router.push(getStudentHomeDestination(destination))}
+      onNavigate={(destination) =>
+        router.push(getStudentHomeDestination(destination, isEdgeDataEnabled()))
+      }
       onChangeEnvironment={() => {
         if (router.canGoBack()) router.back();
         else router.replace('/');

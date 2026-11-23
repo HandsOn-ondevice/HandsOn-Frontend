@@ -1,24 +1,31 @@
-export const edgeBaseUrl = process.env.EXPO_PUBLIC_HANDSON_EDGE_BASE_URL?.trim();
-
-export function isEdgeDataEnabled() {
-  return Boolean(edgeBaseUrl) && process.env.EXPO_PUBLIC_HANDSON_MAESTRO !== '1';
-}
+type EdgeApiErrorInfo = {
+  kind: 'configuration' | 'network' | 'server' | 'invalid-response';
+  status?: number;
+  code?: string;
+};
 
 export class EdgeApiError extends Error {
-  constructor(
-    readonly kind: 'configuration' | 'network' | 'server' | 'invalid-response',
-    readonly status?: number,
-  ) {
+  readonly kind: EdgeApiErrorInfo['kind'];
+  readonly status?: number;
+  readonly code?: string;
+
+  constructor({ kind, status, code }: EdgeApiErrorInfo) {
     super(kind);
     this.name = 'EdgeApiError';
+    this.kind = kind;
+    this.status = status;
+    this.code = code;
   }
 }
 
-function getEdgeOrigin() {
+const REQUEST_TIMEOUT_MS = 10_000;
+
+function parseOrigin(baseUrl: string | undefined) {
   try {
-    const url = new URL(edgeBaseUrl ?? '');
+    const url = new URL(baseUrl ?? '');
     if (
       (url.protocol === 'http:' || url.protocol === 'https:') &&
+      url.host &&
       url.pathname === '/' &&
       !url.search &&
       !url.hash &&
@@ -28,9 +35,77 @@ function getEdgeOrigin() {
       return url.origin;
     }
   } catch {
-    // Invalid URLs are reported as configuration errors.
+    // Report invalid URLs and unsupported URL components as configuration errors.
   }
-  throw new EdgeApiError('configuration');
+  throw new EdgeApiError({ kind: 'configuration' });
+}
+
+function readErrorCode(body: unknown) {
+  const error = (body as { error?: { code?: unknown } } | null)?.error;
+  return typeof error?.code === 'string' && /^[A-Z][A-Z0-9_]{0,63}$/.test(error.code)
+    ? error.code
+    : undefined;
+}
+
+export function createEdgeApi({ baseUrl, token }: { baseUrl?: string; token?: string }) {
+  const origin = parseOrigin(baseUrl);
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  const bearerToken = token?.trim();
+  if (bearerToken) headers.Authorization = `Bearer ${bearerToken}`;
+
+  return {
+    async get(path: `/${string}`, signal?: AbortSignal): Promise<unknown> {
+      const controller = new AbortController();
+      const abort = () => controller.abort();
+      const timer = setTimeout(abort, REQUEST_TIMEOUT_MS);
+      if (signal?.aborted) abort();
+      signal?.addEventListener('abort', abort);
+
+      try {
+        let response: Response;
+        try {
+          response = await fetch(`${origin}/api/v1${path}`, {
+            method: 'GET',
+            credentials: 'omit',
+            redirect: 'error',
+            headers,
+            signal: controller.signal,
+          });
+        } catch {
+          throw new EdgeApiError({ kind: 'network' });
+        }
+
+        let body: unknown;
+        try {
+          body = await response.json();
+        } catch {
+          if (response.ok) {
+            throw new EdgeApiError({
+              kind: controller.signal.aborted ? 'network' : 'invalid-response',
+            });
+          }
+        }
+
+        if (!response.ok) {
+          throw new EdgeApiError({
+            kind: 'server',
+            status: response.status,
+            code: readErrorCode(body),
+          });
+        }
+        return body;
+      } finally {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', abort);
+      }
+    },
+  };
+}
+
+export const edgeBaseUrl = process.env.EXPO_PUBLIC_HANDSON_EDGE_BASE_URL?.trim();
+
+export function isEdgeDataEnabled() {
+  return Boolean(edgeBaseUrl) && process.env.EXPO_PUBLIC_HANDSON_MAESTRO !== '1';
 }
 
 export async function getEdge<T>(
@@ -38,36 +113,8 @@ export async function getEdge<T>(
   query?: Record<string, string>,
   token?: string,
 ): Promise<T> {
-  const url = new URL(`/api/v1${path}`, getEdgeOrigin());
-  for (const [name, value] of Object.entries(query ?? {})) url.searchParams.set(name, value);
-
-  const headers: Record<string, string> = { Accept: 'application/json' };
-  if (token) headers.Authorization = `Bearer ${token}`;
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10_000);
-  try {
-    let response: Response;
-    try {
-      response = await fetch(url.toString(), {
-        method: 'GET',
-        headers,
-        credentials: 'omit',
-        redirect: 'error',
-        signal: controller.signal,
-      });
-    } catch {
-      throw new EdgeApiError('network');
-    }
-    if (!response.ok) throw new EdgeApiError('server', response.status);
-    try {
-      return (await response.json()) as T;
-    } catch {
-      throw new EdgeApiError(controller.signal.aborted ? 'network' : 'invalid-response');
-    }
-  } finally {
-    clearTimeout(timeout);
-  }
+  const requestPath = query ? (`${path}?${new URLSearchParams(query)}` as const) : path;
+  return (await createEdgeApi({ baseUrl: edgeBaseUrl, token }).get(requestPath)) as T;
 }
 
 export function getEdgeErrorMessage(error: unknown) {

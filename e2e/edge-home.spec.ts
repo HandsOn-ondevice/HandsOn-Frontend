@@ -204,7 +204,9 @@ test('S00 → S01 → S04에서 Edge 환경과 기존 준비 세션을 조회한
   expect(session.sessionId).toBe(active.id);
   expect(session.phase).toBe('preparing');
   expect(session.procedure.version).toBe(active.procedureVersion);
-  await expect(page).toHaveURL(`/researcher-workflow/${encodeURIComponent(active.id)}/preparation`);
+  await expect(page).toHaveURL(
+    `/researcher-workflow/${encodeURIComponent(active.id)}/preparation?resume=1`,
+  );
   await expect(page.getByText(`세션 ${active.id}`, { exact: true })).toBeVisible();
   await expect(
     page.getByText(`${session.procedure.title} · v${session.procedure.version}`, { exact: true }),

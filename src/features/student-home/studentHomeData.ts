@@ -54,7 +54,7 @@ export const loadStudentHome: LoadStudentHome = async (environment, edgeToken) =
       !Array.isArray(data.recentResults) ||
       (data.ongoingSession !== null && data.ongoingSession?.environmentId !== environment.id)
     ) {
-      throw new EdgeApiError('invalid-response');
+      throw new EdgeApiError({ kind: 'invalid-response' });
     }
     return data;
   }

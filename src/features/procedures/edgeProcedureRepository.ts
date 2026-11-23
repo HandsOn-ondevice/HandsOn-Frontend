@@ -21,7 +21,7 @@ export function createEdgeProcedureRepository(token?: string): ProcedureReposito
         { environmentId },
         token,
       );
-      if (!Array.isArray(procedures)) throw new EdgeApiError('invalid-response');
+      if (!Array.isArray(procedures)) throw new EdgeApiError({ kind: 'invalid-response' });
       return procedures
         .filter(
           (procedure) =>

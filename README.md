@@ -1,6 +1,6 @@
 # HandsOn Frontend
 
-신규 연구생의 실험 절차 실행과 숙련자의 절차 관리를 지원하는 HandsOn Android 앱입니다. 개발 빌드에서 역할·작업 환경을 선택하면 연구생은 진행 중인 실험·최근 기록과 승인 절차의 목록·상세를 확인하고, 숙련자는 Android 마이크로 절차 설명을 녹음해 원본을 저장할 수 있습니다. **Aurora Lab 디자인 시스템과 26개 공통 컴포넌트**는 개발용 갤러리에서 확인할 수 있습니다. 홈의 작업·결과, 승인 절차 목록·상세, 작업 환경·장치 정보, 갤러리의 센서·음성·차트는 가상의 합성 데이터입니다.
+신규 연구생의 실험 절차 실행과 숙련자의 절차 관리를 지원하는 HandsOn Android 앱입니다. 역할·작업 환경을 선택하면 연구생은 진행 중인 실험·최근 기록과 승인 절차를 확인하고, 숙련자는 Android 마이크로 절차 설명을 녹음해 원본을 저장할 수 있습니다. Edge 주소를 설정하면 환경, 역할별 홈, 연구생 승인 절차와 실험 세션을 서버에서 조회합니다. **Aurora Lab 디자인 시스템과 26개 공통 컴포넌트**는 합성 데이터를 사용하는 개발용 갤러리에서 확인할 수 있습니다.
 
 ## 실행 환경
 
@@ -28,21 +28,31 @@ npm run android
 
 앱은 역할과 작업 환경 선택 화면으로 시작합니다. 개발 빌드에서는 `handson://dev` 또는 개발 웹 서버의 `/dev`에서 갤러리를 열 수 있습니다. 카테고리와 컴포넌트를 선택해 전체 변형과 입력·선택·시트를 확인할 수 있으며 **S06 조합 예제**도 제공합니다. iOS 실행 검증은 현재 범위 밖입니다.
 
+### HandsOn Edge 연결
+
+`.env.example`을 `.env.local`로 복사하고 `EXPO_PUBLIC_HANDSON_EDGE_BASE_URL`에 Android 기기와 브라우저가 접근할 수 있는 Edge 주소를 지정합니다. `http://192.168.1.2:8080`처럼 스킴·호스트·포트까지만 입력한 뒤 Metro를 다시 시작합니다. 앱이 `/api/v1`을 붙여 서버 상태와 작업 환경을 조회합니다. LAN의 HTTP 주소는 Android 개발 빌드에서 사용하고 배포 환경에는 HTTPS 주소를 사용합니다.
+
+Android에서는 Edge와 통신 가능한 네트워크에 기기를 연결하고 개발 빌드를 엽니다. 물리 모바일 브라우저에서는 같은 네트워크에서 `npm run web -- --lan --port 8081`을 실행한 호스트의 주소를 엽니다. Edge 서버의 `HANDSON_CORS_ORIGINS`에는 브라우저 주소창의 스킴·호스트·포트 전체를 등록합니다. 기기에서 이용하는 주소와 브라우저 Origin은 네트워크 환경에 맞게 설정합니다.
+
+역할을 선택하고 **Edge 접속 토큰**에 해당 역할의 토큰을 입력한 뒤 **작업 환경 불러오기**를 누릅니다. 토큰은 앱 메모리에 보관하므로 앱을 다시 열면 입력이 필요합니다. `EXPO_PUBLIC_` 설정은 앱 번들에 포함되므로 토큰을 넣지 않습니다. Edge 주소가 없는 개발 빌드와 Maestro CI는 기존 작업 환경 fixture를 사용합니다.
+
+[API-01 검증 기록](docs/validation/api-01-edge-connection.md)에서 모바일 Playwright 실행 방법과 Android 확인 범위를 확인할 수 있습니다.
+
 ### 앱 진입과 화면 이동
 
 `/`(S00)에서 선택을 마치면 연구생은 `/student`(S01), 숙련자는 `/expert`(E01)로 이동합니다. 선택은 앱 실행 중 메모리에 보관합니다. 연구생 홈은 선택한 환경을 기준으로 진행 중인 작업·승인 절차·최근 기록을 조회하며, 화면 복귀와 앱 활성화 시 다시 불러옵니다. 프로필에서 역할·작업 환경 선택으로 돌아갈 수 있습니다.
 
-개발용 합성 데이터에서 지능형 임베디드·IoT 센서 연구실은 일시정지한 실험과 승인 절차·최근 결과를, 전자회로 실험실은 진행 중 작업과 목록이 없는 상태를 제공합니다. `loadStudentHome`은 개발 빌드 또는 Maestro용 빌드에서만 이 데이터를 반환합니다. 실제 홈 API는 아직 연결하지 않았으며, 일반 배포 빌드에서는 조회 실패와 재시도를 표시합니다.
+Edge 홈은 선택한 환경의 응답을 표시하며 조회 실패 시 다시 시도할 수 있습니다. fixture의 지능형 임베디드·IoT 센서 연구실은 일시정지한 실험과 승인 절차·최근 결과를, 전자회로 실험실은 진행 중 작업과 목록이 없는 상태를 제공합니다.
 
-연구생 홈의 승인된 절차 또는 **실험** 탭에서 `/procedures?environmentId=...`(S02)로 이동합니다. 목록에서 절차를 선택해 확인하면 `/procedures/[procedureId]`(S03)에서 선택한 승인 버전의 상세를 볼 수 있습니다.
+연구생 홈의 **전체 보기** 또는 **실험** 탭에서 `/procedures?environmentId=...`(S02)로 이동합니다. 목록에서 절차를 선택하면 `/procedures/[procedureId]`(S03)에서 선택한 승인 버전의 상세를 볼 수 있습니다. Edge 홈의 승인 절차 카드는 해당 승인 버전의 상세로 바로 연결됩니다.
 
-S03의 **이 버전으로 준비 시작**은 선택한 절차·승인 버전의 실행 가능 여부를 다시 확인합니다. 개발·Maestro 빌드에서는 `/procedures/preparation`에서 전달한 절차 식별자·승인 버전·작업 환경을 확인할 수 있습니다. 실제 절차 API, 세션 생성 시점과 A의 `/researcher-workflow/[sessionId]/preparation` 연결은 계약 확정 후 연동합니다. [S02–S03 검증 기록](docs/validation/s02-s03-procedures.md)에 현재 전달 범위와 재현 방법을 정리했습니다.
+Edge에서 S03의 **이 버전으로 준비 시작**을 누르면 선택한 승인 버전으로 세션을 생성하고 반환된 ID로 준비 화면을 엽니다. fixture에서는 `/procedures/preparation`에서 절차 식별자·승인 버전·작업 환경을 확인할 수 있습니다. [Edge 세션 검증 기록](docs/validation/api-04-edge-session.md) · [S02–S03 fixture 검증 기록](docs/validation/s02-s03-procedures.md)
 
-최근 결과는 `/results/[resultId]?sessionId=...`, 이력과 장치는 `/history`, `/devices`로 연결합니다. 이 경로들은 준비 중 안내와 홈 복귀를 제공하는 인계 지점이며, 결과·이력 경로와 홈 응답 계약은 A·서버 담당과 확정해야 합니다. 이어하기는 기존 세션 ID를 `/researcher-workflow/[sessionId]/preparation`에 전달합니다.
+최근 결과는 `/results/[resultId]?sessionId=...`, 이력과 장치는 `/history`, `/devices`로 연결합니다. 세 경로에서 준비 중 안내와 홈 복귀를 제공합니다. 이어하기는 기존 세션을 같은 ID로 조회해 서버 상태에 맞는 화면을 엽니다.
 
-숙련자 홈은 합성 데이터로 초안·승인 절차, 검토 대기·완료·재측정 요청 결과와 최근 작업을 표시합니다. 하단 절차·현황에서 상태별 목록을 확인하고, 작업에서 돌아오거나 새로고침하면 현황을 다시 조회합니다. [E01 검증 기록](docs/validation/e01-expert-home.md)에 홈 화면 확인 방법을 정리했습니다.
+숙련자 홈은 Edge 응답의 초안·승인 절차와 결과 현황을 표시합니다. 하단 절차·현황에서 상태별 목록을 확인하고, 작업에서 돌아오거나 새로고침하면 현황을 다시 조회합니다. [Edge 홈 검증 기록](docs/validation/api02-edge-home.md) · [E01 fixture 검증 기록](docs/validation/e01-expert-home.md)
 
-숙련자 홈에서 결과를 선택하면 `/expert/results/[resultId]?procedureId=...`(E07)에서 제출된 버전, 조건별 차트와 근거를 확인할 수 있습니다. 검토 의견과 함께 결과를 완료하거나 재측정을 요청하면 숙련자 홈에도 처리 상태가 반영됩니다. 개발용 모의 저장소의 변경은 앱 실행 중에만 유지됩니다. [E07 확인 방법과 연동 범위](docs/validation/e07-expert-review.md)를 참고하세요.
+숙련자 홈에서 결과를 선택하면 `/expert/results/[resultId]?procedureId=...`(E07)로 이동합니다. Edge에서는 홈 응답에 포함된 결과 요약을 볼 수 있습니다. fixture에서는 조건별 근거를 확인하고 결과 검토나 재측정 요청을 진행할 수 있습니다. [E07 확인 방법](docs/validation/e07-expert-review.md)
 
 숙련자 홈의 **새 절차 음성으로 만들기**에서 `/expert/procedures/new`(E02)로 이동합니다. 녹음을 종료하면 유효한 원본을 기기에 저장하고 `/transcription?recordingId=...`(E03)에서 다시 읽습니다. **최근 녹음 다시 열기**에서도 같은 작업 환경의 최신 원본과 편집본을 확인할 수 있습니다. `EXPO_PUBLIC_HANDSON_EDGE_BASE_URL`을 설정하면 E03에서 숙련자 토큰을 입력해 Edge에 업로드하고 서버 전사문을 확인·확정할 수 있습니다. Edge를 설정하지 않은 개발 빌드 및 Maestro 빌드에서는 모의 전사·초안 화면을 제공합니다. [E02 녹음](docs/validation/e02-recording.md) · [E03 Edge 연동과 검증](docs/validation/e03-transcription.md)
 
@@ -129,7 +139,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-테스트가 `http://localhost:8081`의 Expo 웹 서버를 자동으로 시작하고 종료합니다. 같은 저장소의 개발 서버가 이미 해당 주소에서 실행 중이면 재사용합니다. 앱을 먼저 열어 확인하려면 별도 터미널에서 아래 명령을 실행하고 브라우저로 해당 주소에 접속합니다.
+테스트가 `http://localhost:8081`의 Expo 웹 서버를 자동으로 시작하고 종료합니다. 같은 저장소의 개발 서버가 이미 해당 주소에서 실행 중이면 재사용합니다. 그 서버가 Edge에 연결되어 있다면 기본 fixture 검사는 `EXPO_E2E_PORT=8082 npm run test:e2e`처럼 비어 있는 포트에서 실행합니다. 앱을 먼저 열어 확인하려면 별도 터미널에서 아래 명령을 실행하고 브라우저로 해당 주소에 접속합니다.
 
 ```sh
 npm run web -- --localhost --port 8081

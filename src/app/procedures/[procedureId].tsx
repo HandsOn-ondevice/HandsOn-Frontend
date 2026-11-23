@@ -2,6 +2,10 @@ import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEntrySelection } from '@/features/entry/EntrySelectionProvider';
 import { ProcedureDetailScreen } from '@/features/procedures/ProcedureDetailScreen';
 import { usePreparationHandoff } from '@/features/procedures/PreparationHandoffProvider';
+import {
+  isEdgeWorkflowEnabled,
+  startApprovedEdgeSession,
+} from '@/features/researcher-workflow/state/workflow-repository';
 
 export default function Procedure() {
   const router = useRouter();
@@ -24,18 +28,32 @@ export default function Procedure() {
     return <Redirect href="/procedures" />;
   }
 
+  const { edgeToken } = selection;
+
   return (
     <ProcedureDetailScreen
       key={JSON.stringify([procedureId, approvedVersion, environmentId])}
       environment={selection.environment}
-      edgeToken={selection.edgeToken}
+      edgeToken={edgeToken}
       procedureId={procedureId}
       approvedVersion={approvedVersion}
       onBack={() => {
         if (router.canGoBack()) router.back();
         else router.replace('/procedures');
       }}
-      onPrepare={(request) => {
+      startSession={
+        isEdgeWorkflowEnabled()
+          ? async (request) => (await startApprovedEdgeSession(request, edgeToken)).sessionId
+          : undefined
+      }
+      onPrepare={(request, sessionId) => {
+        if (sessionId) {
+          router.push({
+            pathname: '/researcher-workflow/[sessionId]/preparation',
+            params: { sessionId },
+          });
+          return;
+        }
         setRequest(request);
         router.push('/procedures/preparation');
       }}

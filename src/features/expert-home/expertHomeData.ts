@@ -135,7 +135,7 @@ export const loadExpertHome: LoadExpertHome = async (environmentId, edgeToken) =
       !Array.isArray(data.results) ||
       !Array.isArray(data.recentWork)
     ) {
-      throw new EdgeApiError('invalid-response');
+      throw new EdgeApiError({ kind: 'invalid-response' });
     }
     return data;
   }
