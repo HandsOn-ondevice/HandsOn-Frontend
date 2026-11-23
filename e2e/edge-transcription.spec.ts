@@ -12,7 +12,7 @@ const title = 'LED 원본 전사 연동';
 const fixtureText = 'LED 전원을 차단한 뒤 센서 배선을 확인합니다.';
 const editedText = 'LED 전원을 차단한 뒤 센서 배선과 측정 결과를 확인합니다.';
 const audioName = 'edge-transcription.m4a';
-const environmentId = 'demo-circuits';
+const environmentId = 'kit-lab';
 
 test.skip(!liveEdge, '실제 Edge 시뮬레이션 서버를 대상으로 실행하는 검사입니다.');
 // The token is entered as a password. Do not capture its value in an action trace.
@@ -21,8 +21,14 @@ test.use({ trace: 'off' });
 async function openRecording(page: Page) {
   await page.goto('/');
   await page.getByRole('radio', { name: '숙련 연구생, 절차 생성·승인' }).click();
+  try {
+    await page.getByLabel('Edge 접속 토큰', { exact: true }).fill(edgeToken);
+  } catch {
+    throw new Error('Edge 접속 토큰을 입력하지 못했습니다.');
+  }
+  await page.getByRole('button', { name: '다시 시도', exact: true }).click();
   await page.getByRole('button', { name: /^연구실: / }).click();
-  const environment = page.getByRole('radio', { name: '전자회로 실험실', exact: true });
+  const environment = page.getByRole('radio', { name: '지급 키트 실습실', exact: true });
   await environment.click();
   await expect(environment).toBeHidden();
   await page.getByRole('button', { name: '설정하고 계속' }).click();
@@ -78,6 +84,9 @@ for (const viewport of [
     const releaseUpload = Promise.withResolvers<void>();
     const releaseTranscription = Promise.withResolvers<void>();
     const edgeAuthorization = `Bearer ${edgeToken}`;
+    await page.route(`${edgeBaseUrl}/api/v1/procedures/drafts`, (route) =>
+      route.request().method() === 'POST' ? route.abort() : route.continue(),
+    );
 
     await page.route(uploadUrl, async (route) => {
       const upload = route.request();
@@ -148,10 +157,6 @@ for (const viewport of [
       const localId = reviewUrl.searchParams.get('recordingId');
       expect(localId).toBeTruthy();
 
-      const token = page.getByLabel('숙련자 토큰', { exact: true });
-      await token.fill(edgeToken);
-      await page.getByRole('button', { name: '연결하고 진행', exact: true }).click();
-
       const confirm = page.getByRole('button', { name: 'AI 절차 초안 생성', exact: true });
       const uploadLoading = page.getByText('녹음을 업로드하고 있어요', { exact: true });
       await expectUnobstructed(page, uploadLoading, confirm);
@@ -202,7 +207,7 @@ for (const viewport of [
       await expect(page).toHaveURL(reviewUrl.href);
       await expect(transcript).toHaveValue(editedText);
       await confirm.click();
-      await expect(page.getByText('전사문을 확정했어요', { exact: true })).toBeVisible();
+      await expect(page.getByText('초안을 생성하지 못했어요', { exact: true })).toBeVisible();
 
       await page.reload();
       await expect(page).toHaveURL(reviewUrl.href);

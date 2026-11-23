@@ -4,11 +4,23 @@ const port = process.env.EXPO_E2E_PORT ?? '8081';
 const host = process.env.EXPO_E2E_HOST ?? 'localhost';
 const baseURL = `http://${host}:${port}`;
 const verifyEdge = process.env.EXPO_E2E_EDGE === '1';
-const artifactsDir = verifyEdge ? 'artifacts/playwright/edge' : 'artifacts/playwright';
+const verifyEdgeDrafts = process.env.HANDSON_E2E_EDGE_DRAFTS === '1';
+const verifyEdgeTranscription = process.env.HANDSON_E2E_LIVE_EDGE === '1';
+const artifactsDir = verifyEdgeDrafts
+  ? 'artifacts/playwright/edge-drafts'
+  : verifyEdge
+    ? 'artifacts/playwright/edge'
+    : 'artifacts/playwright';
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: verifyEdge ? 'edge-connection.spec.ts' : undefined,
+  testMatch: verifyEdgeDrafts
+    ? 'edge-drafts.spec.ts'
+    : verifyEdge
+      ? 'edge-connection.spec.ts'
+      : verifyEdgeTranscription
+        ? 'edge-transcription.spec.ts'
+        : undefined,
   testIgnore: verifyEdge ? undefined : 'edge-connection.spec.ts',
   outputDir: `${artifactsDir}/test-results`,
   reporter: [['list'], ['html', { outputFolder: `${artifactsDir}/report`, open: 'never' }]],
@@ -24,7 +36,11 @@ export default defineConfig({
     env: {
       CI: '1',
       HANDSON_E2E_EDGE_TOKEN: '',
-      ...(!verifyEdge && { EXPO_PUBLIC_HANDSON_EDGE_BASE_URL: '' }),
+      HANDSON_E2E_EXPERT_TOKEN: '',
+      HANDSON_E2E_OPERATOR_TOKEN: '',
+      ...(!verifyEdge &&
+        !verifyEdgeDrafts &&
+        !verifyEdgeTranscription && { EXPO_PUBLIC_HANDSON_EDGE_BASE_URL: '' }),
     },
   },
 });
