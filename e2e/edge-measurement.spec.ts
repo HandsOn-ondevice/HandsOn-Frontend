@@ -14,7 +14,8 @@ import {
 const fixtureOrigin = 'http://127.0.0.1:19996';
 const initial = edgeMeasurementSession();
 const sessionPath = '/api/v1/sessions/' + initial.sessionId;
-const executionPath = '/researcher-workflow/' + initial.sessionId + '/execution';
+const sessionRoute = '/researcher-workflow/' + initial.sessionId;
+const executionPath = sessionRoute + '/execution';
 
 test.use({ viewport: { width: 360, height: 800 }, isMobile: true, hasTouch: true });
 test.skip(
@@ -33,6 +34,7 @@ async function pressTwice(button: Locator) {
 test('displays Edge measurements, replays the same request, and completes each server cursor once', async ({
   page,
 }) => {
+  await page.clock.install();
   const first = sampleFor();
   const second = sampleFor(nextCursor, 'server-sample-86', 19.2);
   const validFirst = { ...first, status: 'valid' } as const;
@@ -153,6 +155,30 @@ test('displays Edge measurements, replays the same request, and completes each s
   await pressTwice(complete);
   await expect(page.getByText('회차 ID ' + nextCursor.cursorId)).toBeVisible();
   await expect(page.getByText('조건 먼 거리 · 1회차')).toBeVisible();
+  await page.getByRole('button', { name: '더 보기', exact: true }).click();
+  await expect(page).toHaveURL(sessionRoute + '/session-menu');
+  await page.getByRole('button', { name: '장치 상태 확인', exact: true }).click();
+  await expect(page).toHaveURL(sessionRoute + '/device-status');
+  const deviceStatus = page.getByTestId('session-device-status-screen');
+  await expect(
+    deviceStatus.getByText('모의 장치 · 저장된 실행 응답입니다.', { exact: true }),
+  ).toBeVisible();
+  await expect(deviceStatus.getByText('키트 연결 응답 확인', { exact: true })).toBeVisible();
+  await expect(deviceStatus.getByText('23.7 cm', { exact: true })).toBeVisible();
+  const heartbeat = page.waitForRequest(
+    (request) =>
+      request.method() === 'POST' && request.url() === fixtureOrigin + sessionPath + '/heartbeat',
+  );
+  await page.clock.fastForward(10_000);
+  await heartbeat;
+  await deviceStatus.getByRole('button', { name: '뒤로가기', exact: true }).click();
+  await expect(page).toHaveURL(sessionRoute + '/session-menu');
+  await expect(page.getByText('실험 작업 메뉴', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '현재 작업으로 돌아가기', exact: true }).click();
+  await expect(page).toHaveURL(executionPath);
+  await expect(page.getByText('회차 ID ' + nextCursor.cursorId)).toBeVisible();
+  await expect(page.getByText('조건 먼 거리 · 1회차')).toBeVisible();
+  expect(writes).toHaveLength(4);
   await expect(complete).toBeDisabled();
   await pressTwice(sample);
   await expect(page.getByText('측정 시도 ID ' + second.attemptId)).toBeVisible();

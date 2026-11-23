@@ -115,6 +115,15 @@ for (const viewport of [
     });
     await page.getByRole('heading', { name: '실행 중 장치 상태' }).scrollIntoViewIfNeeded();
     await page.screenshot({ path: testInfo.outputPath(`device-status-${viewport.width}-top.png`) });
+    await deviceScreen.getByRole('button', { name: '뒤로가기', exact: true }).click();
+    await expect(page).toHaveURL(`${route}/session-menu`);
+    await expect(page.getByText('실험 작업 메뉴', { exact: true })).toBeVisible();
+    await returnToExecution(page, route);
+    await expect(page.getByText('유효 측정 7 / 15회', { exact: true })).toBeVisible();
+    await expect(page.getByText('“50% 조건 2회차 완료했어”', { exact: true })).toBeVisible();
+    await menu(page);
+    await page.getByRole('button', { name: '장치 상태 확인', exact: true }).click();
+    await expect(page).toHaveURL(`${route}/device-status`);
     await returnToExecution(page, route);
     await expect(complete).toBeDisabled();
     await expect(page.getByText('“50% 조건 2회차 완료했어”', { exact: true })).toBeVisible();

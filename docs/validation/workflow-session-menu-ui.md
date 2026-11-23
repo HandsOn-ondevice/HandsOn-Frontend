@@ -104,3 +104,11 @@ Jest·정적 검사 로그는 임시 검사 폴더의 `logs/guard-final-*.log`, 
 **S11 BottomSheet 닫힘 생명주기 결함은 간헐적 미해결 사항이다.** 이전 반복 검사와 별도 브라우저 진단에서 닫힌 시트가 화면 밖에 남고, Tab으로 내부 버튼에 포커스가 이동하면서 다시 화면 안에 들어오는 현상이 재현됐다. 최신 전체 검사 통과는 이 결함의 해결을 뜻하지 않는다. 정확한 내부 종료·포털 해제 콜백 실패 원인은 미확정이며, 제품 수정이나 assertion 완화로 해결한 것이 아니다. S01의 고정 표시 데이터 불일치와는 별개의 문제이고, 공용 BottomSheet 담당자와 종료·포커스 계약을 검토해야 한다. 기존 trace와 진단 근거는 `reports/two-failures-20261120-5i_lvwl9/`, `reports/sheet-contract-20261120-qo3jtn47/`에 남아 있다.
 
 원본 저장소의 오래된 Expo Router 생성 타입 오류 44건은 검사 복사본의 TypeScript 통과와 구분한다. 원본 생성 파일을 변경하지 않았으며, 기존 Expo Doctor 19/20 의존성 문제도 이번 작업에서 해결하지 않았다. Android 네이티브 실행·Maestro와 GitHub CI는 미검증이다.
+
+## 2026-11-24 장치 상태 조회와 작업 메뉴 복귀
+
+[이슈 #71](https://github.com/HandsOn-ondevice/HandsOn-Frontend/issues/71)의 회귀를 Node 24.3.0과 Chromium에서 확인했다. 수정 전 `0c0981c`에 같은 Playwright 단언을 적용했을 때, Edge 응답 fixture에서는 메뉴의 `장치 상태 확인` 버튼을 찾지 못했고 Mock에서는 장치 상태의 `뒤로가기`가 기대 경로 `/session-menu` 대신 `/execution`을 열었다.
+
+- 수정 후 `researcher-workflow-session-menu.spec.ts` 4개와 `edge-measurement.spec.ts` 2개가 통과했다. Mock은 360px·412px에서 작업 메뉴로 돌아와 기존 조건·회차와 완료 기록을 유지했다. Edge 응답 fixture는 저장된 측정값 표시, 장치 화면에서 heartbeat 갱신, 같은 조건·회차로 복귀하는 동안 추가 세션 명령이 없음을 확인했다.
+- Android 사전 검증 시나리오 `session-device-status-android.yaml`은 Mock의 저장된 50% 조건 3회차를 재개하고, 장치 화면에서 2회차의 마지막 측정값을 확인한 뒤 메뉴를 거쳐 3회차로 복귀한다. Android 실행 결과는 해당 PR의 Maestro 사전 실행 링크에서 확인할 수 있다.
+- 실제 Edge 장치 연결과 실측값은 확인하지 않았다.
