@@ -23,5 +23,9 @@ export interface WorkflowRepository {
     command: WorkflowCommand,
     context: CommandContext,
   ): Promise<ExperimentSession>;
-  subscribe(sessionId: string, listener: (session: ExperimentSession) => void): () => void;
+  subscribe(
+    sessionId: string,
+    listener: (session: ExperimentSession) => void,
+    onReadError?: (error: unknown) => void,
+  ): () => void;
 }

@@ -4,9 +4,9 @@ import type { ExperimentSession } from './models';
 import type { RecoveryAttempt } from './recovery';
 import type { VoiceResolution } from './voice-clarification';
 
-/** Mock 초안. 팀의 승인된 전체 단계 번호·안전 기준·API DTO를 뜻하지 않는다. */
+/** 기존 Mock 초안과 Edge 승인 절차의 실행 순서에 공통으로 필요한 표시 정보. */
 export interface ExecutionDefinition {
-  readonly provenance: 'mock-draft';
+  readonly provenance: 'mock-draft' | 'approved';
   readonly profileVersion: string;
   readonly settlingSeconds: number;
   readonly conditions: readonly {

@@ -129,6 +129,12 @@ export function validateDiagnostics(
 
 export function selectDeviceCheck(session: ExperimentSession) {
   const latest = session.deviceChecks.at(-1);
+  const checking =
+    latest?.status === 'checking' &&
+    (session.source === 'mock' ||
+      (session.phase === 'awaitingDeviceCheck' &&
+        session.pendingJob?.kind === 'deviceCheck' &&
+        session.pendingJob.attemptId === latest.attemptId));
   const preparationComplete = session.procedure.preparation
     .filter((item) => item.requiredForDeviceCheck)
     .every((item) => session.checks.some((check) => check.id === item.id && check.checked));
@@ -149,12 +155,12 @@ export function selectDeviceCheck(session: ExperimentSession) {
     );
   return {
     latest,
-    checking: latest?.status === 'checking',
+    checking,
     preparationComplete,
     canInspect:
       preparationComplete &&
       (session.phase === 'awaitingDeviceCheck' || session.phase === 'readyToExecute') &&
-      latest?.status !== 'checking' &&
+      !checking &&
       !!session.procedure.deviceCheck,
     canStart: session.phase === 'readyToExecute' && passed,
     executionStarted: session.phase === 'running' && passed,
