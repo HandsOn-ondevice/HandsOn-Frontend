@@ -1,0 +1,150 @@
+appId: com.handson.frontend
+name: Android 단계별 기준과 오류 규칙 저장 및 복원
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: '연구실: 연구실을 선택해 주세요'
+    timeout: 30000
+- tapOn: 숙련 연구생, 절차 생성·승인
+- tapOn: '연구실: 연구실을 선택해 주세요'
+- tapOn: 전자회로 실험실
+- tapOn: 설정하고 계속
+- scrollUntilVisible:
+    element:
+      text: 'LED 출력 특성 측정 초안.*'
+    direction: DOWN
+- tapOn: 'LED 출력 특성 측정 초안.*'
+- extendedWaitUntil:
+    visible: 기준값 검토
+    timeout: 10000
+- tapOn: 기준값 검토
+- extendedWaitUntil:
+    visible: 기준값과 오류 규칙 편집
+    timeout: 10000
+- assertVisible: '.*전원 인가와 범위 확인.*'
+
+- scrollUntilVisible:
+    element:
+      id: step-criteria-voltage-min
+    direction: DOWN
+- tapOn:
+    id: step-criteria-voltage-min
+- inputText: '4.9'
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: step-criteria-voltage-max
+    direction: DOWN
+- tapOn:
+    id: step-criteria-voltage-max
+- inputText: '5.1'
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: step-criteria-overcurrent-limit
+    direction: DOWN
+- tapOn:
+    id: step-criteria-overcurrent-limit
+- inputText: '240'
+- hideKeyboard
+
+- scrollUntilVisible:
+    element:
+      id: step-criteria-verified
+    direction: UP
+- tapOn:
+    id: step-criteria-verified
+- scrollUntilVisible:
+    element:
+      id: step-criteria-hold-rule
+    direction: DOWN
+- tapOn:
+    id: step-criteria-hold-rule
+- inputText: Hold the step
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: step-criteria-recovery-rule
+    direction: DOWN
+- tapOn:
+    id: step-criteria-recovery-rule
+- inputText: Check again
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: step-criteria-manual-check
+    direction: DOWN
+- tapOn:
+    id: step-criteria-manual-check
+- inputText: Check wiring
+- hideKeyboard
+- tapOn:
+    id: step-criteria-save
+- extendedWaitUntil:
+    visible: 승인 검토
+    timeout: 10000
+- assertVisible: 기준을 저장했습니다
+- assertVisible: LED 출력 특성 측정 초안
+- assertVisible: 실장비 확인 기록됨
+- takeScreenshot: e05-approval-handoff
+
+- tapOn: 뒤로가기
+- assertVisible: 기준값과 오류 규칙 편집
+- tapOn: 뒤로가기
+- assertVisible: AI 절차 초안
+- tapOn: 기준값 검토
+- extendedWaitUntil:
+    visible: 기준값과 오류 규칙 편집
+    timeout: 10000
+- assertVisible: '.*전원 인가와 범위 확인.*'
+- scrollUntilVisible:
+    element:
+      id: step-criteria-voltage-min
+    direction: DOWN
+- assertVisible:
+    id: step-criteria-voltage-min
+    text: '4[.]9'
+- scrollUntilVisible:
+    element:
+      id: step-criteria-voltage-max
+    direction: DOWN
+- assertVisible:
+    id: step-criteria-voltage-max
+    text: '5[.]1'
+- scrollUntilVisible:
+    element:
+      id: step-criteria-overcurrent-limit
+    direction: DOWN
+- assertVisible:
+    id: step-criteria-overcurrent-limit
+    text: '240'
+- scrollUntilVisible:
+    element:
+      id: step-criteria-hold-rule
+    direction: DOWN
+- assertVisible:
+    id: step-criteria-hold-rule
+    text: Hold the step
+- scrollUntilVisible:
+    element:
+      id: step-criteria-recovery-rule
+    direction: DOWN
+- assertVisible:
+    id: step-criteria-recovery-rule
+    text: Check again
+- scrollUntilVisible:
+    element:
+      id: step-criteria-manual-check
+    direction: DOWN
+- assertVisible:
+    id: step-criteria-manual-check
+    text: Check wiring
+- takeScreenshot: e05-restored-criteria
+
+# Persisting the reopened form without edits must preserve its equipment confirmation.
+- tapOn:
+    id: step-criteria-save
+- extendedWaitUntil:
+    visible: 실장비 확인 기록됨
+    timeout: 10000
