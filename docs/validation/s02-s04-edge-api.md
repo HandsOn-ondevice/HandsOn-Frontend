@@ -19,15 +19,16 @@ npm run test:e2e -- --config playwright.procedures.config.ts
 
 ## 로컬 Edge API를 사용한 확인
 
-360×800 Chromium에서 Expo 웹 `http://localhost:8083`을 실행해 격리된 SQLite를 사용하는 Edge 서버 `http://127.0.0.1:18085`에 연결했다. 백엔드 커밋은 `88b8b81bd42b7aca3f8cec59890e45adf67efff2`다. 개발용 토큰을 시작 화면에 입력해 환경 목록을 조회한 뒤 **실험** 탭으로 진입했다. 아래 표는 브라우저가 주고받은 요청과 응답의 주요 필드다.
+360×800 Chromium에서 Expo 웹 `http://localhost:8083`을 실행해 격리된 SQLite를 사용하는 Edge 서버 `http://127.0.0.1:18085`에 연결했다. 백엔드 커밋은 `88b8b81bd42b7aca3f8cec59890e45adf67efff2`다. 시작 화면의 **Edge 접속 토큰**에 개발용 토큰을 입력해 작업 프로필을 조회한 뒤 **실험** 탭으로 진입했다. 아래 표는 브라우저가 주고받은 요청과 응답의 주요 필드다.
 
 | 요청                                                            | 응답과 화면 확인                                                                                                                                                                                                                                                |
 | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/v1/environments`                                      | 토큰 입력 전 401, 입력 후 200. 응답의 `kit-lab`을 선택했다.                                                                                                                                                                                                     |
+| `GET /api/v1/system/health`                                     | 200. `api`가 `alive`인지 확인했다.                                                                                                                                                                                                                              |
+| `GET /api/v1/work-profiles`                                     | 토큰 입력 전 401, 입력 후 200. 프로필 ID `kit-distance-v1`과 환경 ID `kit-lab`을 확인했다.                                                                                                                                                                      |
 | `GET /api/v1/procedures?environmentId=kit-lab`                  | 200. 목록에서 `kit-distance`의 `1.0.0`을 선택했다.                                                                                                                                                                                                              |
 | `GET /api/v1/procedures/kit-distance?version=1.0.0`             | 200. `procedureId`는 `kit-distance`, `version`은 `1.0.0`이었다. 승인자 `seed-expert`와 예상 소요 `약 5분`을 화면에서 확인했다.                                                                                                                                  |
-| `POST /api/v1/sessions`                                         | 201. 요청 본문에는 `procedureId: kit-distance`, `procedureVersion: 1.0.0`, `workProfileId: kit-distance-v1`, `operatorId: operator-01`을 보냈다. `requestId`와 `Idempotency-Key`는 동일했다. 응답 `sessionId`는 `session-d48e4d3ca90642c2a68d4c6ae1ac0e9f`였다. |
-| `GET /api/v1/sessions/session-d48e4d3ca90642c2a68d4c6ae1ac0e9f` | 200. 같은 세션 ID로 `/researcher-workflow/[sessionId]/preparation`을 열었다. **더 보기**의 **실험 준비 정보**에 **키트 거리 확인 절차 · v1.0.0**이 표시됐다. `dataOrigin`은 `simulation`이었다.                                                                 |
+| `POST /api/v1/sessions`                                         | 201. 요청 본문에는 `procedureId: kit-distance`, `procedureVersion: 1.0.0`, `workProfileId: kit-distance-v1`, `operatorId: operator-01`을 보냈다. `requestId`와 `Idempotency-Key`는 동일했다. 응답 `sessionId`는 `session-c6f96898c56140ef9ca0aa0a595c057b`였다. |
+| `GET /api/v1/sessions/session-c6f96898c56140ef9ca0aa0a595c057b` | 200. 같은 세션 ID로 `/researcher-workflow/[sessionId]/preparation`을 열었다. **더 보기**의 **실험 준비 정보**에 **키트 거리 확인 절차 · v1.0.0**이 표시됐다. `dataOrigin`은 `simulation`이었다.                                                                 |
 
 같은 백엔드를 별도 DB에서 확인했을 때 동일 키로 두 번째 세션 생성 요청도 201과 같은 `sessionId`를 반환했다. 두 번째 응답 헤더는 `X-Idempotent-Replay: true`였으며, 목록에 남은 세션은 1개였다.
 

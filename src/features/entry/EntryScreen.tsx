@@ -32,7 +32,8 @@ import {
 } from './entryEnvironment';
 
 type EnvironmentLookup =
-  | { status: 'loading' | 'error' | 'unauthorized' }
+  | { status: 'loading' | 'editing-token' }
+  | { status: 'error'; error?: EdgeApiError }
   | { status: 'ready'; environments: readonly WorkEnvironment[] };
 
 interface EntryScreenProps {
@@ -41,6 +42,26 @@ interface EntryScreenProps {
 }
 
 const roles = ['student', 'expert'] as const;
+
+function isAuthError(error?: EdgeApiError) {
+  return error?.kind === 'server' && (error.status === 401 || error.status === 403);
+}
+
+function lookupErrorTitle(error?: EdgeApiError) {
+  if (isAuthError(error)) return 'Edge 서버 인증을 확인해 주세요.';
+  switch (error?.kind) {
+    case 'configuration':
+      return 'Edge 서버 주소를 확인해 주세요.';
+    case 'network':
+      return 'Edge 서버에 연결할 수 없어요.';
+    case 'server':
+      return 'Edge 서버에서 작업 환경을 조회하지 못했어요.';
+    case 'invalid-response':
+      return 'Edge 서버 응답을 읽을 수 없어요.';
+    default:
+      return '작업 환경을 불러오지 못했어요.';
+  }
+}
 
 export function EntryScreen({
   onContinue,
@@ -53,38 +74,39 @@ export function EntryScreen({
   const [tokenInput, setTokenInput] = useState('');
 
   useEffect(() => {
-    let active = true;
     const controller = new AbortController();
-    void loadEnvironments({ token: attempt.token, signal: controller.signal }).then(
+    const { signal } = controller;
+    void loadEnvironments({ token: attempt.token, signal }).then(
       (environments) => {
-        if (active) setLookup({ status: 'ready', environments });
+        if (!signal.aborted) setLookup({ status: 'ready', environments });
       },
       (error: unknown) => {
-        if (active) {
-          setLookup({
-            status:
-              error instanceof EdgeApiError && error.status === 401 ? 'unauthorized' : 'error',
-          });
+        if (!signal.aborted) {
+          setLookup({ status: 'error', error: error instanceof EdgeApiError ? error : undefined });
         }
       },
     );
-    return () => {
-      active = false;
-      controller.abort();
-    };
+    return () => controller.abort();
   }, [attempt, loadEnvironments]);
 
   const environments = lookup.status === 'ready' ? lookup.environments : [];
   const environment = environments.find(({ id }) => id === environmentId);
   const loading = lookup.status === 'loading';
   const unavailable = !loading && environments.length === 0;
-  const unauthorized = lookup.status === 'unauthorized';
+  const error = lookup.status === 'error' ? lookup.error : undefined;
+  const editingToken = lookup.status === 'editing-token';
+  const showTokenInput = editingToken || isAuthError(error);
+  const errorDetail = [error?.status && `HTTP ${error.status}`, error?.code]
+    .filter(Boolean)
+    .join(' · ');
   const showSymbol = role === 'expert';
 
   function retry() {
+    const token = showTokenInput ? tokenInput.trim() : attempt.token;
     setEnvironmentId('');
+    setTokenInput('');
     setLookup({ status: 'loading' });
-    setAttempt({ token: unauthorized ? tokenInput.trim() : attempt.token });
+    setAttempt({ token });
   }
 
   return (
@@ -147,9 +169,13 @@ export function EntryScreen({
         {environment ? (
           <SurfaceCard
             tone="subtle"
-            title={`작업 유형 · ${environment.workType}`}
-            subtitle={`실행 장치 · ${environment.deviceName}`}
-          />
+            title={environment.workType ? `작업 유형 · ${environment.workType}` : undefined}
+            subtitle={environment.deviceName ? `실행 장치 · ${environment.deviceName}` : undefined}
+          >
+            <AppText variant="caption" color={colors.text.secondary}>
+              {`프로필 ID · ${environment.workProfileId ?? environment.id}`}
+            </AppText>
+          </SurfaceCard>
         ) : null}
         {lookup.status === 'ready' && attempt.token ? (
           <Button
@@ -158,38 +184,41 @@ export function EntryScreen({
             onPress={() => {
               setEnvironmentId('');
               setTokenInput('');
-              setLookup({ status: 'unauthorized' });
+              setLookup({ status: 'editing-token' });
             }}
           />
         ) : null}
         {unavailable ? (
           <View style={styles.feedback}>
-            <FeedbackPanel
-              title={
-                unauthorized
-                  ? 'Edge API 토큰을 확인해 주세요.'
-                  : lookup.status === 'error'
-                    ? '작업 환경을 불러오지 못했어요.'
+            {!editingToken ? (
+              <FeedbackPanel
+                title={
+                  lookup.status === 'error'
+                    ? lookupErrorTitle(error)
                     : '선택할 수 있는 작업 환경이 없어요.'
-              }
-              tone="warning"
-              icon="alert"
-            />
-            {unauthorized ? (
+                }
+                subtitle={errorDetail}
+                tone="warning"
+                icon="alert"
+              />
+            ) : null}
+            {showTokenInput ? (
               <TextField
-                label="Edge API 토큰"
+                label="Edge 접속 토큰"
                 value={tokenInput}
                 onChange={setTokenInput}
-                autoCapitalize="none"
-                autoCorrect={false}
                 secureTextEntry
+                autoCapitalize="none"
+                autoComplete="off"
+                autoCorrect={false}
+                spellCheck={false}
               />
             ) : null}
             <Button
-              label="다시 시도"
+              label={editingToken ? '작업 환경 불러오기' : '다시 시도'}
               variant="secondary"
               icon="retry"
-              disabled={unauthorized && !tokenInput.trim()}
+              disabled={showTokenInput && !tokenInput.trim()}
               onPress={retry}
             />
           </View>

@@ -12,17 +12,36 @@ const title = 'LED 원본 전사 연동';
 const fixtureText = 'LED 전원을 차단한 뒤 센서 배선을 확인합니다.';
 const editedText = 'LED 전원을 차단한 뒤 센서 배선과 측정 결과를 확인합니다.';
 const audioName = 'edge-transcription.m4a';
-const environmentId = 'demo-circuits';
+const environmentId = 'kit-lab';
 
 test.skip(!liveEdge, '실제 Edge 시뮬레이션 서버를 대상으로 실행하는 검사입니다.');
 // The token is entered as a password. Do not capture its value in an action trace.
 test.use({ trace: 'off' });
 
 async function openRecording(page: Page) {
+  const readProfiles = () =>
+    page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === '/api/v1/work-profiles' &&
+        response.request().method() === 'GET',
+    );
+  const initialProfiles = readProfiles();
   await page.goto('/');
+  let profiles = await initialProfiles;
+  if (profiles.status() === 401 || profiles.status() === 403) {
+    const retry = readProfiles();
+    await page.getByLabel('Edge 접속 토큰', { exact: true }).fill(edgeToken);
+    await page.getByRole('button', { name: '다시 시도', exact: true }).click();
+    profiles = await retry;
+  }
+  expect(profiles.ok()).toBe(true);
+  const workProfiles = (await profiles.json()) as { environmentId: string; name: string }[];
+  const selectedProfile = workProfiles.find((profile) => profile.environmentId === environmentId);
+  if (!selectedProfile) throw new Error(`작업 환경 ${environmentId}가 응답에 없습니다.`);
+
   await page.getByRole('radio', { name: '숙련 연구생, 절차 생성·승인' }).click();
   await page.getByRole('button', { name: /^연구실: / }).click();
-  const environment = page.getByRole('radio', { name: '전자회로 실험실', exact: true });
+  const environment = page.getByRole('radio', { name: selectedProfile.name, exact: true });
   await environment.click();
   await expect(environment).toBeHidden();
   await page.getByRole('button', { name: '설정하고 계속' }).click();

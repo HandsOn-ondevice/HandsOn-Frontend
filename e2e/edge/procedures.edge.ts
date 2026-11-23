@@ -8,6 +8,12 @@ const environment = {
   dataOrigin: 'simulation',
 };
 const profileId = 'kit-distance-v1';
+const workProfile = {
+  ...environment,
+  id: profileId,
+  environmentId: environment.id,
+  profileVersion: '1.0.0',
+};
 const operatorId = 'operator-01';
 const preparation = [
   {
@@ -92,12 +98,12 @@ async function interceptEdge(page: Page, mode: 'retry' | 'reject') {
     const url = new URL(request.url());
     const endpoint = `${request.method()} ${url.pathname}`;
     switch (endpoint) {
+      case 'GET /api/v1/system/health':
+        return route.fulfill({ json: { api: 'alive' } });
       case 'GET /api/v1/environments':
         return route.fulfill({ json: [environment] });
       case 'GET /api/v1/work-profiles':
-        return route.fulfill({
-          json: [{ ...environment, environmentId: environment.id, id: profileId }],
-        });
+        return route.fulfill({ json: [workProfile] });
       case 'GET /api/v1/home/student':
         return route.fulfill({
           json: {
@@ -190,6 +196,7 @@ async function openList(page: Page) {
   await page.getByRole('radio', { name: '신규 연구생, 승인된 절차 실행' }).click();
   await page.getByRole('button', { name: /^연구실: / }).click();
   await page.getByRole('radio', { name: environment.name, exact: true }).click();
+  await expect(page.getByText(`프로필 ID · ${profileId}`, { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '설정하고 계속' }).click();
   await page.getByRole('tab', { name: '실험', exact: true }).click();
   await expect(page).toHaveURL(`/procedures?environmentId=${environment.id}`);

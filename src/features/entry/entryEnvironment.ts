@@ -6,6 +6,7 @@ export interface WorkEnvironment {
   name: string;
   workType: string;
   deviceName: string;
+  workProfileId?: string;
 }
 
 export interface EntrySelection {
@@ -14,10 +15,14 @@ export interface EntrySelection {
   edgeToken?: string;
 }
 
-export type LoadWorkEnvironments = (options?: {
+type EnvironmentRequest = {
   token?: string;
   signal?: AbortSignal;
-}) => Promise<readonly WorkEnvironment[]>;
+};
+
+export type LoadWorkEnvironments = (
+  options?: EnvironmentRequest,
+) => Promise<readonly WorkEnvironment[]>;
 
 const demoEnvironments: readonly WorkEnvironment[] = [
   {
@@ -34,28 +39,51 @@ const demoEnvironments: readonly WorkEnvironment[] = [
   },
 ];
 
-function isEnvironment(value: unknown): value is WorkEnvironment {
+type EdgeWorkProfile = WorkEnvironment & { environmentId: string };
+
+function isWorkProfile(value: unknown): value is EdgeWorkProfile {
   if (!value || typeof value !== 'object') return false;
-  const { id, name, workType, deviceName } = value as Partial<WorkEnvironment>;
-  return [id, name, workType, deviceName].every(
-    (field) => typeof field === 'string' && field.trim() !== '',
+  const { id, environmentId, name, workType, deviceName } = value as Partial<EdgeWorkProfile>;
+  return [id, environmentId, name, workType, deviceName].every(
+    (field) => typeof field === 'string' && field.trim().length > 0,
   );
 }
 
-export const loadWorkEnvironments: LoadWorkEnvironments = async ({ token, signal } = {}) => {
+export const loadWorkEnvironments: LoadWorkEnvironments = async (options) => {
   const baseUrl = getEdgeBaseUrl();
-  if (baseUrl) {
-    const response = await createEdgeApi({ baseUrl, token }).get('/environments', signal);
-    if (!Array.isArray(response) || !response.every(isEnvironment)) {
-      throw new EdgeApiError({ kind: 'invalid-response' });
-    }
-    return response.map(({ id, name, workType, deviceName }) => ({
-      id,
-      name,
-      workType,
-      deviceName,
-    }));
+  if (process.env.EXPO_PUBLIC_HANDSON_MAESTRO === '1' || (__DEV__ && !baseUrl)) {
+    return demoEnvironments;
   }
-  if (__DEV__ || process.env.EXPO_PUBLIC_HANDSON_MAESTRO === '1') return demoEnvironments;
-  throw new EdgeApiError({ kind: 'configuration' });
+  return loadEdgeWorkEnvironments({ baseUrl, ...options });
 };
+
+export async function loadEdgeWorkEnvironments({
+  baseUrl,
+  token,
+  signal,
+}: EnvironmentRequest & { baseUrl?: string }): Promise<readonly WorkEnvironment[]> {
+  const edge = createEdgeApi({ baseUrl, token });
+  const health = await edge.get('/system/health', signal);
+  if ((health as { api?: unknown } | null)?.api !== 'alive') {
+    throw new EdgeApiError({ kind: 'invalid-response' });
+  }
+
+  const profiles = await edge.get('/work-profiles', signal);
+  if (!Array.isArray(profiles) || !profiles.every(isWorkProfile)) {
+    throw new EdgeApiError({ kind: 'invalid-response' });
+  }
+  // Edge v0.1 exposes one work profile per selectable environment.
+  if (
+    new Set(profiles.map(({ id }) => id)).size !== profiles.length ||
+    new Set(profiles.map(({ environmentId }) => environmentId)).size !== profiles.length
+  ) {
+    throw new EdgeApiError({ kind: 'invalid-response' });
+  }
+  return profiles.map(({ id, environmentId, name, workType, deviceName }) => ({
+    id: environmentId,
+    workProfileId: id,
+    name,
+    workType,
+    deviceName,
+  }));
+}
