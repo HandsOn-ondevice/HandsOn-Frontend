@@ -58,7 +58,7 @@ export function createEdgeApi({ baseUrl, token }: { baseUrl?: string; token?: st
   const bearerToken = token?.trim();
   if (bearerToken) baseHeaders.Authorization = `Bearer ${bearerToken}`;
 
-  async function request(path: EdgePath, options: RequestInit, signal?: AbortSignal) {
+  async function get(path: EdgePath, signal?: AbortSignal) {
     const controller = new AbortController();
     const abort = () => controller.abort();
     const timer = setTimeout(abort, REQUEST_TIMEOUT_MS);
@@ -69,9 +69,9 @@ export function createEdgeApi({ baseUrl, token }: { baseUrl?: string; token?: st
       let response: Response;
       try {
         response = await fetch(`${origin}/api/v1${path}`, {
-          ...options,
+          method: 'GET',
           credentials: 'omit',
-          headers: { ...baseHeaders, ...options.headers },
+          headers: baseHeaders,
           signal: controller.signal,
         });
       } catch {
@@ -102,18 +102,7 @@ export function createEdgeApi({ baseUrl, token }: { baseUrl?: string; token?: st
     }
   }
 
-  return {
-    get(path: EdgePath, signal?: AbortSignal) {
-      return request(path, { method: 'GET' }, signal);
-    },
-    post(path: EdgePath, body: object, idempotencyKey: string) {
-      return request(path, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey },
-        body: JSON.stringify(body),
-      });
-    },
-  };
+  return { get };
 }
 
 export type EdgeApi = ReturnType<typeof createEdgeApi>;

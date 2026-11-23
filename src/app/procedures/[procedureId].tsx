@@ -4,10 +4,7 @@ import { useEntrySelection } from '@/features/entry/EntrySelectionProvider';
 import { ProcedureDetailScreen } from '@/features/procedures/ProcedureDetailScreen';
 import { usePreparationHandoff } from '@/features/procedures/PreparationHandoffProvider';
 import { createEdgeProcedureRepository } from '@/features/procedures/procedureRepository';
-import {
-  acknowledgeEdgePreparation,
-  startEdgePreparation,
-} from '@/features/researcher-workflow/infrastructure/edge/edgePreparationRepository';
+import { startApprovedEdgeSession } from '@/features/researcher-workflow/state/workflow-repository';
 
 export default function Procedure() {
   const router = useRouter();
@@ -41,22 +38,24 @@ export default function Procedure() {
       procedureId={procedureId}
       approvedVersion={approvedVersion}
       repository={repository}
-      edgePreparation={
-        edge
-          ? {
-              start: (chosen) => startEdgePreparation(edge, chosen),
-              onReady: (sessionId, chosen) => {
-                router.push({ pathname: '/procedures/preparation', params: { sessionId } });
-                if (chosen) acknowledgeEdgePreparation(edge, chosen);
-              },
-            }
-          : undefined
-      }
       onBack={() => {
         if (router.canGoBack()) router.back();
         else router.replace('/procedures');
       }}
-      onPrepare={(request) => {
+      startSession={
+        edge
+          ? async (request) =>
+              (await startApprovedEdgeSession(request, selection.edgeToken)).sessionId
+          : undefined
+      }
+      onPrepare={(request, sessionId) => {
+        if (sessionId) {
+          router.push({
+            pathname: '/researcher-workflow/[sessionId]/preparation',
+            params: { sessionId },
+          });
+          return;
+        }
         setRequest(request);
         router.push('/procedures/preparation');
       }}

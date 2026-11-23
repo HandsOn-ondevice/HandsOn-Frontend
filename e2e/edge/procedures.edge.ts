@@ -37,7 +37,12 @@ const procedure = {
   gatewayId: 'orange-pi-01',
   preparation,
   deviceCheck: { deviceId: 'orange-pi-01', title: '실험 키트 확인', sensors: [] },
-  execution: { provenance: 'approved' },
+  execution: {
+    provenance: 'approved',
+    profileVersion: '1.0.0',
+    settlingSeconds: 0.2,
+    conditions: [{ id: 'placement-20cm', label: '거리 배치 확인', repetitions: 3 }],
+  },
   dataOrigin: 'simulation',
   equipment: ['오렌지파이', '초음파센서', 'LED', '저항', '연결선'],
   criteria: [{ title: '거리 측정 기준', description: '측정 대상을 15~25cm에 배치합니다.' }],
@@ -68,6 +73,8 @@ const session = {
 
 const startLabel = '이 버전으로 준비 시작';
 const confirmLabel = '선택한 절차 확인';
+const sessionPath = `/api/v1/sessions/${session.sessionId}`;
+const preparationRoute = `/researcher-workflow/${session.sessionId}/preparation`;
 
 async function interceptEdge(page: Page, mode: 'retry' | 'reject') {
   const listResponse = Promise.withResolvers<void>();
@@ -143,17 +150,17 @@ async function interceptEdge(page: Page, mode: 'retry' | 'reject') {
         const existing = sessionsByKey.get(idempotencyKey);
         if (!existing) sessionsByKey.set(idempotencyKey, session);
         if (creates.length === 1) {
-          // The server has stored the session, but the first HTTP response is lost.
           await createResponse.promise;
-          return route.abort('connectionreset');
         }
+        // Lose both the committed response and the immediate replay.
+        if (creates.length <= 2) return route.abort('connectionreset');
         return route.fulfill({
           status: 201,
           json: existing ?? session,
           headers: existing ? { 'X-Idempotent-Replay': 'true' } : undefined,
         });
       }
-      case `GET /api/v1/sessions/${session.sessionId}`:
+      case `GET ${sessionPath}`:
         reads.push(url.pathname);
         await sessionResponse.promise;
         return route.fulfill({ json: session });
@@ -269,23 +276,25 @@ for (const viewport of [
     const error = page.getByText('서버가 세션을 시작했는지 확인하지 못했어요. 다시 시도해 주세요.');
     await assertAboveAction(page, error, start);
     await expect(start).toBeEnabled();
+    expect(api.creates).toHaveLength(2);
     await page.screenshot({ path: testInfo.outputPath('s03-create-retry.png') });
     await start.click();
 
-    await expect(page).toHaveURL(`/procedures/preparation?sessionId=${session.sessionId}`);
-    await assertWithinViewport(page, page.getByText('준비 상태를 불러오는 중'));
-    await expect.poll(() => api.reads).toEqual([`/api/v1/sessions/${session.sessionId}`]);
+    await expect(page).toHaveURL(preparationRoute);
+    await assertWithinViewport(page, page.getByText('준비 상태를 불러오고 있습니다.'));
+    await expect.poll(() => api.reads).toEqual([sessionPath]);
     api.sessionResponse.resolve();
     await assertWithinViewport(
       page,
-      page.getByRole('heading', { name: procedure.title, exact: true }),
+      page.getByRole('checkbox', { name: preparation[0].title, exact: true }),
     );
+    await page.getByRole('button', { name: '더 보기', exact: true }).click();
     await assertWithinViewport(
       page,
-      page.getByText(`승인 버전 ${procedure.version}`, { exact: true }),
+      page.getByText(`${procedure.title} · v${procedure.version}`, { exact: true }),
     );
 
-    expect(api.creates).toHaveLength(2);
+    expect(api.creates).toHaveLength(3);
     expect(api.creates[0].key).toBeTruthy();
     expect(api.creates[0].body).toEqual({
       requestId: api.creates[0].key,
@@ -294,22 +303,21 @@ for (const viewport of [
       workProfileId: profileId,
       operatorId,
     });
-    expect(api.creates[1]).toEqual(api.creates[0]);
+    expect(api.creates.slice(1)).toEqual([api.creates[0], api.creates[0]]);
     expect(api.sessionsByKey.size).toBe(1);
     await page.screenshot({ path: testInfo.outputPath('s04-session.png') });
 
+    await page.getByRole('button', { name: '하단 시트 닫기' }).click();
     await page.getByRole('button', { name: '뒤로가기' }).click();
     await expect(page).toHaveURL(new RegExp(`/procedures/${procedure.procedureId}\\?`));
     await start.click();
-    await expect(page).toHaveURL(`/procedures/preparation?sessionId=${session.sessionId}`);
-    await assertWithinViewport(
-      page,
-      page.getByText(`승인 버전 ${procedure.version}`, { exact: true }),
-    );
-    await expect
-      .poll(() => api.reads)
-      .toEqual(Array(2).fill(`/api/v1/sessions/${session.sessionId}`));
-    expect(api.creates).toHaveLength(2);
+    await expect(page).toHaveURL(preparationRoute);
+    await expect(
+      page.getByRole('checkbox', { name: preparation[0].title, exact: true }),
+    ).toBeVisible();
+    await expect.poll(() => api.reads.length).toBeGreaterThan(1);
+    expect([...new Set(api.reads)]).toEqual([sessionPath]);
+    expect(api.creates).toHaveLength(3);
   });
 }
 

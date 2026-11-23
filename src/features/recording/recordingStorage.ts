@@ -1,6 +1,10 @@
 import { Directory, File, Paths } from 'expo-file-system';
 
-import type { RecordingEnvironment, SavedRecording } from './recordingSession';
+import {
+  createRecordingId,
+  type RecordingEnvironment,
+  type SavedRecording,
+} from './recordingSession';
 
 const validId = (id: string) => /^recording-\d+-[a-z0-9]{8}$/.test(id);
 const recordingsDirectory = () => new Directory(Paths.document, 'recordings');
@@ -41,7 +45,7 @@ export async function saveRecording(
     throw new Error('Empty recording');
   }
   const directory = ensureDirectory();
-  const id = `recording-${Date.now()}-${Math.random().toString(36).slice(2, 10).padEnd(8, '0')}`;
+  const id = createRecordingId();
   const original = new File(directory, `${id}.m4a`);
   const partial = new File(directory, `${id}.m4a.part`);
   const metadata = new File(directory, `${id}.json`);
@@ -107,6 +111,25 @@ export async function readSavedRecording(id: string): Promise<SavedRecording | n
   } catch {
     return null;
   }
+}
+
+export async function readRecentSavedRecording(environmentId: string) {
+  const directory = recordingsDirectory();
+  if (!directory.exists) return null;
+
+  const ids = directory
+    .list()
+    .filter((file) => file instanceof File && file.name.endsWith('.json'))
+    .map((file) => file.name.slice(0, -5))
+    .filter(validId);
+  const timestamp = (id: string) => Number(id.split('-')[1]);
+  ids.sort((first, second) => timestamp(second) - timestamp(first));
+
+  for (const id of ids) {
+    const recording = await readSavedRecording(id);
+    if (recording?.environment.id === environmentId) return recording;
+  }
+  return null;
 }
 
 export async function deleteSavedRecording(id: string) {

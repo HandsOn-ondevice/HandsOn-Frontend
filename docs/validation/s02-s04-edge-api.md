@@ -8,12 +8,12 @@
 npm run test:e2e -- --config playwright.procedures.config.ts
 ```
 
-| 화면 크기        | 실행한 시나리오                                                                                                                                                                                                                                                                                  |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 360×800, 412×920 | 목록 로딩과 503 오류를 확인한 뒤 재조회했다. 승인자와 예상 소요 시간을 대조하고, 하단 버튼 위까지 주의사항을 스크롤했다. 생성 버튼의 연속 입력을 한 요청으로 처리하고, 생성 응답 유실 뒤 같은 요청 ID로 재시도했다. S04에서 버전을 확인한 뒤 S03으로 돌아가 다시 열었을 때 기존 세션을 조회했다. |
-| 360×800          | 세션 생성 시 승인 버전 없음 오류(404)를 반환했다. S03에 재선택 방법이 나오며 생성 버튼이 비활성화되고, S02로 돌아올 수 있었다.                                                                                                                                                                   |
+| 화면 크기        | 실행한 시나리오                                                                                                                                                                                                                                                                                                                       |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 360×800, 412×920 | 목록 로딩과 503 오류를 확인한 뒤 재조회했다. 승인자와 예상 소요 시간을 대조하고, 하단 버튼 위까지 주의사항을 스크롤했다. 생성 버튼의 연속 입력을 한 요청으로 처리하고, 생성 응답과 자동 재전송 응답을 잃은 뒤 같은 요청 ID로 재시도했다. S04의 **실험 준비 정보**에서 버전을 확인했고, S03으로 돌아가 다시 열면 기존 세션을 조회했다. |
+| 360×800          | 세션 생성 시 승인 버전 없음 오류(404)를 반환했다. S03에 재선택 방법이 나오며 생성 버튼이 비활성화되고, S02로 돌아올 수 있었다.                                                                                                                                                                                                        |
 
-세 시나리오가 모두 통과했다. 로딩과 오류 문구, 하단 버튼이 뷰포트 안에 들어오고 스크롤한 본문이 버튼 위에 놓이는지 확인했다. 절차 `kit-distance-mobile`의 승인 버전 `1.3.2`를 선택해 백엔드 기본값과 다른 식별자·버전의 전달도 확인했다. Playwright가 첫 생성 응답을 끊은 뒤 재시도한 POST의 요청 ID·`Idempotency-Key`·본문이 모두 같았고, 테스트 서버가 같은 `session-api03`을 반환했다. S03에서 같은 세션을 다시 열 때는 POST 횟수가 늘지 않았다.
+세 시나리오가 모두 통과했다. 로딩과 오류 문구, 하단 버튼이 뷰포트 안에 들어오고 스크롤한 본문이 버튼 위에 놓이는지 확인했다. 절차 `kit-distance-mobile`의 승인 버전 `1.3.2`를 선택해 백엔드 기본값과 다른 식별자·버전의 전달도 확인했다. Playwright가 생성 응답과 한 차례 자동 재전송 응답을 끊었다. 화면 안내를 보고 버튼을 다시 누르자 테스트 서버가 기존 `session-api03`을 반환했다. 세 번의 POST에서 요청 ID·`Idempotency-Key`·본문이 모두 같았다. S03에서 같은 세션을 다시 열 때는 POST 횟수가 늘지 않았다.
 
 스크린샷과 리포트는 `artifacts/playwright/edge-procedures/`에 저장된다. [Playwright 시나리오](../../e2e/edge/procedures.edge.ts)
 
@@ -26,9 +26,9 @@ npm run test:e2e -- --config playwright.procedures.config.ts
 | `GET /api/v1/environments`                                      | 토큰 입력 전 401, 입력 후 200. 응답의 `kit-lab`을 선택했다.                                                                                                                                                                                                     |
 | `GET /api/v1/procedures?environmentId=kit-lab`                  | 200. 목록에서 `kit-distance`의 `1.0.0`을 선택했다.                                                                                                                                                                                                              |
 | `GET /api/v1/procedures/kit-distance?version=1.0.0`             | 200. `procedureId`는 `kit-distance`, `version`은 `1.0.0`이었다. 승인자 `seed-expert`와 예상 소요 `약 5분`을 화면에서 확인했다.                                                                                                                                  |
-| `POST /api/v1/sessions`                                         | 201. 요청 본문에는 `procedureId: kit-distance`, `procedureVersion: 1.0.0`, `workProfileId: kit-distance-v1`, `operatorId: operator-01`을 보냈다. `requestId`와 `Idempotency-Key`는 동일했다. 응답 `sessionId`는 `session-0b9b956e59b5479587122199402a062d`였다. |
-| `GET /api/v1/sessions/session-0b9b956e59b5479587122199402a062d` | 200. 응답의 절차명 **키트 거리 확인 절차**와 **승인 버전 1.0.0**을 S04에서 확인했다. `dataOrigin`은 `simulation`이었다.                                                                                                                                         |
+| `POST /api/v1/sessions`                                         | 201. 요청 본문에는 `procedureId: kit-distance`, `procedureVersion: 1.0.0`, `workProfileId: kit-distance-v1`, `operatorId: operator-01`을 보냈다. `requestId`와 `Idempotency-Key`는 동일했다. 응답 `sessionId`는 `session-d48e4d3ca90642c2a68d4c6ae1ac0e9f`였다. |
+| `GET /api/v1/sessions/session-d48e4d3ca90642c2a68d4c6ae1ac0e9f` | 200. 같은 세션 ID로 `/researcher-workflow/[sessionId]/preparation`을 열었다. **더 보기**의 **실험 준비 정보**에 **키트 거리 확인 절차 · v1.0.0**이 표시됐다. `dataOrigin`은 `simulation`이었다.                                                                 |
 
 같은 백엔드를 별도 DB에서 확인했을 때 동일 키로 두 번째 세션 생성 요청도 201과 같은 `sessionId`를 반환했다. 두 번째 응답 헤더는 `X-Idempotent-Replay: true`였으며, 목록에 남은 세션은 1개였다.
 
-Android Maestro의 기존 합성 경로는 `procedures-android.yaml`에서 확인한다. 실장비와 S04 이후 준비 상태 변경은 이번 API 검증 범위에서 제외했다.
+Android Maestro의 기존 합성 경로는 `procedures-android.yaml`에서 확인한다. API-03 검증은 세션을 생성해 S04에서 조회하는 범위까지 진행했다. 준비 상태 변경과 장치 점검 시나리오는 API-04 검증 기록에서 확인할 수 있다. [API-04 검증 기록](api-04-edge-session.md)

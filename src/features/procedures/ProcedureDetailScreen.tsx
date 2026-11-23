@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { WorkEnvironment } from '@/features/entry/entryEnvironment';
-import { EdgeApiError } from '@/lib/edgeApi';
+import { WorkflowError } from '@/features/researcher-workflow/domain/models';
 import type { PreparationRequest } from './PreparationHandoffProvider';
 import { ProcedureDetailView } from './ProcedureDetailView';
 import type { ProcedureDetail, ProcedureLookup } from './procedureModels';
@@ -15,11 +15,8 @@ interface ProcedureDetailScreenProps {
   procedureId: string;
   approvedVersion: string;
   onBack: () => void;
-  onPrepare: (request: PreparationRequest) => void;
-  edgePreparation?: {
-    start: (selection: ProcedureSelection) => Promise<string>;
-    onReady: (sessionId: string, startedSelection?: ProcedureSelection) => void;
-  };
+  onPrepare: (request: PreparationRequest, sessionId?: string) => void;
+  startSession?: (request: PreparationRequest) => Promise<string>;
   repository?: ProcedureRepository;
 }
 
@@ -27,20 +24,11 @@ const invalidSelectionMessage =
   '선택한 절차·버전을 더 이상 준비할 수 없어요. 목록에서 다시 선택해 주세요.';
 
 function startFailure(error: unknown) {
-  if (!(error instanceof EdgeApiError) || error.kind !== 'server') {
-    return { error: '서버가 세션을 시작했는지 확인하지 못했어요. 다시 시도해 주세요.' };
-  }
-  if (error.status === 404 || error.code === 'INVALID_PROCEDURE') {
-    return { blocked: invalidSelectionMessage };
-  }
-  if (error.code === 'DEVICE_BUSY') {
-    return { error: '장치에 진행 중인 세션이 있어요. 기존 실험을 종료한 뒤 다시 시도해 주세요.' };
-  }
-  if (error.status === 401 || error.status === 403) {
-    return { blocked: '세션을 시작할 권한이 없어요. 작업 환경을 다시 설정해 주세요.' };
-  }
-  if (error.status === 400 || error.status === 422) {
-    return { blocked: '서버가 준비 시작 요청을 거절했어요. 목록에서 절차를 다시 선택해 주세요.' };
+  if (error instanceof WorkflowError) {
+    if (error.code === 'NOT_FOUND' || error.code === 'INVALID_PROCEDURE') {
+      return { blocked: invalidSelectionMessage };
+    }
+    if (error.code !== 'OUTCOME_UNKNOWN') return { error: error.message };
   }
   return { error: '서버가 세션을 시작했는지 확인하지 못했어요. 다시 시도해 주세요.' };
 }
@@ -57,7 +45,7 @@ export function ProcedureDetailScreen({
   approvedVersion,
   onBack,
   onPrepare,
-  edgePreparation,
+  startSession,
   repository = procedureRepository,
 }: ProcedureDetailScreenProps) {
   const [attempt, setAttempt] = useState(0);
@@ -71,6 +59,7 @@ export function ProcedureDetailScreen({
   }>();
   const [start, setStart] = useState<{
     key: string;
+    repository: ProcedureRepository;
     pending?: boolean;
     error?: string;
     blocked?: string;
@@ -80,7 +69,8 @@ export function ProcedureDetailScreen({
     result?.key === requestKey && result.repository === repository
       ? result.lookup
       : { status: 'loading' };
-  const currentStart = start?.key === requestKey ? start : undefined;
+  const currentStart =
+    start?.key === requestKey && start.repository === repository ? start : undefined;
 
   useEffect(() => {
     const currentGeneration = ++generation.current;
@@ -108,46 +98,46 @@ export function ProcedureDetailScreen({
 
   async function prepare() {
     if (busy.current || lookup.status !== 'ready' || !lookup.data || currentStart?.blocked) return;
-    if (edgePreparation && currentStart?.sessionId) {
-      edgePreparation.onReady(currentStart.sessionId);
+    const selection = { procedureId, approvedVersion, environmentId: environment.id };
+    const request = Object.freeze({
+      procedureId,
+      approvedVersion,
+      environment: Object.freeze({ ...environment }),
+    });
+    if (startSession && currentStart?.sessionId) {
+      onPrepare(request, currentStart.sessionId);
       return;
     }
     busy.current = true;
     const currentGeneration = generation.current;
-    setStart({ key: requestKey, pending: true });
-    const selection = { procedureId, approvedVersion, environmentId: environment.id };
+    const startState = { key: requestKey, repository };
+    setStart({ ...startState, pending: true });
     try {
-      if (edgePreparation) {
-        const sessionId = await edgePreparation.start(selection);
+      if (startSession) {
+        // 세션 생성 API가 선택한 버전의 승인 상태를 검증하고 세션을 생성한다.
+        const sessionId = await startSession(request);
         if (currentGeneration !== generation.current) return;
-        edgePreparation.onReady(sessionId, selection);
-        setStart({ key: requestKey, sessionId });
+        setStart({ ...startState, sessionId });
+        onPrepare(request, sessionId);
         return;
       }
 
-      // The fixture preview rechecks the chosen version before passing its inputs.
       const detail = await repository.getDetail(selection);
       if (currentGeneration !== generation.current) return;
       if (!matchesSelection(detail, selection)) {
         setStart({
-          key: requestKey,
+          ...startState,
           blocked: invalidSelectionMessage,
         });
         return;
       }
-      onPrepare(
-        Object.freeze({
-          procedureId,
-          approvedVersion,
-          environment: Object.freeze({ ...environment }),
-        }),
-      );
-      setStart({ key: requestKey });
+      onPrepare(request);
+      setStart(startState);
     } catch (error) {
       if (currentGeneration === generation.current) {
         setStart({
-          key: requestKey,
-          ...(edgePreparation
+          ...startState,
+          ...(startSession
             ? startFailure(error)
             : { error: '시작 가능 여부를 확인하지 못했어요. 다시 시도해 주세요.' }),
         });

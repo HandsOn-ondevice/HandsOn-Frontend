@@ -136,6 +136,7 @@ export interface ExperimentSession {
   readonly sessionId: string;
   readonly operatorId: string;
   readonly source: 'mock' | 'api';
+  readonly dataOrigin?: 'simulation' | 'hardware';
   readonly procedure: ProcedureSnapshot;
   readonly phase:
     | 'preparing'
@@ -143,6 +144,8 @@ export interface ExperimentSession {
     | 'readyToExecute'
     | 'running'
     | 'paused'
+    | 'held'
+    | 'cancelled'
     | 'cleaningUp'
     | 'completed'
     | 'submitted';
@@ -153,6 +156,7 @@ export interface ExperimentSession {
   readonly evidence: readonly Evidence[];
   readonly events: readonly WorkflowEvent[];
   readonly deviceChecks: readonly DeviceCheckAttempt[];
+  readonly pendingJob?: { readonly kind: string; readonly attemptId: string } | null;
   readonly execution?: ExecutionState;
   readonly resumeChecks?: readonly ResumeCheckAttempt[];
   readonly completion?: CompletionState;
@@ -235,7 +239,9 @@ export type WorkflowErrorCode =
   | 'CHECK_NOT_EDITABLE'
   | 'PREPARATION_INCOMPLETE'
   | 'REVISION_CONFLICT'
-  | 'REQUEST_CONFLICT';
+  | 'REQUEST_CONFLICT'
+  | 'OUTCOME_UNKNOWN'
+  | 'EDGE_REJECTED';
 
 export class WorkflowError extends Error {
   constructor(
