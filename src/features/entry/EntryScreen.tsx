@@ -16,12 +16,14 @@ import {
   StatusBar,
   SurfaceCard,
   Symbol,
+  TextField,
   colors,
   gradients,
   radii,
   spacing,
   type UserRole,
 } from '@/design-system';
+import { EdgeApiError } from '@/lib/edgeApi';
 import {
   loadWorkEnvironments,
   type EntrySelection,
@@ -30,7 +32,9 @@ import {
 } from './entryEnvironment';
 
 type EnvironmentLookup =
-  { status: 'loading' | 'error' } | { status: 'ready'; environments: readonly WorkEnvironment[] };
+  | { status: 'loading' }
+  | { status: 'error'; error?: EdgeApiError }
+  | { status: 'ready'; environments: readonly WorkEnvironment[] };
 
 interface EntryScreenProps {
   onContinue: (selection: EntrySelection) => void;
@@ -39,6 +43,26 @@ interface EntryScreenProps {
 
 const roles = ['student', 'expert'] as const;
 
+function isAuthError(error?: EdgeApiError) {
+  return error?.kind === 'server' && (error.status === 401 || error.status === 403);
+}
+
+function lookupErrorTitle(error?: EdgeApiError) {
+  if (isAuthError(error)) return 'Edge 서버 인증을 확인해 주세요.';
+  switch (error?.kind) {
+    case 'configuration':
+      return 'Edge 서버 주소를 확인해 주세요.';
+    case 'network':
+      return 'Edge 서버에 연결할 수 없어요.';
+    case 'server':
+      return 'Edge 서버에서 작업 환경을 조회하지 못했어요.';
+    case 'invalid-response':
+      return 'Edge 서버 응답을 읽을 수 없어요.';
+    default:
+      return '작업 환경을 불러오지 못했어요.';
+  }
+}
+
 export function EntryScreen({
   onContinue,
   loadEnvironments = loadWorkEnvironments,
@@ -46,33 +70,42 @@ export function EntryScreen({
   const [role, setRole] = useState<UserRole>();
   const [environmentId, setEnvironmentId] = useState('');
   const [lookup, setLookup] = useState<EnvironmentLookup>({ status: 'loading' });
-  const [attempt, setAttempt] = useState(0);
+  const [attempt, setAttempt] = useState<{ token?: string }>({});
+  const [tokenInput, setTokenInput] = useState('');
 
   useEffect(() => {
-    let active = true;
-    void loadEnvironments().then(
+    const controller = new AbortController();
+    const { signal } = controller;
+    void loadEnvironments({ token: attempt.token, signal }).then(
       (environments) => {
-        if (active) setLookup({ status: 'ready', environments });
+        if (!signal.aborted) setLookup({ status: 'ready', environments });
       },
-      () => {
-        if (active) setLookup({ status: 'error' });
+      (error: unknown) => {
+        if (!signal.aborted) {
+          setLookup({ status: 'error', error: error instanceof EdgeApiError ? error : undefined });
+        }
       },
     );
-    return () => {
-      active = false;
-    };
+    return () => controller.abort();
   }, [attempt, loadEnvironments]);
 
   const environments = lookup.status === 'ready' ? lookup.environments : [];
   const environment = environments.find(({ id }) => id === environmentId);
   const loading = lookup.status === 'loading';
   const unavailable = !loading && environments.length === 0;
+  const error = lookup.status === 'error' ? lookup.error : undefined;
+  const authRequired = isAuthError(error);
+  const errorDetail = [error?.status && `HTTP ${error.status}`, error?.code]
+    .filter(Boolean)
+    .join(' · ');
   const showSymbol = role === 'expert';
 
   function retry() {
+    const token = authRequired ? tokenInput.trim() : attempt.token;
     setEnvironmentId('');
+    setTokenInput('');
     setLookup({ status: 'loading' });
-    setAttempt((previous) => previous + 1);
+    setAttempt({ token });
   }
 
   return (
@@ -102,7 +135,11 @@ export function EntryScreen({
         </View>
       </SafeAreaView>
 
-      <ScrollView style={styles.viewport} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.viewport}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
         <SectionHeader title="어떤 역할로 사용하시나요?" />
         <AppText variant="caption" color={colors.text.secondary}>
           역할에 따라 실행 화면과 절차 관리 기능이 달라집니다.
@@ -131,22 +168,45 @@ export function EntryScreen({
         {environment ? (
           <SurfaceCard
             tone="subtle"
-            title={`작업 유형 · ${environment.workType}`}
-            subtitle={`실행 장치 · ${environment.deviceName}`}
-          />
+            title={environment.workType ? `작업 유형 · ${environment.workType}` : undefined}
+            subtitle={environment.deviceName ? `실행 장치 · ${environment.deviceName}` : undefined}
+          >
+            <AppText variant="caption" color={colors.text.secondary}>
+              {`프로필 ID · ${environment.id}`}
+            </AppText>
+          </SurfaceCard>
         ) : null}
         {unavailable ? (
           <View style={styles.feedback}>
             <FeedbackPanel
               title={
                 lookup.status === 'error'
-                  ? '작업 환경을 불러오지 못했어요.'
+                  ? lookupErrorTitle(error)
                   : '선택할 수 있는 작업 환경이 없어요.'
               }
+              subtitle={errorDetail}
               tone="warning"
               icon="alert"
             />
-            <Button label="다시 시도" variant="secondary" icon="retry" onPress={retry} />
+            {authRequired ? (
+              <TextField
+                label="Edge 접속 토큰"
+                value={tokenInput}
+                onChange={setTokenInput}
+                secureTextEntry
+                autoCapitalize="none"
+                autoComplete="off"
+                autoCorrect={false}
+                spellCheck={false}
+              />
+            ) : null}
+            <Button
+              label="다시 시도"
+              variant="secondary"
+              icon="retry"
+              disabled={authRequired && !tokenInput.trim()}
+              onPress={retry}
+            />
           </View>
         ) : null}
         <View style={styles.privacy}>
