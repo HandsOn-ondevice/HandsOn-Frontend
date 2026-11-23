@@ -7,6 +7,8 @@ const verifyEdge = process.env.EXPO_E2E_EDGE === '1';
 const verifyResults = process.env.HANDSON_E2E_EDGE_RESULTS === '1';
 const verifyDrafts = process.env.HANDSON_E2E_EDGE_DRAFTS === '1';
 const verifySubmission = process.env.HANDSON_E2E_EDGE_SUBMISSION === '1';
+const verifyStart = process.env.HANDSON_E2E_EDGE_START === '1';
+const startSpec = 'edge-execution-start.spec.ts';
 const edgeSuite = verifySubmission
   ? { spec: 'edge-submission.spec.ts', folder: '/edge-submission' }
   : verifyResults
@@ -15,7 +17,9 @@ const edgeSuite = verifySubmission
       ? { spec: 'edge-connection.spec.ts', folder: '/edge' }
       : verifyDrafts
         ? { spec: 'edge-drafts.spec.ts', folder: '/edge-drafts' }
-        : undefined;
+        : verifyStart
+          ? { spec: startSpec, folder: '/edge-execution-start' }
+          : undefined;
 const useEdgeServer =
   Boolean(edgeSuite) ||
   process.env.HANDSON_E2E_EDGE_HOME === '1' ||
@@ -34,7 +38,9 @@ export default defineConfig({
         'edge-drafts.spec.ts',
         'edge-results.spec.ts',
         'edge-submission.spec.ts',
+        startSpec,
       ],
+  workers: edgeSuite?.spec === startSpec ? 1 : undefined,
   outputDir: `${artifactsDir}/test-results`,
   reporter: [['list'], ['html', { outputFolder: `${artifactsDir}/report`, open: 'never' }]],
   use: {
