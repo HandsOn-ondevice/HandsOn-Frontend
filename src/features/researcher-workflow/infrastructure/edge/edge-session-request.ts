@@ -2,7 +2,8 @@ import { WorkflowError, type ExperimentSession, type WorkflowErrorCode } from '.
 import { parseEdgeSession } from './edge-session';
 
 type EdgeSessionPost =
-  { requestId: string; body: string } | { heartbeat: true; signal?: AbortSignal };
+  | { requestId?: string; body: string; timeoutMs?: number }
+  | { heartbeat: true; signal?: AbortSignal };
 
 export type EdgeSessionRequest = (
   path: `/sessions${string}`,
@@ -25,16 +26,16 @@ export function createEdgeSessionRequest(baseUrl: string, token?: string): EdgeS
     const controller = new AbortController();
     const abort = () => controller.abort();
     const abortSignal = post && 'heartbeat' in post ? post.signal : undefined;
-    const write = post && 'requestId' in post ? post : undefined;
+    const write = post && 'body' in post ? post : undefined;
     if (abortSignal?.aborted) abort();
     abortSignal?.addEventListener('abort', abort, { once: true });
-    const timer = setTimeout(abort, 10_000);
+    const timer = setTimeout(abort, write?.timeoutMs ?? 10_000);
     try {
       const headers: Record<string, string> = { Accept: 'application/json' };
       if (token) headers.Authorization = `Bearer ${token}`;
       if (write) {
         headers['Content-Type'] = 'application/json';
-        headers['Idempotency-Key'] = write.requestId;
+        if (write.requestId) headers['Idempotency-Key'] = write.requestId;
       }
       const response = await fetch(`${origin}/api/v1${path}`, {
         method: post ? 'POST' : 'GET',
@@ -153,6 +154,24 @@ function toWorkflowError(reason: unknown, sessionId?: string) {
 export async function readEdgeSession(request: EdgeSessionRequest, path: `/sessions${string}`) {
   try {
     return (await request(path)).body;
+  } catch (reason) {
+    throw toWorkflowError(reason);
+  }
+}
+
+export async function postEdgeVoiceText(
+  request: EdgeSessionRequest,
+  sessionId: string,
+  text: string,
+) {
+  try {
+    return (
+      await request(`/sessions/${encodeURIComponent(sessionId)}/voice/interpret`, {
+        body: JSON.stringify({ text }),
+        // The Edge agent can take up to 15 seconds before returning a fallback.
+        timeoutMs: 20_000,
+      })
+    ).body;
   } catch (reason) {
     throw toWorkflowError(reason);
   }

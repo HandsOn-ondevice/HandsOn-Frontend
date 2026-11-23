@@ -287,15 +287,16 @@ test('마지막 회차부터 정리·제출 응답 유실 후 재시도와 숙�
     );
   }
   const sampleResponse = nextCommand('requestExecutionSample');
-  await click(page, button(page, '측정 요청'));
+  await click(page, button(page, '현재 회차 측정값 확인'));
   const sample = await sampleResponse;
   await readJson<Session>(sample);
   expect(sample.request().postDataJSON()).toMatchObject({
     command: { type: 'requestExecutionSample', cursorId },
   });
-  await expect(button(page, '회차 완료')).toBeEnabled();
+  const completeRound = button(page, '완료 요청');
+  await expect(completeRound).toBeEnabled();
   const completeResponse = nextCommand('completeExecutionStep');
-  await click(page, button(page, '회차 완료'));
+  await click(page, completeRound);
   const complete = await completeResponse;
   const measured = await readJson<Session>(complete);
   expect(measured).toMatchObject({
@@ -481,7 +482,7 @@ test('마지막 회차부터 정리·제출 응답 유실 후 재시도와 숙�
     id: resultId,
     publicationStatus: 'submitted',
   });
-  await expect(page.getByText('제출한 결과', { exact: true })).toBeVisible();
+  await expect(page.getByText('실험 결과 · 읽기 전용', { exact: true })).toBeVisible();
 
   const expert = await browser.newPage({
     baseURL: testInfo.project.use.baseURL,

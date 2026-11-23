@@ -207,6 +207,31 @@ function hasValidCompletion(value: Record<string, unknown>) {
   );
 }
 
+function isVoiceRequest(value: unknown) {
+  return (
+    isRecord(value) &&
+    isText(value.commandId) &&
+    isText(value.utterance) &&
+    isText(value.createdAt) &&
+    value.source === 'api' &&
+    isCursor(value.cursor) &&
+    (value.sampleAttemptId === null || isText(value.sampleAttemptId))
+  );
+}
+
+function isVoiceResolution(value: unknown) {
+  return (
+    isRecord(value) &&
+    isVoiceRequest(value) &&
+    (value.choice === 'repeatGuidance' ||
+      value.choice === 'remeasure' ||
+      value.choice === 'doNothing' ||
+      value.choice === 'cancel') &&
+    isText(value.resolvedAt) &&
+    isText(value.evidenceId)
+  );
+}
+
 const phases = new Set([
   'preparing',
   'awaitingDeviceCheck',
@@ -305,6 +330,9 @@ export function parseEdgeSession(value: unknown, sessionId?: string): Experiment
     (execution != null &&
       (!isRecord(execution) ||
         !Array.isArray(execution.attempts) ||
+        (execution.pendingVoice != null && !isVoiceRequest(execution.pendingVoice)) ||
+        (execution.voiceResolutions !== undefined &&
+          !isList(execution.voiceResolutions, isVoiceResolution)) ||
         (execution.cursor !== null && !isCursor(execution.cursor)))) ||
     (value.phase === 'running' && (!isRecord(execution) || !isCursor(execution.cursor))) ||
     (value.workflowVersion === '2.0'

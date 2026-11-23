@@ -56,7 +56,7 @@ export function StudentResultScreen({
 
   return (
     <ReviewLayout
-      title={conditionId ? '측정 상세와 근거 이력' : '제출한 결과'}
+      title={conditionId ? '측정 상세와 근거 이력' : '실험 결과'}
       onBack={onBack}
       result={result}
       footer={
@@ -65,7 +65,7 @@ export function StudentResultScreen({
     >
       {data?.kind === 'summary' && onOpenCondition ? (
         <>
-          <SurfaceCard title="제출한 결과 · 읽기 전용">
+          <SurfaceCard title="실험 결과 · 읽기 전용">
             <AppText variant="heading" accessibilityRole="header">
               {data.result.procedureTitle}
             </AppText>

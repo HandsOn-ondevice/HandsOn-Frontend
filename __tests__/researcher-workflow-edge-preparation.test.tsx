@@ -5,6 +5,7 @@ import ExecutionRoute from '@/app/researcher-workflow/[sessionId]/execution';
 import PauseRoute from '@/app/researcher-workflow/[sessionId]/paused';
 import PreparationRoute from '@/app/researcher-workflow/[sessionId]/preparation';
 import SessionMenuRoute from '@/app/researcher-workflow/[sessionId]/session-menu';
+import { EntrySelectionProvider } from '@/features/entry/EntrySelectionProvider';
 import type { WorkflowRepository } from '@/features/researcher-workflow/application/WorkflowRepository';
 import {
   WorkflowError,
@@ -16,6 +17,7 @@ import * as workflowRepository from '@/features/researcher-workflow/state/workfl
 jest.mock('expo-router', () => ({
   Redirect: jest.fn(() => null),
   useFocusEffect: jest.fn(),
+  useIsFocused: () => true,
   useLocalSearchParams: jest.fn(),
   router: {
     canGoBack: jest.fn(() => false),
@@ -209,6 +211,7 @@ test('Edge 실행 메뉴는 결과를 받지 못한 일시정지 요청을 같�
     <WorkflowProvider repository={repository}>
       <ExecutionRoute />
     </WorkflowProvider>,
+    { wrapper: EntrySelectionProvider },
   );
 
   await fireEvent.press(await screen.findByRole('button', { name: '더 보기' }));

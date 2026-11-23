@@ -10,11 +10,7 @@ import {
 import { parseEdgeSession } from './edge-session';
 import { readEdgeSession, writeEdgeSession, type EdgeSessionRequest } from './edge-session-request';
 
-const JOB_POLL_INTERVAL_MS = 600;
-
-function hasPendingJob(session: ExperimentSession) {
-  return selectDeviceCheck(session).checking || session.pendingJob?.kind === 'sample';
-}
+const DEVICE_CHECK_POLL_INTERVAL_MS = 600;
 
 type Listener = (session: ExperimentSession) => void;
 type WatchedSession = {
@@ -146,6 +142,9 @@ export class EdgeWorkflowRepository implements WorkflowRepository {
       case 'requestCleanup':
       case 'setCleanupCheck':
       case 'submitResult':
+      case 'requestVoiceClarification':
+      case 'resolveVoiceClarification':
+      case 'dismissVoiceClarification':
         return this.writeCommand(sessionId, command, context);
       default:
         throw new WorkflowError('INVALID_STATE', '이 단계의 Edge 명령은 아직 연결되지 않았어요.');
@@ -228,8 +227,8 @@ export class EdgeWorkflowRepository implements WorkflowRepository {
     if (watched.latest && watched.latest.revision > next.revision) return watched.latest;
     watched.latest = next;
     for (const listener of watched.listeners.keys()) listener(next);
-    if (hasPendingJob(next)) {
-      this.pollDuringJob(next.sessionId, watched);
+    if (selectDeviceCheck(next).checking) {
+      this.pollDuringDeviceCheck(next.sessionId, watched);
     } else {
       clearTimeout(watched.timer);
       watched.timer = undefined;
@@ -237,11 +236,11 @@ export class EdgeWorkflowRepository implements WorkflowRepository {
     return next;
   }
 
-  private pollDuringJob(sessionId: string, watched: WatchedSession) {
+  private pollDuringDeviceCheck(sessionId: string, watched: WatchedSession) {
     if (
       this.watched.get(sessionId) !== watched ||
       !watched.latest ||
-      !hasPendingJob(watched.latest) ||
+      !selectDeviceCheck(watched.latest).checking ||
       watched.timer !== undefined
     ) {
       return;
@@ -251,6 +250,6 @@ export class EdgeWorkflowRepository implements WorkflowRepository {
       void this.getSession(sessionId).catch((error: unknown) => {
         for (const onReadError of watched.listeners.values()) onReadError?.(error);
       });
-    }, JOB_POLL_INTERVAL_MS);
+    }, DEVICE_CHECK_POLL_INTERVAL_MS);
   }
 }
