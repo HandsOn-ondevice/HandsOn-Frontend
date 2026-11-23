@@ -52,6 +52,9 @@ export function createDemoProcedureRepository(
 }
 
 function demoRepositoryFor(environmentId: string) {
+  if (!__DEV__ && process.env.EXPO_PUBLIC_HANDSON_MAESTRO !== '1') {
+    throw new Error('절차 API가 아직 연결되지 않았습니다.');
+  }
   const releases = listDemoProcedureReleases(environmentId);
   const releasedIds = new Set(releases.map(({ procedure }) => procedure.id));
   return createDemoProcedureRepository([

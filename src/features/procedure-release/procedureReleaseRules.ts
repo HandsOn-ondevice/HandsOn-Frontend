@@ -35,7 +35,8 @@ export function describeStepCriteria(step: ProcedureDraftStep) {
 
 export function getUnresolvedDraftItems(draft: ProcedureDraft) {
   return draft.pendingItems.filter(({ id, stepId }) => {
-    const criteria = draft.steps.find((step) => step.id === stepId)?.criteria;
+    const step = draft.steps.find((step) => step.id === stepId);
+    const criteria = step?.criteria;
     if (!criteria) return true;
 
     switch (id) {
@@ -49,6 +50,8 @@ export function getUnresolvedDraftItems(draft: ProcedureDraft) {
         return criteria.overcurrentLimit === null;
       case 'sensor-age-limit':
         return criteria.freshnessLimit === null || criteria.freshnessLimit < 0;
+      case 'review-transcript-content':
+        return !step.description.trim() || !describeStepCriteria(step);
       default:
         return true;
     }

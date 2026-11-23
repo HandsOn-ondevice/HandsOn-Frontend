@@ -14,6 +14,7 @@ import {
 import { procedureRepository } from '@/features/procedures/procedureRepository';
 import { MockWorkflowRepository } from '@/features/researcher-workflow/infrastructure/mock/MockWorkflowRepository';
 import { loadStudentHome } from '@/features/student-home/studentHomeData';
+import { transcriptionService } from '@/features/transcription/transcriptionService';
 
 const environmentId = 'demo-embedded-iot';
 const draftId = getDemoProcedureDraftId(environmentId);
@@ -143,4 +144,40 @@ test('같은 배포 요청의 결과를 복원하고 목록을 갱신하며 앞�
   });
   expect(student.ongoingSession).toEqual(before.ongoingSession);
   expect(await sessions.getSession(sessionId)).toEqual(session);
+});
+
+test('녹음에서 생성한 새 초안은 작업 설명과 기준을 저장한 뒤 첫 버전으로 배포한다', async () => {
+  const generated = await transcriptionService!.generateDraft({
+    recordingId: 'demo-recording',
+    title: '새 LED 측정',
+    confirmedText: '저장할 작업 설명',
+  });
+  const saved = await procedureDraftRepository.save(environmentId, {
+    ...generated,
+    materials: ['LED 모듈'],
+  });
+  expect((await procedureReleaseRepository.load(environmentId, saved.id))?.blockers).toContain(
+    '필수 기준 미확정 · 작업 설명의 단계와 완료 기준을 검토해 주세요.',
+  );
+  const draft = await procedureDraftRepository.saveStepCriteria(
+    environmentId,
+    saved.id,
+    saved.steps[0].id,
+    { ...checkedCriteria, manualCheck: '장비 표시를 확인합니다.' },
+  );
+  const release = await procedureReleaseRepository.publish({
+    environmentId,
+    draft,
+    ...confirmations,
+  });
+  expect(release).toMatchObject({
+    id: generated.id,
+    approvedVersion: 'v1.0',
+    estimatedMinutes: null,
+  });
+  expect(await procedureRepository.list(environmentId)).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ id: generated.id, approvedVersion: 'v1.0' }),
+    ]),
+  );
 });

@@ -92,7 +92,7 @@ function isStoredRelease(value: unknown): value is ProcedureDetail {
     typeof value.approvedVersion === 'string' &&
     Boolean(value.approvedVersion.trim()) &&
     typeof value.approvedBy === 'string' &&
-    Number.isFinite(value.estimatedMinutes) &&
+    (value.estimatedMinutes === null || Number.isFinite(value.estimatedMinutes)) &&
     Number.isSafeInteger(value.stepCount) &&
     value.category === 'led' &&
     isStringList(value.equipment) &&
