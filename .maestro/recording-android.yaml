@@ -57,6 +57,13 @@ name: Android 음성 녹음과 일시정지 및 초안 생성
 - assertVisible: LED output measurement
 - assertVisible: '.*녹음 길이.*'
 - takeScreenshot: e03-transcription
+- tapOn: 뒤로가기
+- tapOn: 새 절차 음성으로 만들기
+- tapOn: 최근 녹음 다시 열기
+- extendedWaitUntil:
+    visible: STT 변환이 완료되었습니다
+    timeout: 15000
+- assertVisible: LED output measurement
 - scrollUntilVisible:
     element: AI 절차 초안 생성
     direction: DOWN
