@@ -2,8 +2,7 @@ import { File, UploadType } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 import type { SavedRecording } from '@/features/recording/recordingSession';
-import { readSavedRecording } from '@/features/recording/recordingStorage';
-import { readWebRecording, readWebRecordingFile } from '@/features/recording/webRecording';
+import { readWebRecordingFile } from '@/features/recording/webRecording';
 import { edgeTranscriptionStorage, type SavedEdgeTranscription } from './transcriptionStorage';
 
 function configuredBaseUrl() {
@@ -212,19 +211,4 @@ export async function convertEdgeRecording({
     }
     throw new EdgeConversionError(phase);
   }
-}
-
-export async function readConfirmedDraftRequest(localRecordingId: string) {
-  if (!edgeApiBaseUrl) return null;
-  const readRecording = Platform.OS === 'web' ? readWebRecording : readSavedRecording;
-  const recording = await readRecording(localRecordingId);
-  if (!recording) return null;
-  const saved = edgeTranscriptionStorage.load(localRecordingId, edgeApiBaseUrl);
-  if (!saved?.transcript?.confirmedText) return null;
-  return {
-    recordingId: saved.serverRecordingId,
-    title: recording.title,
-    confirmedText: saved.transcript.confirmedText,
-    environmentId: recording.environment.id,
-  };
 }

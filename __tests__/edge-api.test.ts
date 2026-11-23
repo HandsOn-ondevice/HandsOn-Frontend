@@ -10,7 +10,13 @@ afterEach(() => {
 });
 
 test('같은 Edge에서 상태와 작업 환경을 GET으로 요청하고 서버의 프로필을 사용한다', async () => {
-  const profile = { id: 'kit-profile', name: '실습실', workType: '거리 확인', deviceName: '키트' };
+  const profile = {
+    id: 'kit-profile',
+    environmentId: 'kit-lab',
+    name: '실습실',
+    workType: '거리 확인',
+    deviceName: '키트',
+  };
   const request = jest
     .spyOn(globalThis, 'fetch')
     .mockResolvedValueOnce(new Response(JSON.stringify({ api: 'alive' })))

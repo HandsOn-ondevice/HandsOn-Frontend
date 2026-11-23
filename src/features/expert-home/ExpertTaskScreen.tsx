@@ -21,7 +21,8 @@ export function ExpertTaskScreen({ kind }: { kind: TaskKind }) {
     <Screen scroll>
       <ExistingTask
         kind={kind}
-        environmentId={selection.environment.id}
+        environmentId={selection.environment.environmentId ?? selection.environment.id}
+        edgeToken={selection.edgeToken}
         procedureId={params.procedureId}
         resultId={params.resultId}
       />
@@ -33,15 +34,17 @@ export function ExpertTaskScreen({ kind }: { kind: TaskKind }) {
 function ExistingTask({
   kind,
   environmentId,
+  edgeToken,
   procedureId,
   resultId,
 }: {
   kind: TaskKind;
   environmentId: string;
+  edgeToken?: string;
   procedureId?: string;
   resultId?: string;
 }) {
-  const { state, refresh } = useExpertHome(environmentId);
+  const { state, refresh } = useExpertHome(environmentId, undefined, edgeToken);
   if (state.status === 'loading') return <FeedbackPanel title="선택한 작업을 불러오는 중이에요." />;
   if (state.status === 'error')
     return (

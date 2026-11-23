@@ -22,6 +22,7 @@ import {
 } from '@/design-system';
 import type { WorkEnvironment } from '@/features/entry/entryEnvironment';
 import { reviewStatusLabels } from '@/features/expert-review/reviewData';
+import { getEdgeBaseUrl } from '@/lib/edgeApi';
 import type {
   ExpertHomeData,
   ExpertProcedure,
@@ -37,6 +38,7 @@ export type ExpertTask =
 
 interface ExpertHomeScreenProps {
   environment: WorkEnvironment;
+  edgeToken?: string;
   loadHome?: LoadExpertHome;
   onOpenTask: (task: ExpertTask) => void;
   onChangeEnvironment: () => void;
@@ -44,11 +46,16 @@ interface ExpertHomeScreenProps {
 
 export function ExpertHomeScreen({
   environment,
+  edgeToken,
   loadHome,
   onOpenTask,
   onChangeEnvironment,
 }: ExpertHomeScreenProps) {
-  const { state, refresh } = useExpertHome(environment.id, loadHome);
+  const { state, refresh } = useExpertHome(
+    environment.environmentId ?? environment.id,
+    loadHome,
+    edgeToken,
+  );
   const [active, setActive] = useState<NavigationItem>('home');
   const [procedureFilter, setProcedureFilter] = useState('draft');
   const [resultFilter, setResultFilter] = useState('pending');
@@ -99,10 +106,12 @@ export function ExpertHomeScreen({
             <SurfaceCard title="숙련 연구생" subtitle={environment.name}>
               <AppText>작업 유형 · {environment.workType}</AppText>
               <AppText>실행 장치 · {environment.deviceName}</AppText>
-              <AppText variant="caption" color={colors.text.secondary}>
-                현재 현황과 목록은 개발용 합성 데이터입니다. 실제 장치 연결 상태는 확인하지
-                않습니다.
-              </AppText>
+              {!getEdgeBaseUrl() ? (
+                <AppText variant="caption" color={colors.text.secondary}>
+                  현재 현황과 목록은 개발용 합성 데이터입니다. 실제 장치 연결 상태는 확인하지
+                  않습니다.
+                </AppText>
+              ) : null}
             </SurfaceCard>
             <Button label="역할·작업 환경 변경" variant="secondary" onPress={onChangeEnvironment} />
           </>

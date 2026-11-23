@@ -15,10 +15,7 @@ const edgeScreens = new Set([
 
 export default function ResearcherWorkflowLayout() {
   const { selection } = useEntrySelection();
-  const edgeToken =
-    selection && 'edgeToken' in selection && typeof selection.edgeToken === 'string'
-      ? selection.edgeToken
-      : undefined;
+  const edgeToken = selection?.edgeToken;
 
   if (isEdgeWorkflowEnabled()) {
     return (

@@ -133,12 +133,12 @@ export function ProcedureListView({
             subtitle={procedure.description}
             meta={[
               procedure.approvedVersion,
-              `${procedure.stepCount}단계`,
+              procedure.stepCount === undefined ? null : `${procedure.stepCount}단계`,
               procedure.estimatedMinutes === null ? null : `약 ${procedure.estimatedMinutes}분`,
             ]
               .filter(Boolean)
               .join(' · ')}
-            detail={`승인자 · ${procedure.approvedBy}`}
+            detail={procedure.approvedBy ? `승인자 · ${procedure.approvedBy}` : undefined}
             state={selectionKey(procedure) === selectedKey ? 'selected' : 'approved'}
             onPress={() => setSelectedKey(selectionKey(procedure))}
           />

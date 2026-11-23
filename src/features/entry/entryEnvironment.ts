@@ -3,6 +3,7 @@ import { createEdgeApi, EdgeApiError } from '@/lib/edgeApi';
 
 export interface WorkEnvironment {
   id: string;
+  environmentId?: string;
   name: string;
   workType: string;
   deviceName: string;
@@ -11,6 +12,7 @@ export interface WorkEnvironment {
 export interface EntrySelection {
   role: UserRole;
   environment: WorkEnvironment;
+  edgeToken?: string;
 }
 
 type EnvironmentRequest = {
@@ -39,10 +41,10 @@ const demoEnvironments: readonly WorkEnvironment[] = [
 
 function isWorkEnvironment(value: unknown): value is WorkEnvironment {
   if (!value || typeof value !== 'object') return false;
-  const { id, name, workType, deviceName } = value as Partial<WorkEnvironment>;
-  return [id, name, workType, deviceName].every(
-    (field) => typeof field === 'string' && field.trim().length > 0,
-  );
+  const { id, environmentId, name, workType, deviceName } = value as Partial<WorkEnvironment>;
+  const fields = [id, name, workType, deviceName];
+  if (environmentId !== undefined) fields.push(environmentId);
+  return fields.every((field) => typeof field === 'string' && field.trim().length > 0);
 }
 
 export const loadWorkEnvironments: LoadWorkEnvironments = async (options) => {
@@ -71,5 +73,11 @@ export async function loadEdgeWorkEnvironments({
   if (new Set(profiles.map(({ id }) => id)).size !== profiles.length) {
     throw new EdgeApiError({ kind: 'invalid-response' });
   }
-  return profiles.map(({ id, name, workType, deviceName }) => ({ id, name, workType, deviceName }));
+  return profiles.map(({ id, environmentId, name, workType, deviceName }) => ({
+    id,
+    ...(environmentId && { environmentId }),
+    name,
+    workType,
+    deviceName,
+  }));
 }

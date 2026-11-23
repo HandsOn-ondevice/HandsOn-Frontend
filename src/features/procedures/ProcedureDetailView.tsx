@@ -91,31 +91,37 @@ export function ProcedureDetailView({
         />
       ) : (
         <>
-          <View style={styles.stats}>
-            <SurfaceCard style={styles.stat}>
-              <AppText variant="caption" color={colors.text.secondary}>
-                승인자
-              </AppText>
-              <AppText variant="title" color={colors.text.secondary}>
-                {procedure.approvedBy}
-              </AppText>
-            </SurfaceCard>
-            {procedure.estimatedMinutes !== null ? (
-              <SurfaceCard style={styles.stat}>
-                <AppText variant="caption" color={colors.text.secondary}>
-                  예상 소요
-                </AppText>
-                <AppText variant="title" color={colors.text.secondary}>
-                  {procedure.estimatedMinutes}
-                </AppText>
-                <AppText variant="caption" color={colors.text.secondary}>
-                  {`분 · 약 ${procedure.estimatedMinutes}분`}
-                </AppText>
-              </SurfaceCard>
-            ) : null}
-          </View>
+          {procedure.approvedBy || procedure.estimatedMinutes !== null ? (
+            <View style={styles.stats}>
+              {procedure.approvedBy ? (
+                <SurfaceCard style={styles.stat}>
+                  <AppText variant="caption" color={colors.text.secondary}>
+                    승인자
+                  </AppText>
+                  <AppText variant="title" color={colors.text.secondary}>
+                    {procedure.approvedBy}
+                  </AppText>
+                </SurfaceCard>
+              ) : null}
+              {procedure.estimatedMinutes !== null ? (
+                <SurfaceCard style={styles.stat}>
+                  <AppText variant="caption" color={colors.text.secondary}>
+                    예상 소요
+                  </AppText>
+                  <AppText variant="title" color={colors.text.secondary}>
+                    {procedure.estimatedMinutes}
+                  </AppText>
+                  <AppText variant="caption" color={colors.text.secondary}>
+                    {`분 · 약 ${procedure.estimatedMinutes}분`}
+                  </AppText>
+                </SurfaceCard>
+              ) : null}
+            </View>
+          ) : null}
 
-          <AppText color={colors.text.secondary}>{procedure.description}</AppText>
+          {procedure.description ? (
+            <AppText color={colors.text.secondary}>{procedure.description}</AppText>
+          ) : null}
 
           {procedure.conditions.length > 0 ? (
             <SurfaceCard style={styles.conditionsCard}>
@@ -168,7 +174,13 @@ export function ProcedureDetailView({
             ))}
           </View>
 
-          <SectionHeader title={`단계 요약 · 총 ${procedure.stepCount}단계`} />
+          <SectionHeader
+            title={
+              procedure.stepCount === undefined
+                ? '단계 요약'
+                : `단계 요약 · 총 ${procedure.stepCount}단계`
+            }
+          />
           <SurfaceCard style={styles.stack}>
             {procedure.steps.map((step, index) => (
               <View key={`${step}-${index}`} style={styles.step}>

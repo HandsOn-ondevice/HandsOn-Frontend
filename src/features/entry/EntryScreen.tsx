@@ -221,7 +221,9 @@ export function EntryScreen({
         primary="설정하고 계속"
         disabled={!role || !environment}
         onPrimary={() => {
-          if (role && environment) onContinue({ role, environment });
+          if (role && environment) {
+            onContinue({ role, environment, ...(attempt.token && { edgeToken: attempt.token }) });
+          }
         }}
         safeArea
       />

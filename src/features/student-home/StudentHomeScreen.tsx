@@ -130,7 +130,13 @@ export function StudentHomeScreen({
                 >
                   <SurfaceCard
                     title={procedure.title}
-                    subtitle={`${procedure.version} · ${procedure.equipmentLabel} · ${procedure.stepCount}단계`}
+                    subtitle={[
+                      procedure.version,
+                      procedure.equipmentLabel,
+                      procedure.stepCount === undefined ? undefined : `${procedure.stepCount}단계`,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
                     style={styles.procedure}
                   />
                 </Pressable>

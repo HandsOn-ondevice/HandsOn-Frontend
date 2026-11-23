@@ -22,7 +22,7 @@ export interface StudentHomeData {
     title: string;
     version: string;
     equipmentLabel: string;
-    stepCount: number;
+    stepCount?: number;
   }[];
   recentResults: readonly {
     id: string;

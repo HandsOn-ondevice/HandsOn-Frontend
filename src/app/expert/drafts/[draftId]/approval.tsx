@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Redirect,
   useFocusEffect,
@@ -8,18 +8,21 @@ import {
 } from 'expo-router';
 import { AppBar, Button, FeedbackPanel, Screen, StatusBar } from '@/design-system';
 import { useEntrySelection } from '@/features/entry/EntrySelectionProvider';
-import type { ProcedureDetail } from '@/features/procedures/procedureModels';
+import { EdgeApiError } from '@/lib/edgeApi';
 import { ProcedureReleasePreview } from '@/features/procedure-release/ProcedureReleasePreview';
 import {
   ProcedureReleaseResult,
   ProcedureReleaseView,
 } from '@/features/procedure-release/ProcedureReleaseView';
 import {
+  getProcedureReleaseRepository,
   ProcedureReleaseRejected,
-  procedureReleaseRepository,
+  type ProcedureReleaseReceipt,
 } from '@/features/procedure-release/procedureReleaseRepository';
 
-type Review = NonNullable<Awaited<ReturnType<typeof procedureReleaseRepository.load>>>;
+type Review = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getProcedureReleaseRepository>['load']>>
+>;
 
 type ReviewState =
   { status: 'loading' | 'error' | 'missing' } | { status: 'ready'; review: Review };
@@ -33,13 +36,15 @@ export default function DraftApprovalRoute() {
 
   const editRoute = { pathname: '/expert/drafts/[draftId]' as const, params: { draftId } };
   const reviewedStepId = typeof stepId === 'string' ? stepId : undefined;
+  const environmentId = selection.environment.environmentId ?? selection.environment.id;
 
   return (
     <DraftApprovalContext
-      key={JSON.stringify([selection.environment.id, draftId, reviewedStepId])}
+      key={JSON.stringify([environmentId, draftId, reviewedStepId])}
       draftId={draftId}
       stepId={reviewedStepId}
-      environmentId={selection.environment.id}
+      environmentId={environmentId}
+      edgeToken={selection.edgeToken}
       onBack={() => {
         if (router.canGoBack()) router.back();
         else if (reviewedStepId) {
@@ -59,6 +64,7 @@ function DraftApprovalContext({
   draftId,
   stepId,
   environmentId,
+  edgeToken,
   onBack,
   onEdit,
   onHome,
@@ -66,17 +72,21 @@ function DraftApprovalContext({
   draftId: string;
   stepId?: string;
   environmentId: string;
+  edgeToken?: string;
   onBack: () => void;
   onEdit: () => void;
   onHome: () => void;
 }) {
+  const repository = useMemo(() => getProcedureReleaseRepository(edgeToken), [edgeToken]);
   const [state, setState] = useState<ReviewState>({ status: 'loading' });
   const [equipmentConfirmed, setEquipmentConfirmed] = useState(false);
   const [reviewConfirmed, setReviewConfirmed] = useState(false);
+  const [reason, setReason] = useState('');
+  const [reasonLocked, setReasonLocked] = useState(false);
   const [preview, setPreview] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [published, setPublished] = useState<ProcedureDetail | null>(null);
+  const [published, setPublished] = useState<ProcedureReleaseReceipt | null>(null);
   const [leaving, setLeaving] = useState(false);
   const mounted = useRef(false);
   const inFlight = useRef(false);
@@ -96,7 +106,7 @@ function DraftApprovalContext({
     const request = ++loadRequest.current;
     setState({ status: 'loading' });
     try {
-      const review = await procedureReleaseRepository.load(environmentId, draftId);
+      const review = await repository.load(environmentId, draftId);
       if (loadRequest.current !== request) return;
       const snapshot = review ? JSON.stringify(review) : null;
       if (lastReview.current !== snapshot) {
@@ -109,7 +119,7 @@ function DraftApprovalContext({
     } catch {
       if (loadRequest.current === request) setState({ status: 'error' });
     }
-  }, [draftId, environmentId]);
+  }, [draftId, environmentId, repository]);
 
   useFocusEffect(
     useCallback(() => {
@@ -143,7 +153,8 @@ function DraftApprovalContext({
       state.status !== 'ready' ||
       state.review.blockers.length > 0 ||
       !equipmentConfirmed ||
-      !reviewConfirmed
+      !reviewConfirmed ||
+      (state.review.draft.edge && !reason.trim())
     ) {
       return;
     }
@@ -152,21 +163,31 @@ function DraftApprovalContext({
     setSubmitting(true);
     setError(null);
     try {
-      const procedure = await procedureReleaseRepository.publish({
+      const procedure = await repository.publish({
         environmentId,
         draft: state.review.draft,
         equipmentConfirmed,
         reviewConfirmed,
+        reason,
       });
       if (mounted.current) setPublished(procedure);
     } catch (failure) {
       if (!mounted.current) return;
       if (failure instanceof ProcedureReleaseRejected) {
         setError(failure.message);
+        setReasonLocked(false);
         setEquipmentConfirmed(false);
         setReviewConfirmed(false);
         void loadReview();
       } else {
+        if (
+          failure instanceof EdgeApiError &&
+          (failure.kind === 'network' ||
+            failure.kind === 'invalid-response' ||
+            (failure.status ?? 0) >= 500)
+        ) {
+          setReasonLocked(true);
+        }
         setError('승인·배포 요청에 실패했어요. 다시 시도해 주세요.');
       }
     } finally {
@@ -175,7 +196,15 @@ function DraftApprovalContext({
     }
   }
 
-  if (published) return <ProcedureReleaseResult procedure={published} onHome={goHome} />;
+  if (published) {
+    return (
+      <ProcedureReleaseResult
+        procedure={published}
+        edge={state.status === 'ready' && Boolean(state.review.draft.edge)}
+        onHome={goHome}
+      />
+    );
+  }
 
   if (state.status === 'ready') {
     const { draft, blockers, proposedVersion, approverName } = state.review;
@@ -198,10 +227,13 @@ function DraftApprovalContext({
         approverName={approverName}
         reviewConfirmed={reviewConfirmed}
         equipmentConfirmed={equipmentConfirmed}
+        reason={reason}
+        reasonLocked={reasonLocked}
         submitting={submitting}
         error={error}
         reviewedStep={reviewedStep?.criteria ? reviewedStep : undefined}
         onEquipmentChange={setEquipmentConfirmed}
+        onReasonChange={setReason}
         onReviewChange={setReviewConfirmed}
         onApprove={() => void approve()}
         onBack={onBack}

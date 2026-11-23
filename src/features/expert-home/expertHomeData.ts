@@ -6,6 +6,7 @@ import {
 import { getDemoHomeReviews, type ReviewStatus } from '@/features/expert-review/reviewData';
 import { getUnresolvedDraftItems } from '@/features/procedure-release/procedureReleaseRules';
 import { demoLedProcedure } from '@/features/procedures/demoProcedures';
+import { createEdgeApi, EdgeApiError, getEdgeBaseUrl } from '@/lib/edgeApi';
 
 export interface ExpertProcedure {
   readonly id: string;
@@ -47,7 +48,7 @@ export interface ExpertHomeData {
   readonly recentWork: readonly ExpertRecentWork[];
 }
 
-export type LoadExpertHome = (environmentId: string) => Promise<ExpertHomeData>;
+export type LoadExpertHome = (environmentId: string, edgeToken?: string) => Promise<ExpertHomeData>;
 
 function createDemoHome(environmentId: string): ExpertHomeData {
   const procedureId = (name: string) => `${environmentId}:procedure:${name}`;
@@ -123,8 +124,40 @@ function createDemoHome(environmentId: string): ExpertHomeData {
   };
 }
 
-export const loadExpertHome: LoadExpertHome = async (environmentId) => {
+export const loadExpertHome: LoadExpertHome = async (environmentId, edgeToken) => {
   if (!environmentId.trim()) throw new Error('작업 환경을 선택해 주세요.');
+  const baseUrl = getEdgeBaseUrl();
+  if (baseUrl) {
+    const edge = createEdgeApi({ baseUrl, token: edgeToken });
+    const data = (await edge.get(
+      `/home/expert?environmentId=${encodeURIComponent(environmentId)}`,
+    )) as ExpertHomeData | null;
+    if (
+      typeof data?.displayName !== 'string' ||
+      !Array.isArray(data.procedures) ||
+      !data.procedures.every(
+        (item) =>
+          item &&
+          typeof item.id === 'string' &&
+          typeof item.title === 'string' &&
+          typeof item.version === 'string' &&
+          (item.status === 'draft' || item.status === 'approved'),
+      ) ||
+      !Array.isArray(data.results) ||
+      !Array.isArray(data.recentWork)
+    ) {
+      throw new EdgeApiError({ kind: 'invalid-response' });
+    }
+    const approvedIds = new Set(
+      data.procedures.filter(({ status }) => status === 'approved').map(({ id }) => id),
+    );
+    return {
+      ...data,
+      procedures: data.procedures.filter(
+        ({ id, status }) => status === 'approved' || !approvedIds.has(id),
+      ),
+    };
+  }
   if (__DEV__ || process.env.EXPO_PUBLIC_HANDSON_MAESTRO === '1') {
     const demo = createDemoHome(environmentId);
     const savedDrafts = await procedureDraftRepository.listSaved(environmentId);

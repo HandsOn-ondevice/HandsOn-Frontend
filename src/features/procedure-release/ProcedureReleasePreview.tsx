@@ -13,7 +13,7 @@ import {
 } from '@/design-system';
 import type { ProcedureDraft } from '@/features/procedure-draft/procedureDraftRepository';
 import { ProcedureFrame } from '@/features/procedures/ProcedureFrame';
-import { describeStepCriteria } from './procedureReleaseRules';
+import { describeExecutionCriteria, describeStepCriteria } from './procedureReleaseRules';
 
 interface ProcedureReleasePreviewProps {
   draft: ProcedureDraft;
@@ -35,13 +35,18 @@ export function ProcedureReleasePreview({
     const item = describeStepCriteria(step);
     return item ? [{ ...item, stepId: step.id }] : [];
   });
+  const execution = draft.edge?.execution;
 
   return (
     <ProcedureFrame
       headerTitle="절차 미리보기"
       title={draft.title}
       subtitle={
-        proposedVersion ? `배포 예정 버전 ${proposedVersion}` : `승인 전 초안 ${draft.version}`
+        proposedVersion
+          ? `배포 예정 버전 ${proposedVersion}`
+          : draft.edge
+            ? `승인 전 초안 · 리비전 ${draft.edge.revision}`
+            : `승인 전 초안 ${draft.version}`
       }
       heroAccessory={<BrandLogo width={88} />}
       onBack={onBack}
@@ -77,7 +82,9 @@ export function ProcedureReleasePreview({
       )}
 
       <SectionHeader title="핵심 기준" />
-      {criteria.length > 0 ? (
+      {execution ? (
+        <SurfaceCard subtitle={describeExecutionCriteria(execution).join('\n')} />
+      ) : criteria.length > 0 ? (
         criteria.map(({ title, description, stepId }) => (
           <EvidenceRow
             key={stepId}

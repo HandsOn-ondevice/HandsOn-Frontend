@@ -1,21 +1,32 @@
 import {
+  approveEdgeProcedureDraft,
   findSavedDemoDraft,
   getDemoProcedureDraftId,
+  getProcedureDraftRepository,
+  isDraftRevisionConflict,
+  loadEdgeProcedureApproval,
+  procedureDraftRepository,
   recordDemoProcedureRelease,
   type ProcedureDraft,
 } from '@/features/procedure-draft/procedureDraftRepository';
 import { demoLedProcedure } from '@/features/procedures/demoProcedures';
 import type { ProcedureDetail } from '@/features/procedures/procedureModels';
+import { EdgeApiError } from '@/lib/edgeApi';
 import { describeStepCriteria, getProcedureReleaseBlockers } from './procedureReleaseRules';
 
 export class ProcedureReleaseRejected extends Error {}
 
-interface ProcedureReleaseReview {
+export type ProcedureReleaseReceipt = Pick<
+  ProcedureDetail,
+  'id' | 'code' | 'approvedVersion' | 'approvedBy' | 'title'
+>;
+
+interface ProcedureReleaseReview<Receipt extends ProcedureReleaseReceipt> {
   draft: ProcedureDraft;
   blockers: readonly string[];
   proposedVersion: string | null;
-  approverName: string;
-  published: ProcedureDetail | null;
+  approverName: string | null;
+  published: Receipt | null;
 }
 
 interface ProcedureReleaseInput {
@@ -23,12 +34,15 @@ interface ProcedureReleaseInput {
   draft: ProcedureDraft;
   reviewConfirmed: boolean;
   equipmentConfirmed: boolean;
+  reason?: string;
 }
 
 /** Frontend boundary for review and publication of a saved draft. */
-export interface ProcedureReleaseRepository {
-  load(environmentId: string, draftId: string): Promise<ProcedureReleaseReview | null>;
-  publish(input: ProcedureReleaseInput): Promise<ProcedureDetail>;
+export interface ProcedureReleaseRepository<
+  Receipt extends ProcedureReleaseReceipt = ProcedureDetail,
+> {
+  load(environmentId: string, draftId: string): Promise<ProcedureReleaseReview<Receipt> | null>;
+  publish(input: ProcedureReleaseInput): Promise<Receipt>;
 }
 
 // These fixed responses stand in for server-assigned versions in development and Maestro.
@@ -96,3 +110,56 @@ export const procedureReleaseRepository: ProcedureReleaseRepository = {
     });
   },
 };
+
+function edgeReceipt(
+  draft: ProcedureDraft,
+  result: Awaited<ReturnType<typeof approveEdgeProcedureDraft>>,
+): ProcedureReleaseReceipt {
+  return {
+    id: result.id,
+    code: result.id,
+    title: draft.title,
+    approvedVersion: result.version,
+    approvedBy: result.approvedBy,
+  };
+}
+
+export function getProcedureReleaseRepository(
+  token?: string,
+): ProcedureReleaseRepository<ProcedureReleaseReceipt> {
+  const repository = getProcedureDraftRepository(token);
+  if (repository === procedureDraftRepository) return procedureReleaseRepository;
+
+  return {
+    async load(environmentId, draftId) {
+      const draft = await repository.load(environmentId, draftId);
+      if (!draft?.edge) return null;
+      const result = await loadEdgeProcedureApproval(draft, token);
+      return {
+        draft,
+        blockers: getProcedureReleaseBlockers(draft),
+        proposedVersion: null,
+        approverName: null,
+        published: result ? edgeReceipt(draft, result) : null,
+      };
+    },
+
+    async publish({ draft, reviewConfirmed, equipmentConfirmed, reason }) {
+      if (!reviewConfirmed || !equipmentConfirmed || !reason?.trim()) {
+        throw new ProcedureReleaseRejected('장비와 절차를 확인하고 승인 사유를 입력해 주세요.');
+      }
+
+      try {
+        return edgeReceipt(draft, await approveEdgeProcedureDraft(draft, reason.trim(), token));
+      } catch (error) {
+        if (isDraftRevisionConflict(error)) {
+          throw new ProcedureReleaseRejected('초안이 변경됐어요. 최신 초안을 다시 검토해 주세요.');
+        }
+        if (error instanceof EdgeApiError && error.code === 'REVIEW_REQUIRED') {
+          throw new ProcedureReleaseRejected('미확정 항목과 실행 기준을 먼저 검토해 주세요.');
+        }
+        throw error;
+      }
+    },
+  };
+}

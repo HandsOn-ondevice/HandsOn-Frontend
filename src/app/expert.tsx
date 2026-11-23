@@ -24,6 +24,7 @@ export default function ExpertHome() {
   return (
     <ExpertHomeScreen
       environment={selection.environment}
+      edgeToken={selection.edgeToken}
       onOpenTask={openTask}
       onChangeEnvironment={() => router.replace('/')}
     />

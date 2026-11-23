@@ -18,7 +18,8 @@ export function ProcedureListScreen({
   repository = procedureRepository,
 }: ProcedureListScreenProps) {
   const [attempt, setAttempt] = useState(0);
-  const requestKey = JSON.stringify([environment.id, attempt]);
+  const environmentId = environment.environmentId ?? environment.id;
+  const requestKey = JSON.stringify([environmentId, attempt]);
   const [result, setResult] = useState<{
     key: string;
     lookup: ProcedureLookup<readonly ProcedureSummary[]>;
@@ -26,7 +27,7 @@ export function ProcedureListScreen({
 
   useEffect(() => {
     let active = true;
-    void repository.list(environment.id).then(
+    void repository.list(environmentId).then(
       (data) => {
         if (active) setResult({ key: requestKey, lookup: { status: 'ready', data } });
       },
@@ -37,7 +38,7 @@ export function ProcedureListScreen({
     return () => {
       active = false;
     };
-  }, [environment.id, repository, requestKey]);
+  }, [environmentId, repository, requestKey]);
 
   return (
     <ProcedureListView

@@ -66,14 +66,15 @@ test('조회 실패와 재시도 중에는 진행을 막고 성공 후 환경 �
   expect(onContinue).toHaveBeenCalledWith({ role: 'expert', environment });
 });
 
-test('인증 오류에서 입력한 토큰으로 재시도하고 연결이 끊겨도 토큰을 다시 사용한다', async () => {
+test('인증 재시도에 성공한 토큰을 선택한 역할에 전달한다', async () => {
+  const onContinue = jest.fn();
   const loadEnvironments = jest
     .fn<LoadWorkEnvironments>()
     .mockRejectedValueOnce(new EdgeApiError({ kind: 'server', status: 401, code: 'UNAUTHORIZED' }))
     .mockRejectedValueOnce(new EdgeApiError({ kind: 'network' }))
     .mockResolvedValueOnce([environment]);
   const screen = await render(
-    <EntryScreen onContinue={jest.fn()} loadEnvironments={loadEnvironments} />,
+    <EntryScreen onContinue={onContinue} loadEnvironments={loadEnvironments} />,
   );
   const retry = () => screen.getByRole('button', { name: '다시 시도' });
 
@@ -99,6 +100,11 @@ test('인증 오류에서 입력한 토큰으로 재시도하고 연결이 끊�
     'test-token',
   ]);
   expect(loadEnvironments.mock.calls[0][0]?.signal?.aborted).toBe(true);
+  await fireEvent.press(screen.getByRole('button', { name: '연구실: 연구실을 선택해 주세요' }));
+  await fireEvent.press(screen.getByRole('radio', { name: environment.name }));
+  await fireEvent.press(screen.getByRole('radio', { name: /^숙련 연구생/ }));
+  await fireEvent.press(screen.getByRole('button', { name: '설정하고 계속' }));
+  expect(onContinue).toHaveBeenCalledWith({ role: 'expert', environment, edgeToken: 'test-token' });
 });
 
 test('인증 이외 HTTP 오류는 토큰 입력 없이 응답 상태와 오류 코드를 안내한다', async () => {

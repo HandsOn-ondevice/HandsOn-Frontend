@@ -1,7 +1,19 @@
 import type {
+  EdgeDraftExecution,
   ProcedureDraft,
   ProcedureDraftStep,
 } from '@/features/procedure-draft/procedureDraftRepository';
+
+export function describeExecutionCriteria(execution: EdgeDraftExecution) {
+  return [
+    `거리 ${execution.distanceMinCm}~${execution.distanceMaxCm} cm`,
+    `조도 최솟값 ${execution.lightMinRaw}`,
+    `안정화 대기 ${execution.settlingSeconds}초`,
+    `센서값 최대 경과 ${execution.staleAfterMs} ms`,
+    `장치 점검 유효 시간 ${execution.checkValidityMs} ms`,
+    ...execution.conditions.map(({ label, repetitions }) => `${label} · ${repetitions}회`),
+  ];
+}
 
 export function describeStepCriteria(step: ProcedureDraftStep) {
   if (!step.criteria) return null;
@@ -34,6 +46,7 @@ export function describeStepCriteria(step: ProcedureDraftStep) {
 }
 
 export function getUnresolvedDraftItems(draft: ProcedureDraft) {
+  if (draft.edge) return draft.pendingItems;
   return draft.pendingItems.filter(({ id, stepId }) => {
     const step = draft.steps.find((step) => step.id === stepId);
     const criteria = step?.criteria;
@@ -59,6 +72,7 @@ export function getUnresolvedDraftItems(draft: ProcedureDraft) {
 }
 
 export function stepNeedsCriteriaReview(draft: ProcedureDraft, step: ProcedureDraftStep) {
+  if (draft.edge) return step.needsReview;
   const mapped = draft.pendingItems.some(({ stepId }) => stepId === step.id);
   return (
     getUnresolvedDraftItems(draft).some(({ stepId }) => stepId === step.id) ||
@@ -69,6 +83,13 @@ export function stepNeedsCriteriaReview(draft: ProcedureDraft, step: ProcedureDr
 export function getProcedureReleaseBlockers(draft: ProcedureDraft) {
   const pending = getUnresolvedDraftItems(draft);
   const blockers = pending.map(({ label }) => `필수 기준 미확정 · ${label}`);
+  if (draft.edge) {
+    for (const { title, needsReview } of draft.steps) {
+      if (needsReview) blockers.push(`단계 검토 필요 · ${title}`);
+    }
+    if (!draft.edge.execution) blockers.push('실행 기준을 입력해 주세요.');
+    return blockers;
+  }
   if (!draft.title.trim()) blockers.push('절차 이름이 필요합니다.');
   if (!draft.steps.length || draft.steps.some(({ title }) => !title.trim())) {
     blockers.push('절차 단계를 확인해 주세요.');

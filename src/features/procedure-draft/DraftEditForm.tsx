@@ -28,15 +28,22 @@ export function DraftEditForm({ editor, draft, onClose, onApply }: DraftEditForm
   const [destination, setDestination] = useState(position);
 
   const label = draftEditorLabel(editor);
+  const invalidStep =
+    editor.kind === 'step' && (!step || !title.trim() || (draft.edge && !text.trim()));
 
   function apply() {
     if (editor.kind === 'step') {
-      if (!step || !title.trim()) return;
+      if (!step || invalidStep) return;
       onApply((current) => {
         const edited: ProcedureDraftStep = {
           ...step,
           title: title.trim(),
           description: text.trim(),
+          needsReview:
+            step.needsReview ||
+            Boolean(
+              draft.edge && (step.title !== title.trim() || step.description !== text.trim()),
+            ),
         };
         const steps = current.steps.filter(({ id }) => id !== step.id);
         steps.splice(destination, 0, edited);
@@ -60,6 +67,7 @@ export function DraftEditForm({ editor, draft, onClose, onApply }: DraftEditForm
             label="단계 이름"
             value={title}
             onChange={setTitle}
+            maxLength={draft.edge ? 120 : undefined}
             withinSheet={useNativeKeyboardIntegration}
           />
           <View style={styles.order}>
@@ -85,17 +93,20 @@ export function DraftEditForm({ editor, draft, onClose, onApply }: DraftEditForm
       ) : null}
       <TextField
         label={editor.kind === 'step' ? '단계 내용' : label}
-        support={editor.kind === 'step' ? undefined : '한 줄에 한 항목을 입력해 주세요.'}
+        support={
+          editor.kind === 'step'
+            ? draft.edge && !text.trim()
+              ? '단계 내용을 입력해 주세요.'
+              : undefined
+            : '한 줄에 한 항목을 입력해 주세요.'
+        }
         value={text}
         onChange={setText}
         multiline
+        maxLength={editor.kind === 'step' && draft.edge ? 10000 : undefined}
         withinSheet={useNativeKeyboardIntegration}
       />
-      <Button
-        label="편집 적용"
-        disabled={editor.kind === 'step' && (!step || !title.trim())}
-        onPress={apply}
-      />
+      <Button label="편집 적용" disabled={Boolean(invalidStep)} onPress={apply} />
     </>
   );
 }
