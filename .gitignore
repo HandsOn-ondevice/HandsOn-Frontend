@@ -47,4 +47,5 @@ example
 coverage/
 artifacts/
 .env*
+.env.local
 !.env.example
