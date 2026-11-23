@@ -335,13 +335,13 @@ describe('읽기 전용 워크플로 조회 계약', () => {
     const summary = await workflowQueries.getSessionSummary('demo-session-led-m03');
     expect(summary).toMatchObject({
       sessionId: 'demo-session-led-m03',
-      phase: 'preparing',
+      phase: 'paused',
       source: 'mock',
-      cursor: null,
-      condition: null,
+      cursor: { conditionId: 'output-50', trialIndex: 3 },
+      condition: { id: 'output-50', label: '50%' },
       resultId: null,
-      canOpenResume: false,
-      progress: { validMeasurements: 0, totalMeasurements: 15, percentage: 0 },
+      canOpenResume: true,
+      progress: { validMeasurements: 8, totalMeasurements: 15, percentage: 53 },
     });
     expect(Object.keys(workflowQueries).sort()).toEqual(['getResult', 'getSessionSummary']);
     await expect(workflowQueries.getSessionSummary('missing-session')).rejects.toMatchObject({

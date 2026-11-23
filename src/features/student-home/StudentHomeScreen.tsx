@@ -32,7 +32,12 @@ interface StudentHomeScreenProps {
   onChangeEnvironment: () => void;
 }
 
-const sessionLabels = { running: '진행 중', paused: '일시정지', held: '보류' } as const;
+const sessionLabels = {
+  preparing: '준비 중',
+  running: '진행 중',
+  paused: '일시정지',
+  held: '보류',
+} as const;
 const completionLabels = {
   awaitingCleanup: '실험 정리 대기',
   readyToSubmit: '결과 제출 대기',
@@ -119,7 +124,7 @@ export function StudentHomeScreen({
               subtitle={
                 edge
                   ? `${completionLabel ?? (session.status === 'held' ? '보류' : '저장된 작업')} · ${session.completedCycles} / ${session.totalCycles}회차`
-                  : `${sessionLabels[session.status]} · ${session.savedAtLabel} 저장\n${session.conditionProgress}% 조건 · ${session.completedCycles} / ${session.totalCycles}회차`
+                  : `${sessionLabels[session.status]} · ${session.savedAtLabel} 저장${session.status === 'preparing' ? '' : `\n${session.conditionProgress}% 조건 · ${session.completedCycles} / ${session.totalCycles}회차`}`
               }
             />
             <Button

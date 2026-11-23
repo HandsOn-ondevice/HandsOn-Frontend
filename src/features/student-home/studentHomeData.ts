@@ -3,6 +3,9 @@ import { demoLedProcedure } from '@/features/procedures/demoProcedures';
 import type { WorkEnvironment } from '../entry/entryEnvironment';
 import { EdgeApiError, getEdge, isEdgeDataEnabled } from '@/lib/edgeApi';
 import type { ExperimentSession } from '@/features/researcher-workflow/domain/models';
+import { selectExecution } from '@/features/researcher-workflow/domain/execution';
+import { isMockWorkflowEnabled } from '@/features/researcher-workflow/infrastructure/mock/mock-environment';
+import { developmentRepository } from '@/features/researcher-workflow/state/workflow-repository';
 
 export interface StudentHomeData {
   dataOrigin?: 'simulation' | 'hardware';
@@ -14,7 +17,7 @@ export interface StudentHomeData {
     procedureVersion: string;
     environmentId: string;
     deviceId: string;
-    status: 'running' | 'paused' | 'held';
+    status: 'preparing' | 'running' | 'paused' | 'held';
     phase?: ExperimentSession['phase'];
     savedAtLabel: string;
     conditionProgress: number;
@@ -64,7 +67,7 @@ export const loadStudentHome: LoadStudentHome = async (environment, edgeToken) =
     }
     return data;
   }
-  if (!__DEV__ && process.env.EXPO_PUBLIC_HANDSON_MAESTRO !== '1') {
+  if (!isMockWorkflowEnabled()) {
     throw new Error('연구생 홈 조회가 아직 연결되지 않았습니다.');
   }
 
@@ -86,21 +89,11 @@ export const loadStudentHome: LoadStudentHome = async (environment, edgeToken) =
     };
   }
 
+  const session = developmentRepository.getOngoingSession();
   return {
     researcherName: '준혁',
     deviceStatus: 'connected',
-    ongoingSession: {
-      id: 'demo-session-led-m03',
-      title: 'LED 출력 단계별\n조도·소비전력 측정',
-      procedureVersion: 'v1.2',
-      environmentId: environment.id,
-      deviceId: 'demo-orange-pi-5-plus',
-      status: 'paused',
-      savedAtLabel: '09:34',
-      conditionProgress: 50,
-      completedCycles: 2,
-      totalCycles: 3,
-    },
+    ongoingSession: session ? toMockOngoingSession(environment.id, session) : null,
     approvedProcedures: released.some(({ id }) => id === demoLedProcedure.id)
       ? released
       : [
@@ -124,5 +117,49 @@ export const loadStudentHome: LoadStudentHome = async (environment, edgeToken) =
     ],
   };
 };
+
+function toMockOngoingSession(
+  environmentId: string,
+  session: ExperimentSession,
+): NonNullable<StudentHomeData['ongoingSession']> {
+  const execution = selectExecution(session);
+  const { phase, procedure } = session;
+  const attempts = session.execution?.attempts ?? [];
+  const lastConditionId = attempts.at(-1)?.cursor.conditionId;
+  const condition =
+    execution.condition ??
+    procedure.execution?.conditions.find((item) => item.id === lastConditionId);
+  let status: NonNullable<StudentHomeData['ongoingSession']>['status'] = 'running';
+  if (phase === 'preparing' || phase === 'awaitingDeviceCheck' || phase === 'readyToExecute') {
+    status = 'preparing';
+  } else if (phase === 'paused') {
+    status = 'paused';
+  } else if (phase === 'held' || execution.requiresRecovery || execution.requiresRemeasurement) {
+    status = 'held';
+  }
+
+  return {
+    id: session.sessionId,
+    title: procedure.title,
+    procedureVersion: procedure.version.startsWith('v')
+      ? procedure.version
+      : `v${procedure.version}`,
+    environmentId,
+    deviceId: procedure.deviceCheck?.deviceId ?? procedure.deviceId,
+    status,
+    phase,
+    savedAtLabel: new Date(session.updatedAt).toLocaleTimeString('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }),
+    conditionProgress: Number.parseFloat(condition?.label ?? '') || 0,
+    completedCycles: attempts.filter(
+      (attempt) => attempt.status === 'valid' && attempt.cursor.conditionId === condition?.id,
+    ).length,
+    totalCycles: condition?.repetitions ?? 0,
+  };
+}
 
 const deviceStatuses = { connected: true, disconnected: true, unknown: true };

@@ -16,6 +16,7 @@ import { currentEdgeHold } from '../domain/edge-hold';
 import type { ExperimentSession } from '../domain/models';
 import { useWorkflowSession } from '../state/useWorkflowSession';
 import { EdgeHoldConfirmation, useEdgeHoldConfirmation } from './EdgeHoldConfirmation';
+import { procedureVersionLabel } from './procedure-version-label';
 
 export function EdgeResumeScreen({
   sessionId,
@@ -87,6 +88,7 @@ export function EdgeResumeScreen({
         ) : null}
         {paused && cursor ? (
           <>
+            <AppText>승인 버전 {procedureVersionLabel(session.procedure.version)}</AppText>
             <AppText variant="heading" accessibilityRole="header">
               {condition?.label ?? cursor.conditionId} 조건 · {cursor.trialIndex}회차부터 재개
             </AppText>

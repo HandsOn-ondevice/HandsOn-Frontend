@@ -26,12 +26,14 @@ export function PreparationScreen({
   onBack,
   onHome = onBack,
   onDeviceCheck,
+  continuationLoading,
   renderResume,
 }: {
   sessionId: string;
   onBack: () => void;
   onHome?: () => void;
   onDeviceCheck: () => void;
+  continuationLoading?: ReactNode;
   renderResume?: (session: ExperimentSession) => ReactNode;
 }) {
   const {
@@ -52,16 +54,11 @@ export function PreparationScreen({
   const mock = session?.source === 'mock';
   const [enteredPreparation, setEnteredPreparation] = useState(false);
   // An open checklist continues to use its explicit navigation after its own commands.
-  if (
-    renderResume &&
-    !enteredPreparation &&
-    session?.source === 'api' &&
-    session.phase === 'preparing'
-  ) {
+  if (renderResume && !enteredPreparation && session?.phase === 'preparing') {
     setEnteredPreparation(true);
   }
-  const resumeDestination =
-    session && (mock || !enteredPreparation) ? renderResume?.(session) : null;
+  if (loading && !enteredPreparation && continuationLoading) return continuationLoading;
+  const resumeDestination = session && !enteredPreparation ? renderResume?.(session) : null;
   if (resumeDestination) return resumeDestination;
 
   const guidance =
