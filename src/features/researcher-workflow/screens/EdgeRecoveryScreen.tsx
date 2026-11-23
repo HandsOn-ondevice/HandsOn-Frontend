@@ -14,12 +14,13 @@ import {
 import { useEntrySelection } from '@/features/entry/EntrySelectionProvider';
 import type { WorkflowRepository } from '../application/WorkflowRepository';
 import { selectEdgeRecovery } from '../domain/edge-recovery';
+import { selectEdgeRemeasurement } from '../domain/edge-remeasurement';
 import { withEdgeMeasurement } from '../infrastructure/edge/edge-measurement';
 import { createEdgeSessionRequest } from '../infrastructure/edge/edge-session-request';
 import { WorkflowProvider, useWorkflowRepository } from '../state/WorkflowProvider';
 import { useWorkflowSession } from '../state/useWorkflowSession';
 
-type Props = { sessionId: string; onBack: () => void };
+type Props = { sessionId: string; onBack: () => void; onRemeasurement: () => void };
 type Deadline = { attemptId: string; expiresAt: number };
 const deadlines = new WeakMap<WorkflowRepository, Map<string, Deadline>>();
 const POLL_INTERVAL_MS = 600;
@@ -50,12 +51,18 @@ export function EdgeRecoveryScreen(props: Props) {
   );
 }
 
-function RecoveryContent({ sessionId, onBack, base }: Props & { base: WorkflowRepository }) {
+function RecoveryContent({
+  sessionId,
+  onBack,
+  onRemeasurement,
+  base,
+}: Props & { base: WorkflowRepository }) {
   const { session, loading, error, pending, execute, refresh, canRetryCommand, retryCommand } =
     useWorkflowSession(sessionId);
   const repository = useWorkflowRepository();
   const focused = useIsFocused();
   const state = selectEdgeRecovery(session);
+  const remeasurement = selectEdgeRemeasurement(session);
   const attemptId = state?.checking ? state.recovery?.sampleAttemptId : undefined;
   const finishedAttemptId =
     state?.recovery && state.recovery.status !== 'checking'
@@ -173,11 +180,16 @@ function RecoveryContent({ sessionId, onBack, base }: Props & { base: WorkflowRe
               />
             ) : null}
             {state.recovered ? (
-              <FeedbackPanel
-                title="센서 재확인 완료"
-                subtitle="현재 회차에서 새 측정을 해야 완료할 수 있습니다."
-                tone="success"
-              />
+              <>
+                <FeedbackPanel
+                  title="센서 재확인 완료"
+                  subtitle="현재 회차에서 새 측정을 해야 완료할 수 있습니다."
+                  tone="success"
+                />
+                {remeasurement?.canRequest ? (
+                  <Button label="같은 회차 재측정으로 이동" onPress={onRemeasurement} />
+                ) : null}
+              </>
             ) : (
               <Button
                 label="센서 다시 확인"
@@ -193,6 +205,8 @@ function RecoveryContent({ sessionId, onBack, base }: Props & { base: WorkflowRe
               />
             )}
           </>
+        ) : remeasurement && (remeasurement.sampling || remeasurement.ready) ? (
+          <Button label="재측정 상태 보기" onPress={onRemeasurement} />
         ) : session ? (
           <FeedbackPanel title="복구할 측정 오류가 없습니다" />
         ) : null}

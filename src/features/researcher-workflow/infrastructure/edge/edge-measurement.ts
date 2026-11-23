@@ -15,7 +15,8 @@ export function withEdgeMeasurement(
       if (
         command.type !== 'requestExecutionSample' &&
         command.type !== 'completeExecutionStep' &&
-        command.type !== 'requestRecovery'
+        command.type !== 'requestRecovery' &&
+        command.type !== 'requestRecoveryRemeasurement'
       ) {
         return base.executeCommand(id, command, context);
       }

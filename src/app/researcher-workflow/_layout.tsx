@@ -12,6 +12,7 @@ const edgeScreens = new Set([
   '[sessionId]/device-check',
   '[sessionId]/execution',
   '[sessionId]/recovery',
+  '[sessionId]/remeasurement',
 ]);
 
 export default function ResearcherWorkflowLayout() {
