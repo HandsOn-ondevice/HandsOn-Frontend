@@ -233,6 +233,16 @@ export async function finishDemo(
       await expect(
         student.getByText(`유효 측정 ${total} / ${total}`, { exact: true }),
       ).toBeVisible();
+      await button(student, '뒤로가기').click();
+      await expect(student).toHaveURL((url) => url.pathname === `${route}/execution`);
+      const execution = student.getByTestId('execution-screen');
+      await expect(execution.getByText('측정 기록 확인', { exact: true })).toBeVisible();
+      await expect(button(student, '현재 회차 측정값 확인')).toHaveCount(0);
+      await execution.getByRole('button', { name: '누락·이상 검토', exact: true }).click();
+      await expect(student).toHaveURL(`${route}/review`);
+      await expect(
+        student.getByText(`유효 측정 ${total} / ${total}`, { exact: true }),
+      ).toBeVisible();
       await capture(student, info, '14-final-measurement-review');
 
       await button(student, '장치 정리로 이동').click();

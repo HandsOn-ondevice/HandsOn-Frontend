@@ -119,6 +119,19 @@ for (const viewport of [
     for (let index = 1; index < 15; index++) await measure(page);
     await expect(page).toHaveURL(`${route}/review`);
     await expect(page.getByText('유효 측정 15회가 확인되었습니다', { exact: true })).toBeVisible();
+    await page
+      .getByTestId('completion-누락·이상 검토')
+      .getByRole('button', { name: '뒤로가기', exact: true })
+      .click();
+    await expect(page).toHaveURL((url) => url.pathname === `${route}/execution`);
+    const execution = page.getByTestId('execution-screen');
+    await expect(execution.getByText('반복 측정 완료', { exact: true })).toBeVisible();
+    await expect(
+      execution.getByRole('button', { name: '현재 회차 측정값 확인', exact: true }),
+    ).toBeDisabled();
+    await execution.getByRole('button', { name: '누락·이상 검토', exact: true }).click();
+    await expect(page).toHaveURL(`${route}/review`);
+    await expect(page.getByText('유효 측정 15회가 확인되었습니다', { exact: true })).toBeVisible();
     await capture(
       page,
       testInfo,

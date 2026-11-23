@@ -1,12 +1,20 @@
 import { afterEach, expect, jest, test } from '@jest/globals';
-import { act, renderHook, waitFor } from '@testing-library/react-native';
+import { act, render, renderHook, waitFor } from '@testing-library/react-native';
+import { loadEdgeResult } from '@/features/expert-review/edgeResultRepository';
 import type { WorkflowRepository } from '@/features/researcher-workflow/application/WorkflowRepository';
 import { WorkflowError } from '@/features/researcher-workflow/domain/models';
 import { EdgeWorkflowRepository } from '@/features/researcher-workflow/infrastructure/edge/EdgeWorkflowRepository';
 import { createEdgeSessionRequest } from '@/features/researcher-workflow/infrastructure/edge/edge-session-request';
 import { parseEdgeSession } from '@/features/researcher-workflow/infrastructure/edge/edge-session';
+import { EdgeCompletionScreen } from '@/features/researcher-workflow/screens/EdgeCompletionScreen';
 import { useWorkflowSession } from '@/features/researcher-workflow/state/useWorkflowSession';
 import { WorkflowProvider } from '@/features/researcher-workflow/state/WorkflowProvider';
+
+jest.mock('expo-router', () => ({ router: { replace: jest.fn(), push: jest.fn() } }));
+jest.mock('@/features/entry/EntrySelectionProvider', () => ({
+  useEntrySelection: () => ({ selection: { environment: { id: 'kit-lab' } } }),
+}));
+jest.mock('@/features/expert-review/edgeResultRepository', () => ({ loadEdgeResult: jest.fn() }));
 
 const now = '2026-11-24T05:00:00.000Z';
 const sessionId = 'session-1';
@@ -185,6 +193,97 @@ test('회차 완료의 423 응답에서 저장된 마지막 측정과 출력 종
       { requestId: 'complete-1', expectedRevision: 17 },
     ),
   ).rejects.toMatchObject({ code: 'CLEANUP_OUTPUT_FAILED', session: failedOutput });
+});
+
+test('Edge S12는 요약이 1/1이어도 현재 세션에 해당 회차의 수락 근거가 생길 때까지 정리를 열지 않는다', async () => {
+  const cursor = {
+    cursorId: 'cursor-1',
+    stepId: 'distance-measurement',
+    conditionId: '20cm',
+    trialIndex: 1,
+  };
+  const attempt = {
+    attemptId: 'sample-1',
+    cursor,
+    status: 'valid',
+    requestedAt: now,
+    receivedAt: now,
+    confirmedAt: now,
+    report: {
+      attemptId: 'sample-1',
+      cursorId: cursor.cursorId,
+      source: 'api',
+      stability: 'stable',
+      diagnostics: { deviceId: 'orange-pi-01', checkedAt: now, source: 'api', sensors: [] },
+    },
+  };
+  const before = parseEdgeSession({
+    ...awaitingCleanup,
+    execution: { ...awaitingCleanup.execution, attempts: [attempt] },
+  });
+  const accepted = parseEdgeSession({
+    ...before,
+    revision: before.revision + 1,
+    evidence: [
+      {
+        evidenceId: 'accepted-1',
+        sessionId,
+        kind: 'sensor',
+        actorId: 'edge-service',
+        action: 'measurementAccepted',
+        recordedAt: now,
+        source: 'api',
+        attemptId: attempt.attemptId,
+        cursor,
+      },
+    ],
+  });
+  jest.mocked(loadEdgeResult).mockResolvedValue({
+    result: {
+      id: sessionId,
+      sessionId,
+      procedureId: 'kit-distance',
+      procedureTitle: '키트 거리 확인',
+      approvedVersion: '1.1.0',
+      studentName: 'operator-01',
+      deviceName: 'orange-pi-01',
+      submittedLabel: '',
+      status: 'pending',
+      comment: '',
+      validCount: 1,
+      totalCount: 1,
+      unresolvedCount: 0,
+      remeasurementCount: 0,
+      unit: 'cm',
+      conditions: [
+        { id: '20cm', label: '20 cm', value: 20, validCount: 1, totalCount: 1, invalidCount: 0 },
+      ],
+    },
+    evidenceByCondition: new Map(),
+  });
+  let publish: Parameters<WorkflowRepository['subscribe']>[1] = () => {};
+  const repository: WorkflowRepository = {
+    getSession: jest.fn<WorkflowRepository['getSession']>().mockResolvedValue(before),
+    createSession: jest.fn<WorkflowRepository['createSession']>(),
+    executeCommand: jest.fn<WorkflowRepository['executeCommand']>(),
+    subscribe: (_, listener) => {
+      publish = listener;
+      return () => {};
+    },
+  };
+  const screen = await render(
+    <WorkflowProvider repository={repository}>
+      <EdgeCompletionScreen sessionId={sessionId} stage="review" />
+    </WorkflowProvider>,
+  );
+  await screen.findByText('유효 측정 1 / 1');
+  expect(screen.getByText('20 cm 조건 1회차를 확인해 주세요')).toBeTruthy();
+  expect(screen.queryByRole('button', { name: '장치 정리로 이동' })).toBeNull();
+
+  await act(async () => publish(accepted));
+
+  expect(await screen.findByRole('button', { name: '장치 정리로 이동' })).toBeEnabled();
+  expect(screen.queryByText('20 cm 조건 1회차를 확인해 주세요')).toBeNull();
 });
 
 test('제출 응답을 받지 못하면 명시적 재시도 때만 동일 키와 본문을 보낸다', async () => {
