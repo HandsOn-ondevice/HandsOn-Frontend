@@ -18,7 +18,12 @@ type StudentHome = {
   recentResults: { id: string; sessionId: string; title: string }[];
 };
 type ExpertHome = {
-  procedures: (ProcedureSummary & { status: 'approved' | 'draft' })[];
+  procedures: (ProcedureSummary & {
+    status: 'approved' | 'draft';
+    summary: string;
+    updatedLabel: string;
+  })[];
+  recentWork: unknown[];
   results: {
     id: string;
     procedureId: string;
@@ -338,6 +343,23 @@ test('S00 → E01에서 Edge 응답의 초안·승인 절차·제출 결과를 �
     await expect(page.getByRole('button', { name: draft.title }).first()).toBeVisible();
   }
   await page.screenshot({ path: testInfo.outputPath('expert-home.png') });
+  const mostRecentApproval = [...approved].sort(
+    (a, b) => Date.parse(b.updatedLabel) - Date.parse(a.updatedLabel),
+  )[0];
+  if (home.recentWork.length === 0 && mostRecentApproval) {
+    const { id, title, version, summary, updatedLabel } = mostRecentApproval;
+    const recentApproval = page.getByRole('button', {
+      name: `${title}, 승인, ${summary} · ${updatedLabel}, 승인 ${version}`,
+      exact: true,
+    });
+    await expect(recentApproval).toBeVisible();
+    await recentApproval.click();
+    await expect(page).toHaveURL(
+      `/expert/procedures/${encodeURIComponent(id)}?version=${encodeURIComponent(version)}`,
+    );
+    await expect(page.getByText(version, { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: '숙련자 홈으로', exact: true }).click();
+  }
   for (const result of pending) {
     const button = page.getByRole('button', {
       name: `${result.studentName} · ${result.deviceName}, 검토 대기, ${result.summary}`,
