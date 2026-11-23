@@ -53,9 +53,9 @@ for (const viewport of [
       .click();
     await expect
       .poll(() => decodeURIComponent(new URL(page.url()).pathname))
-      .toBe(`/expert/procedures/${draftId}`);
-    await expect(page.getByRole('heading', { name: '절차 편집' })).toBeVisible();
-    await returnHome(page);
+      .toBe(`/expert/drafts/${draftId}`);
+    await expect(page.getByRole('heading', { name: 'AI 절차 초안', exact: true })).toBeVisible();
+    await returnHome(page, '뒤로가기');
 
     await page.getByRole('button', { name: /노준혁.*LED-M03/ }).click();
     await expect

@@ -74,16 +74,44 @@ import { Button, SensorCard } from '@/design-system';
 
 ## 검사
 
+PR 생성·업데이트 전 저장소 루트에서 CI와 같은 명령을 실행합니다. 의존성이나 lockfile을 바꿨다면 먼저 `npm ci`를 실행합니다.
+
 ```sh
-npm run typecheck
-npm run lint
-npm run format:check
-npm run test:ci
-npm run doctor
-npm run export:android
+npm run verify:pr
 ```
 
-PR과 main push에서 같은 검사를 GitHub Actions로 실행합니다. 번들·단위 테스트는 실제 기기의 제스처·키보드·레이아웃 확인을 대체하지 않습니다. 검증 결과와 남은 제한은 [검증 기록](docs/validation/README.md)에 적습니다.
+`doctor` → `typecheck` → `lint` → `format:check` → `test:ci` → `export:android` 순서로 검사하며, 하나라도 실패하면 중단합니다. 각 단계는 `npm run doctor`처럼 개별 실행할 수도 있습니다. Doctor는 온라인 의존성 검사를 유지하므로 네트워크 연결이 필요합니다. 로컬 통과 후에도 Expo의 권장 버전 정보가 갱신되면 CI에서 새 불일치를 발견할 수 있습니다.
+
+PR과 main push에서 같은 명령을 GitHub Actions로 실행합니다. 번들·단위 테스트는 실제 기기의 제스처·키보드·레이아웃 확인을 대체하지 않습니다. 검증 결과와 남은 제한은 [검증 기록](docs/validation/README.md)에 적습니다.
+
+### Maestro PR 사전 실행
+
+화면 문구·접근성 이름·이동 경로·네이티브 동작을 바꿨다면 해당 화면과 진입·후속 화면을 사용하는 `.maestro/` 시나리오를 검토하고 Android에서 실행합니다. 문서·검증 명령만 바꾼 작업에는 Android 시나리오 실행이 필요하지 않습니다.
+
+로컬 Android 환경이 없을 때는 기존 `Maestro Android` 워크플로의 수동 실행을 사용합니다. 변경을 커밋하고 작업 브랜치를 push한 뒤 실행하므로 PR 생성 전에도 확인할 수 있습니다. 아래 `codex/your-branch`는 실제 작업 브랜치명으로 바꿉니다.
+
+```sh
+git push -u origin codex/your-branch
+gh workflow run maestro.yml --repo HandsOn-ondevice/HandsOn-Frontend --ref codex/your-branch
+gh run list --repo HandsOn-ondevice/HandsOn-Frontend --workflow maestro.yml \
+  --branch codex/your-branch --event workflow_dispatch --limit 5 \
+  --json databaseId,headSha,status,conclusion,url
+git rev-parse HEAD
+```
+
+목록의 `headSha`와 `git rev-parse HEAD`가 같은 실행의 `databaseId`를 선택합니다. 아래 `<run-id>`를 그 값으로 바꿔 완료까지 확인합니다.
+
+```sh
+gh run watch <run-id> --repo HandsOn-ondevice/HandsOn-Frontend --exit-status
+```
+
+CI는 `EXPO_PUBLIC_HANDSON_MAESTRO=1`로 fixture를 활성화한 APK를 빌드하고 `.maestro/` 전체를 실행합니다. 실패하면 실행 페이지의 단계별 로그와 `maestro-android` 아티팩트에 저장된 JUnit 결과·스크린샷·디버그 로그를 확인합니다. PR에 실행 링크와 대상 커밋, 실제 결과를 기록하고, 수정한 커밋을 push했다면 다시 실행합니다. 수동 실행은 작업 브랜치의 커밋을 확인하며, PR의 CI는 main과 합쳐진 결과를 확인합니다.
+
+이미 현재 코드의 fixture 활성화 APK를 설치한 Android 기기와 Maestro CLI가 준비돼 있다면 관련 시나리오만 로컬에서 실행할 수도 있습니다. CI의 Maestro 버전은 `.github/workflows/maestro.yml`에 고정돼 있습니다. 아래 `<device-id>`는 실행 중인 Android 기기 ID로 바꿉니다.
+
+```sh
+maestro --device <device-id> test .maestro/recording-android.yaml
+```
 
 ## 웹 E2E 환경 확인
 

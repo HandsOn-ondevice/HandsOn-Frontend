@@ -17,7 +17,7 @@ HandsOn은 신규 연구생의 실험 준비와 숙련자의 절차 관리를 �
 - `nvm use` 후 `npm ci`로 lockfile 기준의 의존성을 설치한다.
 - `npm run android`로 Android development build를 생성·설치하고 실행한다. 이미 설치된 빌드에는 `npm start`로 Metro를 실행한다. 네이티브 의존성이나 앱 설정을 바꾸면 `npm run android`로 다시 빌드한다.
 - `npm run web`으로 Expo 개발 웹을 실행한다.
-- `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm run test:ci`, `npm run doctor`, `npm run export:android`는 `.github/workflows/checks.yml`이 실행하는 검사다.
+- `npm run verify:pr`은 로컬과 `.github/workflows/checks.yml`의 공통 검증 명령이다. 온라인 `doctor` → `typecheck` → `lint` → `format:check` → `test:ci` → `export:android` 순서로 실행하며, 하나라도 실패하면 중단한다. 각 검사는 개별 명령으로도 실행할 수 있다.
 
 ## Coding Style & Naming Conventions
 
@@ -26,6 +26,13 @@ TypeScript strict 모드를 유지한다. 들여쓰기는 공백 2칸, 문자열
 컴포넌트와 타입은 PascalCase, 함수·변수는 camelCase, Hook은 `use` 접두사를 사용한다. `@/`는 `src/`를 가리킨다. 스타일은 `StyleSheet`와 `tokens.ts`의 의미 토큰을 사용한다. 입력값과 업무 상태는 호출자가 소유하고, 공통 컴포넌트는 표시와 콜백을 담당한다.
 
 ## Testing Guidelines
+
+### PR 전 실행 기준
+
+- PR 생성·업데이트 전 `npm run verify:pr`을 실행한다. 의존성·lockfile을 바꿨다면 먼저 `npm ci`로 설치 정합성을 확인한다. Doctor의 온라인 의존성 검사는 유지하며, 실패를 피하려고 검사 제외·오프라인 실행·경고 처리로 바꾸지 않는다.
+- 화면 문구·접근성 이름·이동 경로·네이티브 동작을 바꾸면 해당 화면과 진입·후속 화면을 사용하는 `.maestro/` 시나리오를 함께 검토한다. 실제 화면과 기대값을 대조하고, 실패 단언을 제거하거나 대기 시간만 늘려 통과시키지 않는다.
+- 위 변경은 해당 Android Maestro 시나리오로 검증한다. 로컬 Android 실행 환경이 없으면 브랜치를 먼저 push하고 기존 Maestro CI를 `workflow_dispatch`로 실행한다. [README의 사전 실행 절차](README.md#maestro-pr-사전-실행)를 따른다. 문서·검증 명령만 바꾼 작업에는 Android 시나리오 실행을 요구하지 않는다.
+- 검증 후 관련 코드를 바꿨다면 영향을 받는 검사를 다시 실행한다. 원격 Maestro 결과의 `headSha`가 push한 검증 대상 커밋과 같은지 확인하고, PR에 명령·결과·실행 링크와 미실시 항목을 적는다. Playwright 통과를 Android 검증 결과로 기록하지 않는다.
 
 ### Jest
 

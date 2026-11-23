@@ -64,5 +64,10 @@ name: Android 음성 녹음과 일시정지 및 초안 생성
 - extendedWaitUntil:
     visible: AI 절차 초안
     timeout: 15000
-- assertVisible: LED output measurement
+- extendedWaitUntil:
+    visible: 1단계 작업 설명 검토
+    timeout: 15000
+- assertVisible: '1단계 · 준비물 0개'
+- assertVisible: 임시 저장됨 · 승인 전
+- assertVisible: 미확정 항목 1개 보기
 - takeScreenshot: e04-generated-draft

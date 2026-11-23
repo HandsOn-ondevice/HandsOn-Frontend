@@ -1,3 +1,8 @@
+import {
+  getDemoProcedureDraftId,
+  procedureDraftRepository,
+} from '@/features/procedure-draft/procedureDraftRepository';
+
 export interface ExpertProcedure {
   readonly id: string;
   readonly title: string;
@@ -41,16 +46,17 @@ export type LoadExpertHome = (environmentId: string) => Promise<ExpertHomeData>;
 function createDemoHome(environmentId: string): ExpertHomeData {
   const procedureId = (name: string) => `${environmentId}:procedure:${name}`;
   const resultId = (name: string) => `${environmentId}:result:${name}`;
+  const draftId = getDemoProcedureDraftId(environmentId);
 
   return {
     displayName: '지연',
     procedures: [
       {
-        id: procedureId('led-output-draft'),
+        id: draftId,
         title: 'LED 출력 특성 측정 초안',
         status: 'draft',
         version: 'v0.1',
-        updatedLabel: '자동 저장 8분 전',
+        updatedLabel: '검토 대기',
         summary: '미확정 기준 3개',
         detail: '기준값 검토 필요',
       },
@@ -123,10 +129,10 @@ function createDemoHome(environmentId: string): ExpertHomeData {
       {
         id: `${environmentId}:recent:draft`,
         kind: 'procedure',
-        procedureId: procedureId('led-output-draft'),
+        procedureId: draftId,
         title: 'LED 출력 특성 측정 초안',
         summary: '초안 편집',
-        updatedLabel: '8분 전',
+        updatedLabel: '검토 대기',
       },
       {
         id: `${environmentId}:recent:review`,
@@ -143,9 +149,37 @@ function createDemoHome(environmentId: string): ExpertHomeData {
 
 export const loadExpertHome: LoadExpertHome = async (environmentId) => {
   if (!environmentId.trim()) throw new Error('작업 환경을 선택해 주세요.');
-  // Replace the fixture loader after home aggregates and draft re-entry contracts are agreed.
   if (__DEV__ || process.env.EXPO_PUBLIC_HANDSON_MAESTRO === '1') {
-    return createDemoHome(environmentId);
+    const demo = createDemoHome(environmentId);
+    const savedDrafts = await procedureDraftRepository.listSaved(environmentId);
+    const savedIds = new Set(savedDrafts.map((draft) => draft.id));
+    const savedProcedures = savedDrafts.map<ExpertProcedure>((draft) => ({
+      id: draft.id,
+      title: draft.title,
+      status: draft.status,
+      version: draft.version,
+      updatedLabel: '임시 저장 완료',
+      summary: `${draft.steps.length}단계 · 준비물 ${draft.materials.length}개`,
+      detail: draft.pendingItems.length ? `미확정 항목 ${draft.pendingItems.length}개` : undefined,
+    }));
+
+    return {
+      ...demo,
+      procedures: [...savedProcedures, ...demo.procedures.filter((item) => !savedIds.has(item.id))],
+      recentWork: [
+        ...savedProcedures.map<ExpertRecentWork>((draft) => ({
+          id: draft.id,
+          kind: 'procedure',
+          procedureId: draft.id,
+          title: draft.title,
+          summary: '초안 편집',
+          updatedLabel: draft.updatedLabel,
+        })),
+        ...demo.recentWork.filter(
+          (item) => item.kind !== 'procedure' || !savedIds.has(item.procedureId),
+        ),
+      ],
+    };
   }
   throw new Error('숙련자 홈 조회가 아직 연결되지 않았습니다.');
 };
