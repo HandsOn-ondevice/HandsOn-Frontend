@@ -24,6 +24,7 @@ const useEdgeServer =
   process.env.HANDSON_E2E_EDGE_HOME === '1' ||
   process.env.HANDSON_E2E_EDGE_SESSION === '1' ||
   process.env.HANDSON_E2E_EDGE_EXECUTION === '1' ||
+  process.env.HANDSON_E2E_LIGHT_HOLD === '1' ||
   process.env.HANDSON_E2E_LIVE_EDGE === '1';
 const artifactsDir = `artifacts/playwright${edgeSuite?.folder ?? ''}`;
 
