@@ -1,6 +1,6 @@
 # HandsOn Frontend
 
-신규 연구생의 실험 절차 실행과 숙련자의 절차 관리를 지원하는 HandsOn Android 앱입니다. 개발 빌드에서 역할·작업 환경을 선택하면 연구생은 진행 중인 실험·최근 기록과 승인 절차의 목록·상세를 확인하고, 숙련자는 Android 마이크로 절차 설명을 녹음해 원본을 저장할 수 있습니다. **Aurora Lab 디자인 시스템과 26개 공통 컴포넌트**는 개발용 갤러리에서 확인할 수 있습니다. 홈의 작업·결과, 승인 절차 목록·상세, 작업 환경·장치 정보, 갤러리의 센서·음성·차트는 가상의 합성 데이터입니다.
+신규 연구생의 실험 절차 실행과 숙련자의 절차 관리를 지원하는 HandsOn Android 앱입니다. 연구생은 Edge에 연결해 승인 절차와 버전을 확인하고 실험 준비 세션을 열 수 있습니다. 숙련자는 Android 마이크로 절차 설명을 녹음해 원본을 저장할 수 있습니다. **Aurora Lab 디자인 시스템과 26개 공통 컴포넌트**는 개발용 갤러리에서 확인할 수 있습니다. 개발용 홈과 갤러리는 합성 데이터를 제공합니다.
 
 ## 실행 환경
 
@@ -36,7 +36,9 @@ npm run android
 
 연구생 홈의 승인된 절차 또는 **실험** 탭에서 `/procedures?environmentId=...`(S02)로 이동합니다. 목록에서 절차를 선택해 확인하면 `/procedures/[procedureId]`(S03)에서 선택한 승인 버전의 상세를 볼 수 있습니다.
 
-S03의 **이 버전으로 준비 시작**은 선택한 절차·승인 버전의 실행 가능 여부를 다시 확인합니다. 개발·Maestro 빌드에서는 `/procedures/preparation`에서 전달한 절차 식별자·승인 버전·작업 환경을 확인할 수 있습니다. 실제 절차 API, 세션 생성 시점과 A의 `/researcher-workflow/[sessionId]/preparation` 연결은 계약 확정 후 연동합니다. [S02–S03 검증 기록](docs/validation/s02-s03-procedures.md)에 현재 전달 범위와 재현 방법을 정리했습니다.
+Edge를 연결하려면 `.env.example`을 `.env.local`로 복사하고 앱이나 브라우저에서 접근할 수 있는 `EXPO_PUBLIC_HANDSON_EDGE_BASE_URL`을 입력합니다. 서버가 인증을 요구하면 시작 화면에서 토큰을 입력합니다. 개발 빌드에서 주소를 비워 두거나 Maestro를 실행하면 합성 절차와 준비 입력 미리보기를 사용합니다.
+
+S03의 **이 버전으로 준비 시작**은 선택한 절차 ID와 승인 버전으로 Edge에 세션을 생성합니다. S04는 `/procedures/preparation?sessionId=...`에서 생성된 세션을 다시 조회해 절차 버전과 준비 항목을 표시합니다. 준비 확인과 장치 점검 명령은 API-04에서 이어서 연결합니다. [S02–S04 검증 기록](docs/validation/s02-s04-edge-api.md)
 
 최근 결과는 `/results/[resultId]?sessionId=...`, 이력과 장치는 `/history`, `/devices`로 연결합니다. 이 경로들은 준비 중 안내와 홈 복귀를 제공하는 인계 지점이며, 결과·이력 경로와 홈 응답 계약은 A·서버 담당과 확정해야 합니다. 이어하기는 기존 세션 ID를 `/researcher-workflow/[sessionId]/preparation`에 전달합니다.
 
@@ -148,6 +150,8 @@ npx playwright show-report artifacts/playwright/report
 ```
 
 설정은 `playwright.config.ts`, 테스트는 `e2e/`에서 관리합니다. Jest는 기존 `__tests__/`만 실행합니다. 자세한 사용법은 [Playwright 실행 가이드](https://playwright.dev/docs/running-tests)를 참고합니다.
+
+모바일 웹에서 승인 절차 조회와 세션 생성 재시도를 확인하려면 `npm run test:e2e -- --config playwright.procedures.config.ts`를 실행합니다. 이 검사는 기본 8082 포트에서 Expo 서버를 실행하고 Edge 요청에 테스트 응답을 반환합니다.
 
 ## GitHub Flow
 
