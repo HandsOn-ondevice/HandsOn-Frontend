@@ -52,12 +52,21 @@ test('재측정 요청 후에도 기존 근거를 열고 숙련자 현황에서 
 }, testInfo) => {
   await page.setViewportSize({ width: 360, height: 800 });
   await openPendingResult(page);
-  await page.getByRole('button', { name: '재측정 요청', exact: true }).click();
+  const remeasure = page.getByRole('button', { name: '재측정 요청', exact: true });
+  const note = page.getByRole('textbox', { name: '검토 의견' });
+  const comment = '센서 연결 상태를 확인하고 다시 측정해 주세요.';
+  await expect(remeasure).toBeDisabled();
+  await expect(page.getByRole('button', { name: '검토 완료', exact: true })).toBeDisabled();
+  await note.fill('   ');
+  await expect(remeasure).toBeDisabled();
+  await note.fill(comment);
+  await remeasure.click();
   await expect(page.getByText('재측정 요청을 기록했습니다', { exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('expert-review-remeasurement.png') });
   await page.getByRole('button', { name: '검토 화면으로 돌아가기', exact: true }).click();
   await expect(page.getByText(reviewTitle, { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: '재측정 요청', exact: true })).toHaveCount(0);
+  await expect(remeasure).toHaveCount(0);
+  await expect(page.getByText(comment, { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: /^50% 조건, 422 lx/ }).click();
   await expect(page.getByText('2회차 · 무효 · 420 lx', { exact: true })).toBeVisible();
