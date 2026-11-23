@@ -107,8 +107,11 @@ export async function enterProcedure(page: Page, token: string, procedureTitle: 
   await expect(page).toHaveURL(/\/procedures\/kit-distance\?/);
 }
 
-export function isolatedEdge(request: APIRequestContext) {
-  const origin = new URL(process.env.EXPO_PUBLIC_HANDSON_EDGE_BASE_URL ?? '');
+export function isolatedEdge(
+  request: APIRequestContext,
+  baseURL = process.env.EXPO_PUBLIC_HANDSON_EDGE_BASE_URL ?? '',
+) {
+  const origin = new URL(baseURL);
   if (!['127.0.0.1', 'localhost', '[::1]'].includes(origin.hostname)) {
     throw new Error(
       'Run session E2E only on a dedicated loopback Edge with its own data directory.',
