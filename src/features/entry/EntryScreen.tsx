@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,12 +16,14 @@ import {
   StatusBar,
   SurfaceCard,
   Symbol,
+  TextField,
   colors,
   gradients,
   radii,
   spacing,
   type UserRole,
 } from '@/design-system';
+import { getEdgeErrorMessage, isEdgeDataEnabled } from '@/lib/edgeApi';
 import {
   loadWorkEnvironments,
   type EntrySelection,
@@ -30,7 +32,9 @@ import {
 } from './entryEnvironment';
 
 type EnvironmentLookup =
-  { status: 'loading' | 'error' } | { status: 'ready'; environments: readonly WorkEnvironment[] };
+  | { status: 'idle' | 'loading' }
+  | { status: 'error'; detail?: string }
+  | { status: 'ready'; environments: readonly WorkEnvironment[] };
 
 interface EntryScreenProps {
   onContinue: (selection: EntrySelection) => void;
@@ -43,36 +47,63 @@ export function EntryScreen({
   onContinue,
   loadEnvironments = loadWorkEnvironments,
 }: EntryScreenProps) {
+  const edge = isEdgeDataEnabled();
   const [role, setRole] = useState<UserRole>();
+  const [tokenInput, setTokenInput] = useState('');
+  const [entryRequest, setEntryRequest] = useState<{ token?: string }>();
+  const currentRequest = useRef(entryRequest);
   const [environmentId, setEnvironmentId] = useState('');
-  const [lookup, setLookup] = useState<EnvironmentLookup>({ status: 'loading' });
-  const [attempt, setAttempt] = useState(0);
+  const [lookup, setLookup] = useState<EnvironmentLookup>({
+    status: edge ? 'idle' : 'loading',
+  });
 
   useEffect(() => {
+    if (edge && !entryRequest) return;
     let active = true;
-    void loadEnvironments().then(
+    void loadEnvironments(entryRequest?.token).then(
       (environments) => {
-        if (active) setLookup({ status: 'ready', environments });
+        if (active && entryRequest === currentRequest.current) {
+          setLookup({ status: 'ready', environments });
+        }
       },
-      () => {
-        if (active) setLookup({ status: 'error' });
+      (error: unknown) => {
+        if (active && entryRequest === currentRequest.current) {
+          setLookup({ status: 'error', detail: getEdgeErrorMessage(error) });
+        }
       },
     );
     return () => {
       active = false;
     };
-  }, [attempt, loadEnvironments]);
+  }, [edge, entryRequest, loadEnvironments]);
 
   const environments = lookup.status === 'ready' ? lookup.environments : [];
   const environment = environments.find(({ id }) => id === environmentId);
   const loading = lookup.status === 'loading';
-  const unavailable = !loading && environments.length === 0;
+  const unavailable = lookup.status !== 'idle' && !loading && environments.length === 0;
   const showSymbol = role === 'expert';
 
-  function retry() {
+  function selectRole(choice: UserRole) {
+    if (edge && role !== choice) resetEdgeLookup();
+    setRole(choice);
+  }
+
+  function resetEdgeLookup() {
+    currentRequest.current = undefined;
+    setTokenInput('');
+    setEntryRequest(undefined);
+    setEnvironmentId('');
+    setLookup({ status: 'idle' });
+  }
+
+  function requestEnvironments() {
     setEnvironmentId('');
     setLookup({ status: 'loading' });
-    setAttempt((previous) => previous + 1);
+    const token = tokenInput.trim() || entryRequest?.token;
+    const request = { token };
+    currentRequest.current = request;
+    setEntryRequest(request);
+    setTokenInput('');
   }
 
   return (
@@ -102,7 +133,11 @@ export function EntryScreen({
         </View>
       </SafeAreaView>
 
-      <ScrollView style={styles.viewport} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.viewport}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
         <SectionHeader title="어떤 역할로 사용하시나요?" />
         <AppText variant="caption" color={colors.text.secondary}>
           역할에 따라 실행 화면과 절차 관리 기능이 달라집니다.
@@ -113,13 +148,32 @@ export function EntryScreen({
               key={choice}
               role={choice}
               state={role === choice ? 'selected' : 'default'}
-              onPress={() => setRole(choice)}
+              onPress={() => selectRole(choice)}
               style={styles.role}
             />
           ))}
         </View>
 
         <SectionHeader title="작업 환경" />
+        {edge && role && (lookup.status === 'idle' || lookup.status === 'error') ? (
+          <TextField
+            label="Edge 접속 토큰"
+            value={tokenInput}
+            onChange={setTokenInput}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="off"
+            spellCheck={false}
+          />
+        ) : null}
+        {edge && lookup.status === 'idle' && role ? (
+          <Button
+            label="작업 환경 불러오기"
+            disabled={!tokenInput.trim()}
+            onPress={requestEnvironments}
+          />
+        ) : null}
         <SelectField
           label="연구실"
           value={environment?.id ?? ''}
@@ -133,7 +187,16 @@ export function EntryScreen({
             tone="subtle"
             title={`작업 유형 · ${environment.workType}`}
             subtitle={`실행 장치 · ${environment.deviceName}`}
-          />
+          >
+            {environment.workProfile ? (
+              <AppText variant="caption" color={colors.text.secondary}>
+                {`작업 프로필 · ${environment.workProfile.id} · ${environment.workProfile.version}`}
+              </AppText>
+            ) : null}
+          </SurfaceCard>
+        ) : null}
+        {edge && lookup.status === 'ready' ? (
+          <Button label="Edge 접속 토큰 변경" variant="tertiary" onPress={resetEdgeLookup} />
         ) : null}
         {unavailable ? (
           <View style={styles.feedback}>
@@ -143,10 +206,16 @@ export function EntryScreen({
                   ? '작업 환경을 불러오지 못했어요.'
                   : '선택할 수 있는 작업 환경이 없어요.'
               }
+              subtitle={lookup.status === 'error' ? lookup.detail : undefined}
               tone="warning"
               icon="alert"
             />
-            <Button label="다시 시도" variant="secondary" icon="retry" onPress={retry} />
+            <Button
+              label="다시 시도"
+              variant="secondary"
+              icon="retry"
+              onPress={requestEnvironments}
+            />
           </View>
         ) : null}
         <View style={styles.privacy}>
@@ -161,7 +230,10 @@ export function EntryScreen({
         primary="설정하고 계속"
         disabled={!role || !environment}
         onPrimary={() => {
-          if (role && environment) onContinue({ role, environment });
+          if (role && environment)
+            onContinue(
+              edge ? { role, environment, edgeToken: entryRequest?.token } : { role, environment },
+            );
         }}
         safeArea
       />
