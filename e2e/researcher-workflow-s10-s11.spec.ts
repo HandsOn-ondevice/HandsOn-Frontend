@@ -156,6 +156,7 @@ test('S11 실패 응답은 재개를 차단하며 재시도와 재진입에도 �
 }, testInfo) => {
   test.setTimeout(60_000);
   await page.setViewportSize({ width: 412, height: 920 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   const route = await enterExecution(page);
@@ -174,8 +175,7 @@ test('S11 실패 응답은 재개를 차단하며 재시도와 재진입에도 �
     await expect(
       page.getByRole('button', { name: `Mock 점검 시나리오: ${next}`, exact: true }),
     ).toBeVisible();
-    // SelectField는 별도 fade Modal이다. 상태 갱신 뒤에도 DOM과 포커스 처리가 남으므로
-    // 선택창이 완전히 제거된 뒤 바깥 BottomSheet를 닫는다.
+    // 선택창이 완전히 제거되고 포커스가 돌아온 뒤 바깥 BottomSheet를 닫는다.
     await expect(
       page.getByRole('radio', { name: next, exact: true, includeHidden: true }),
     ).toHaveCount(0);

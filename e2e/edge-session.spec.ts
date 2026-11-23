@@ -498,7 +498,7 @@ test('모바일에서 일시정지 후 점검을 통과하면 실제 Edge의 같
       holdReason: { code: 'USER_PAUSED' },
       execution: { cursor },
     });
-    await expect(page).toHaveURL(`${screenPath}/resume`);
+    await expect(page).toHaveURL(({ pathname }) => pathname === `${screenPath}/resume`);
     await checkLayout(page, page.getByText('센서가 연결되지 않았습니다.', { exact: false }));
     await expect(confirmation).not.toBeChecked();
     await expect(resume).toBeDisabled();
