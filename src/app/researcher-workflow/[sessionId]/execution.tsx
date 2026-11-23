@@ -11,8 +11,26 @@ export default function ExecutionRoute() {
       pathname: '/researcher-workflow/[sessionId]/device-check',
       params: { sessionId },
     });
+  const onMenu = () =>
+    router.push({
+      pathname: '/researcher-workflow/[sessionId]/session-menu',
+      params: { sessionId },
+    });
+  const onRecovery = () =>
+    router.push({ pathname: '/researcher-workflow/[sessionId]/recovery', params: { sessionId } });
+  const onPause = () =>
+    router.push({ pathname: '/researcher-workflow/[sessionId]/paused', params: { sessionId } });
   if (isEdgeWorkflowEnabled()) {
-    return <EdgeExecutionScreen key={sessionId} sessionId={sessionId} onBack={onBack} />;
+    return (
+      <EdgeExecutionScreen
+        key={sessionId}
+        sessionId={sessionId}
+        onBack={onBack}
+        onMenu={onMenu}
+        onRecovery={onRecovery}
+        onPause={onPause}
+      />
+    );
   }
 
   return (
@@ -20,31 +38,16 @@ export default function ExecutionRoute() {
       <ExecutionScreen
         key={sessionId}
         sessionId={sessionId}
-        onMenu={() =>
-          router.push({
-            pathname: '/researcher-workflow/[sessionId]/session-menu',
-            params: { sessionId },
-          })
-        }
+        onMenu={onMenu}
         onBack={onBack}
-        onRecovery={() =>
-          router.push({
-            pathname: '/researcher-workflow/[sessionId]/recovery',
-            params: { sessionId },
-          })
-        }
+        onRecovery={onRecovery}
         onRemeasurement={() =>
           router.push({
             pathname: '/researcher-workflow/[sessionId]/remeasurement',
             params: { sessionId },
           })
         }
-        onPause={() =>
-          router.push({
-            pathname: '/researcher-workflow/[sessionId]/paused',
-            params: { sessionId },
-          })
-        }
+        onPause={onPause}
         onClarification={() =>
           router.push({
             pathname: '/researcher-workflow/[sessionId]/voice-clarification',

@@ -1,12 +1,37 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { AppText, Button, FeedbackPanel, Screen } from '@/design-system';
+import { EdgeResumeScreen } from '@/features/researcher-workflow/screens/EdgeResumeScreen';
 import { ResumeScreen } from '@/features/researcher-workflow/screens/ResumeScreen';
 import { selectResume } from '@/features/researcher-workflow/domain/resume';
 import { useWorkflowSession } from '@/features/researcher-workflow/state/useWorkflowSession';
+import { isEdgeWorkflowEnabled } from '@/features/researcher-workflow/state/workflow-repository';
 
 export default function ResumeRoute() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
+  const onBack = () =>
+    router.dismissTo({
+      pathname: '/researcher-workflow/[sessionId]/paused',
+      params: { sessionId },
+    });
+  const onExecution = () =>
+    router.dismissTo({
+      pathname: '/researcher-workflow/[sessionId]/execution',
+      params: { sessionId },
+    });
+  const Resume = isEdgeWorkflowEnabled() ? EdgeResumeScreen : MockResumeRoute;
+  return <Resume key={sessionId} sessionId={sessionId} onBack={onBack} onExecution={onExecution} />;
+}
+
+function MockResumeRoute({
+  sessionId,
+  onBack,
+  onExecution,
+}: {
+  sessionId: string;
+  onBack: () => void;
+  onExecution: () => void;
+}) {
   const { session, loading } = useWorkflowSession(sessionId);
   const [admittedSession, setAdmittedSession] = useState<string | null>(null);
   const paused = session ? selectResume(session).paused : false;
@@ -52,22 +77,5 @@ export default function ResumeRoute() {
               : '/researcher-workflow/[sessionId]/device-check';
     return <Redirect href={{ pathname, params: { sessionId } }} />;
   }
-  return (
-    <ResumeScreen
-      key={sessionId}
-      sessionId={sessionId}
-      onBack={() =>
-        router.dismissTo({
-          pathname: '/researcher-workflow/[sessionId]/paused',
-          params: { sessionId },
-        })
-      }
-      onExecution={() =>
-        router.dismissTo({
-          pathname: '/researcher-workflow/[sessionId]/execution',
-          params: { sessionId },
-        })
-      }
-    />
-  );
+  return <ResumeScreen sessionId={sessionId} onBack={onBack} onExecution={onExecution} />;
 }
