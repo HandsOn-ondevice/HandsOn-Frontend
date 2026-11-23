@@ -26,6 +26,7 @@ import {
 import { EdgeApiError } from '@/lib/edgeApi';
 import {
   loadWorkEnvironments,
+  getEntryEdgeBaseUrl,
   type EntrySelection,
   type LoadWorkEnvironments,
   type WorkEnvironment,
@@ -100,12 +101,20 @@ export function EntryScreen({
     .join(' · ');
   const showSymbol = role === 'expert';
 
-  function retry() {
-    const token = authRequired ? tokenInput.trim() : attempt.token;
+  function loadAgain(nextAttempt: typeof attempt) {
     setEnvironmentId('');
     setTokenInput('');
     setLookup({ status: 'loading' });
-    setAttempt({ token });
+    setAttempt(nextAttempt);
+  }
+
+  function retry() {
+    loadAgain(authRequired ? { token: tokenInput.trim() } : { ...attempt });
+  }
+
+  function chooseRole(choice: UserRole) {
+    setRole(choice);
+    if (role && role !== choice && attempt.token) loadAgain({});
   }
 
   return (
@@ -150,7 +159,7 @@ export function EntryScreen({
               key={choice}
               role={choice}
               state={role === choice ? 'selected' : 'default'}
-              onPress={() => setRole(choice)}
+              onPress={() => chooseRole(choice)}
               style={styles.role}
             />
           ))}
@@ -221,7 +230,14 @@ export function EntryScreen({
         primary="설정하고 계속"
         disabled={!role || !environment}
         onPrimary={() => {
-          if (role && environment) onContinue({ role, environment });
+          if (!role || !environment) return;
+          const baseUrl =
+            loadEnvironments === loadWorkEnvironments ? getEntryEdgeBaseUrl() : undefined;
+          onContinue({
+            role,
+            environment,
+            ...(baseUrl && { edge: { baseUrl, token: attempt.token } }),
+          });
         }}
         safeArea
       />
