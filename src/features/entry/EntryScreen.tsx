@@ -16,12 +16,14 @@ import {
   StatusBar,
   SurfaceCard,
   Symbol,
+  TextField,
   colors,
   gradients,
   radii,
   spacing,
   type UserRole,
 } from '@/design-system';
+import { EdgeApiError } from '@/lib/edgeApi';
 import {
   loadWorkEnvironments,
   type EntrySelection,
@@ -30,7 +32,8 @@ import {
 } from './entryEnvironment';
 
 type EnvironmentLookup =
-  { status: 'loading' | 'error' } | { status: 'ready'; environments: readonly WorkEnvironment[] };
+  | { status: 'loading' | 'error' | 'unauthorized' }
+  | { status: 'ready'; environments: readonly WorkEnvironment[] };
 
 interface EntryScreenProps {
   onContinue: (selection: EntrySelection) => void;
@@ -46,20 +49,28 @@ export function EntryScreen({
   const [role, setRole] = useState<UserRole>();
   const [environmentId, setEnvironmentId] = useState('');
   const [lookup, setLookup] = useState<EnvironmentLookup>({ status: 'loading' });
-  const [attempt, setAttempt] = useState(0);
+  const [attempt, setAttempt] = useState<{ token?: string }>({});
+  const [tokenInput, setTokenInput] = useState('');
 
   useEffect(() => {
     let active = true;
-    void loadEnvironments().then(
+    const controller = new AbortController();
+    void loadEnvironments({ token: attempt.token, signal: controller.signal }).then(
       (environments) => {
         if (active) setLookup({ status: 'ready', environments });
       },
-      () => {
-        if (active) setLookup({ status: 'error' });
+      (error: unknown) => {
+        if (active) {
+          setLookup({
+            status:
+              error instanceof EdgeApiError && error.status === 401 ? 'unauthorized' : 'error',
+          });
+        }
       },
     );
     return () => {
       active = false;
+      controller.abort();
     };
   }, [attempt, loadEnvironments]);
 
@@ -67,12 +78,13 @@ export function EntryScreen({
   const environment = environments.find(({ id }) => id === environmentId);
   const loading = lookup.status === 'loading';
   const unavailable = !loading && environments.length === 0;
+  const unauthorized = lookup.status === 'unauthorized';
   const showSymbol = role === 'expert';
 
   function retry() {
     setEnvironmentId('');
     setLookup({ status: 'loading' });
-    setAttempt((previous) => previous + 1);
+    setAttempt({ token: unauthorized ? tokenInput.trim() : attempt.token });
   }
 
   return (
@@ -102,7 +114,11 @@ export function EntryScreen({
         </View>
       </SafeAreaView>
 
-      <ScrollView style={styles.viewport} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.viewport}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
         <SectionHeader title="어떤 역할로 사용하시나요?" />
         <AppText variant="caption" color={colors.text.secondary}>
           역할에 따라 실행 화면과 절차 관리 기능이 달라집니다.
@@ -135,18 +151,47 @@ export function EntryScreen({
             subtitle={`실행 장치 · ${environment.deviceName}`}
           />
         ) : null}
+        {lookup.status === 'ready' && attempt.token ? (
+          <Button
+            label="Edge API 토큰 변경"
+            variant="tertiary"
+            onPress={() => {
+              setEnvironmentId('');
+              setTokenInput('');
+              setLookup({ status: 'unauthorized' });
+            }}
+          />
+        ) : null}
         {unavailable ? (
           <View style={styles.feedback}>
             <FeedbackPanel
               title={
-                lookup.status === 'error'
-                  ? '작업 환경을 불러오지 못했어요.'
-                  : '선택할 수 있는 작업 환경이 없어요.'
+                unauthorized
+                  ? 'Edge API 토큰을 확인해 주세요.'
+                  : lookup.status === 'error'
+                    ? '작업 환경을 불러오지 못했어요.'
+                    : '선택할 수 있는 작업 환경이 없어요.'
               }
               tone="warning"
               icon="alert"
             />
-            <Button label="다시 시도" variant="secondary" icon="retry" onPress={retry} />
+            {unauthorized ? (
+              <TextField
+                label="Edge API 토큰"
+                value={tokenInput}
+                onChange={setTokenInput}
+                autoCapitalize="none"
+                autoCorrect={false}
+                secureTextEntry
+              />
+            ) : null}
+            <Button
+              label="다시 시도"
+              variant="secondary"
+              icon="retry"
+              disabled={unauthorized && !tokenInput.trim()}
+              onPress={retry}
+            />
           </View>
         ) : null}
         <View style={styles.privacy}>
@@ -161,7 +206,13 @@ export function EntryScreen({
         primary="설정하고 계속"
         disabled={!role || !environment}
         onPrimary={() => {
-          if (role && environment) onContinue({ role, environment });
+          if (role && environment) {
+            onContinue({
+              role,
+              environment,
+              ...(attempt.token && { edgeToken: attempt.token }),
+            });
+          }
         }}
         safeArea
       />

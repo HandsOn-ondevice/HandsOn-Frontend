@@ -1,4 +1,5 @@
 import type { UserRole } from '@/design-system';
+import { createEdgeApi, EdgeApiError, getEdgeBaseUrl } from '@/lib/edgeApi';
 
 export interface WorkEnvironment {
   id: string;
@@ -10,9 +11,13 @@ export interface WorkEnvironment {
 export interface EntrySelection {
   role: UserRole;
   environment: WorkEnvironment;
+  edgeToken?: string;
 }
 
-export type LoadWorkEnvironments = () => Promise<readonly WorkEnvironment[]>;
+export type LoadWorkEnvironments = (options?: {
+  token?: string;
+  signal?: AbortSignal;
+}) => Promise<readonly WorkEnvironment[]>;
 
 const demoEnvironments: readonly WorkEnvironment[] = [
   {
@@ -29,8 +34,28 @@ const demoEnvironments: readonly WorkEnvironment[] = [
   },
 ];
 
-export const loadWorkEnvironments: LoadWorkEnvironments = async () => {
-  // Replace this loader when the environment and device API contract is agreed.
+function isEnvironment(value: unknown): value is WorkEnvironment {
+  if (!value || typeof value !== 'object') return false;
+  const { id, name, workType, deviceName } = value as Partial<WorkEnvironment>;
+  return [id, name, workType, deviceName].every(
+    (field) => typeof field === 'string' && field.trim() !== '',
+  );
+}
+
+export const loadWorkEnvironments: LoadWorkEnvironments = async ({ token, signal } = {}) => {
+  const baseUrl = getEdgeBaseUrl();
+  if (baseUrl) {
+    const response = await createEdgeApi({ baseUrl, token }).get('/environments', signal);
+    if (!Array.isArray(response) || !response.every(isEnvironment)) {
+      throw new EdgeApiError({ kind: 'invalid-response' });
+    }
+    return response.map(({ id, name, workType, deviceName }) => ({
+      id,
+      name,
+      workType,
+      deviceName,
+    }));
+  }
   if (__DEV__ || process.env.EXPO_PUBLIC_HANDSON_MAESTRO === '1') return demoEnvironments;
-  throw new Error('작업 환경 조회가 아직 연결되지 않았습니다.');
+  throw new EdgeApiError({ kind: 'configuration' });
 };
