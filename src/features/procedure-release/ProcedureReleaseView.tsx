@@ -12,6 +12,7 @@ import {
   Screen,
   StatusBar,
   SurfaceCard,
+  TextField,
   colors,
   spacing,
 } from '@/design-system';
@@ -20,19 +21,23 @@ import type {
   ProcedureDraftStep,
 } from '@/features/procedure-draft/procedureDraftRepository';
 import { ProcedureFrame } from '@/features/procedures/ProcedureFrame';
-import type { ProcedureDetail } from '@/features/procedures/procedureModels';
+import type { ProcedureReleaseReceipt } from './procedureReleaseRepository';
+import { describeExecutionCriteria } from './procedureReleaseRules';
 
 interface ProcedureReleaseViewProps {
   draft: ProcedureDraft;
   reviewedStep?: ProcedureDraftStep;
   blockers: readonly string[];
   proposedVersion: string | null;
-  approverName: string;
+  approverName: string | null;
   reviewConfirmed: boolean;
   equipmentConfirmed: boolean;
+  reason: string;
+  reasonLocked?: boolean;
   submitting: boolean;
   error: string | null;
   onEquipmentChange: (confirmed: boolean) => void;
+  onReasonChange: (reason: string) => void;
   onReviewChange: (confirmed: boolean) => void;
   onApprove: () => void;
   onBack: () => void;
@@ -77,9 +82,12 @@ export function ProcedureReleaseView({
   approverName,
   reviewConfirmed,
   equipmentConfirmed,
+  reason,
+  reasonLocked,
   submitting,
   error,
   onEquipmentChange,
+  onReasonChange,
   onReviewChange,
   onApprove,
   onBack,
@@ -87,8 +95,11 @@ export function ProcedureReleaseView({
   onPreview,
 }: ProcedureReleaseViewProps) {
   const blocked = blockers.length > 0;
-  const canApprove = !blocked && reviewConfirmed && equipmentConfirmed;
+  const edge = draft.edge;
+  const canApprove =
+    !blocked && reviewConfirmed && equipmentConfirmed && (!edge || !!reason.trim());
   const criteria = summarizeCriteria(draft.steps);
+  const executionCriteria = edge?.execution ? describeExecutionCriteria(edge.execution) : [];
   const approveLabel = proposedVersion ? `${proposedVersion} 승인·배포` : '승인·배포';
   const primaryLabel = submitting ? '승인·배포 중' : error ? '다시 시도' : approveLabel;
 
@@ -99,7 +110,14 @@ export function ProcedureReleaseView({
       subtitle={blocked ? '미확정 항목을 검토해 주세요.' : '절차와 장비를 확인한 뒤 승인해 주세요.'}
       onBack={onBack}
       navigationDisabled={submitting}
-      help={help}
+      help={
+        edge
+          ? {
+              ...help,
+              subtitle: '미리보기에서 단계와 실행 기준을 확인하고 승인 사유를 입력해 주세요.',
+            }
+          : help
+      }
       footer={
         <>
           {error ? (
@@ -138,7 +156,7 @@ export function ProcedureReleaseView({
         <MetricTile title="단계" value={String(draft.steps.length)} meta="개" style={styles.tile} />
         <MetricTile
           title="승인 기준"
-          value={String(criteria.numerical)}
+          value={String(edge ? executionCriteria.length : criteria.numerical)}
           meta="개"
           style={styles.tile}
         />
@@ -166,34 +184,47 @@ export function ProcedureReleaseView({
           />
         </>
       ) : null}
-      <EvidenceRow
-        title="작업자 확인 항목"
-        subtitle="단계별 작업자 확인 지시"
-        kind="human"
-        state={criteria.manual ? 'confirmed' : 'pending'}
-        meta={`${criteria.manual}개`}
-      />
-      <EvidenceRow
-        title="센서 완료 기준"
-        subtitle="저장된 수치와 반복 기준"
-        kind="sensor"
-        state={criteria.numerical ? 'confirmed' : 'pending'}
-        meta={`${criteria.numerical}개`}
-      />
-      <EvidenceRow
-        title="오류 복구 규칙"
-        subtitle="보류 조건과 복구 안내"
-        kind="program"
-        state={criteria.recovery ? 'confirmed' : 'pending'}
-        meta={`${criteria.recovery}개`}
-      />
+      {edge ? (
+        <SurfaceCard
+          title="저장된 실행 기준"
+          subtitle={executionCriteria.join('\n') || '등록된 실행 기준이 없어요.'}
+        />
+      ) : (
+        <>
+          <EvidenceRow
+            title="작업자 확인 항목"
+            subtitle="단계별 작업자 확인 지시"
+            kind="human"
+            state={criteria.manual ? 'confirmed' : 'pending'}
+            meta={`${criteria.manual}개`}
+          />
+          <EvidenceRow
+            title="센서 완료 기준"
+            subtitle="저장된 수치와 반복 기준"
+            kind="sensor"
+            state={criteria.numerical ? 'confirmed' : 'pending'}
+            meta={`${criteria.numerical}개`}
+          />
+          <EvidenceRow
+            title="오류 복구 규칙"
+            subtitle="보류 조건과 복구 안내"
+            kind="program"
+            state={criteria.recovery ? 'confirmed' : 'pending'}
+            meta={`${criteria.recovery}개`}
+          />
+        </>
+      )}
       <SurfaceCard
         title={`준비물 · ${draft.materials.length}개`}
         subtitle={draft.materials.join(' · ') || '등록된 준비물이 없어요.'}
       />
       <SurfaceCard
         title={proposedVersion ? `새 버전 · ${proposedVersion}` : '새 버전 · 배포 응답에서 확인'}
-        subtitle={`모의 배포 · 승인자 ${approverName} · 초안 ${draft.version}`}
+        subtitle={
+          edge
+            ? `초안 리비전 ${edge.revision}`
+            : `모의 배포 · 승인자 ${approverName} · 초안 ${draft.version}`
+        }
       />
       <View style={styles.versionNote}>
         <Icon name="lock" size={16} color={colors.text.secondary} />
@@ -203,7 +234,7 @@ export function ProcedureReleaseView({
       </View>
       <CheckboxRow
         title="준비물과 장비를 확인했습니다."
-        subtitle="모의 배포에 필요한 검토 사실을 기록합니다."
+        subtitle={edge ? undefined : '모의 배포에 필요한 검토 사실을 기록합니다.'}
         checked={equipmentConfirmed}
         onChange={onEquipmentChange}
         disabled={submitting}
@@ -221,6 +252,17 @@ export function ProcedureReleaseView({
         disabled={submitting}
         testID="release-review-confirmed"
       />
+      {edge ? (
+        <TextField
+          label="승인 사유"
+          value={reason}
+          onChange={onReasonChange}
+          maxLength={500}
+          disabled={submitting || reasonLocked}
+          support={reasonLocked ? '같은 승인 사유로 다시 시도해 주세요.' : undefined}
+          multiline
+        />
+      ) : null}
       {blocked ? null : (
         <Button
           label="편집으로 돌아가기"
@@ -234,11 +276,15 @@ export function ProcedureReleaseView({
 }
 
 interface ProcedureReleaseResultProps {
-  procedure: ProcedureDetail;
+  procedure: ProcedureReleaseReceipt;
+  edge?: boolean;
   onHome: () => void;
 }
 
-export function ProcedureReleaseResult({ procedure, onHome }: ProcedureReleaseResultProps) {
+export function ProcedureReleaseResult({ procedure, edge, onHome }: ProcedureReleaseResultProps) {
+  const result = edge
+    ? `${procedure.title}\n절차 ID · ${procedure.id}\n승인자 · ${procedure.approvedBy}`
+    : `모의 배포 · ${procedure.code} · ${procedure.title}\n${procedure.approvedBy}님의 검토와 승인 사실을 기록했습니다.`;
   return (
     <Screen>
       <StatusBar />
@@ -248,7 +294,7 @@ export function ProcedureReleaseResult({ procedure, onHome }: ProcedureReleaseRe
           tone="success"
           icon="check"
           title={`${procedure.approvedVersion} 승인·배포 완료`}
-          subtitle={`모의 배포 · ${procedure.code} · ${procedure.title}\n${procedure.approvedBy}님의 검토와 승인 사실을 기록했습니다.\n승인 절차 목록에 반영했습니다. 진행 중인 세션은 기존 버전을 유지합니다.`}
+          subtitle={`${result}\n승인 절차 목록에 반영했습니다. 진행 중인 세션은 기존 버전을 유지합니다.`}
         />
       </ScrollView>
       <ActionShelf primary="숙련자 홈으로" onPrimary={onHome} />

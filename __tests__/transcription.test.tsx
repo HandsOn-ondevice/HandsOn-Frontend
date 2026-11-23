@@ -25,7 +25,12 @@ jest.mock('expo-router', () => {
   };
 });
 jest.mock('@/features/entry/EntrySelectionProvider', () => ({
-  useEntrySelection: () => ({ selection: { role: 'expert', environment: { id: 'lab' } } }),
+  useEntrySelection: () => ({
+    selection: {
+      role: 'expert',
+      environment: { id: 'lab', workProfile: { id: 'previous-profile', version: '1.0.0' } },
+    },
+  }),
 }));
 jest.mock('@/features/recording/recordingStorage', () => ({ deleteSavedRecording: jest.fn() }));
 jest.mock('@/features/procedure-draft/procedureDraftRepository', () => ({
@@ -94,6 +99,18 @@ test('변환에 같은 음성 원본을 전달하고 실패 후 다시 요청할
   await act(() => retry.resolve({ text: originalText }));
   expect(await screen.findByDisplayValue(originalText)).toBeVisible();
   expect(storage.save).toHaveBeenCalledWith(recording.id, converted);
+});
+
+test('현재 환경의 작업 프로필 ID로 저장한 이전 녹음에서 초안을 만들 수 있다', async () => {
+  jest.mocked(readTranscriptionRecording).mockResolvedValue({
+    ...recording,
+    environment: { ...recording.environment, id: 'previous-profile' },
+  });
+  storage.load.mockResolvedValue(converted);
+  const screen = await render(<TranscriptionScreen recordingId={recording.id} />);
+
+  expect(await screen.findByDisplayValue(originalText)).toBeVisible();
+  expect(screen.getByTestId('transcription-generate')).toBeEnabled();
 });
 
 test('편집한 텍스트를 그대로 전달하고 요청이 끝나기 전 중복 생성과 화면 이동을 막는다', async () => {

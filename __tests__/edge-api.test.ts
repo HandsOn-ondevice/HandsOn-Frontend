@@ -38,6 +38,7 @@ test('같은 Edge에서 조회한 작업 프로필과 연결된 환경의 ID를 
   const options = expect.objectContaining({
     method: 'GET',
     credentials: 'omit',
+    redirect: 'error',
     headers: { Accept: 'application/json', Authorization: 'Bearer test-token' },
   });
   expect(request).toHaveBeenNthCalledWith(1, `${baseUrl}/api/v1/system/health`, options);

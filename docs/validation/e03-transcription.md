@@ -6,11 +6,11 @@ Android는 종료한 녹음 원본과 메타데이터를 기기에 저장합니�
 
 1. `.env.example`을 `.env.local`로 복사해 `EXPO_PUBLIC_HANDSON_EDGE_BASE_URL`에 기기에서 접근할 수 있는 Edge 주소를 설정합니다. `/api/v1`은 앱에서 붙입니다. LAN의 HTTP 주소는 Android development build에서 사용합니다.
 2. 숙련자 역할과 환경을 선택한 뒤 E02에서 녹음을 종료합니다. 개발 웹에서는 절차 이름을 입력하고 준비한 M4A 파일을 선택합니다.
-3. E03에서 개발 Edge의 숙련자 토큰을 입력합니다. 토큰은 현재 앱 실행 중 메모리에 보관합니다. 전사문을 수정하고 **AI 절차 초안 생성**을 누르면 확정본이 저장됩니다.
+3. E03은 환경 선택에서 인증한 숙련자 토큰을 사용합니다. 다시 인증해야 하면 E03에서 토큰을 입력합니다. 전사문을 수정하고 **AI 절차 초안 생성**을 누르면 확정본을 기기에 저장한 뒤 Edge에 초안 생성을 요청합니다.
 
 업로드는 로컬 녹음 ID를 `Idempotency-Key`로 사용합니다. 응답을 받으면 서버 `recordingId`를 저장한 뒤 전사를 요청합니다. Edge가 확정한 전사 실패는 새 `requestId`로 재시도하며, 네트워크가 끊겨 결과를 모르는 경우 같은 `requestId`를 재사용합니다. 전사 작업 ID를 받은 경우에는 해당 ID로 상태를 조회합니다. 현재 확인한 서버 구현은 등록된 모의 전사문을 동기로 반환합니다.
 
-`readConfirmedDraftRequest(localRecordingId)`는 서버 녹음 ID, 제목, 확정한 전사문, 작업 환경 ID를 반환합니다. 초안 API 요청과 E04 이동은 API-07에서 연결합니다. Edge 주소 없이 개발 빌드를 실행하거나 `EXPO_PUBLIC_HANDSON_MAESTRO=1`로 빌드하면 기존 모의 전사와 초안 생성 흐름을 사용할 수 있습니다.
+E03은 서버 녹음 ID, 제목, 확정 전사문과 환경 ID를 `POST /api/v1/procedures/drafts`에 보냅니다. 응답을 받지 못하면 기기에 저장한 요청 ID로 다시 시도합니다. 성공하면 응답의 초안 ID로 E04를 엽니다. Edge 주소 없이 개발 빌드를 실행하거나 `EXPO_PUBLIC_HANDSON_MAESTRO=1`로 빌드하면 모의 전사와 초안 생성 흐름을 사용할 수 있습니다.
 
 ## 검증 재현
 

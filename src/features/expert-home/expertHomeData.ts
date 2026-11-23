@@ -1,6 +1,8 @@
 import {
   getDemoProcedureDraftId,
+  getProcedureDraftRepository,
   listDemoProcedureReleases,
+  loadEdgeProcedureApproval,
   procedureDraftRepository,
 } from '@/features/procedure-draft/procedureDraftRepository';
 import { loadEdgeReviewStatus } from '@/features/expert-review/edgeResultRepository';
@@ -126,6 +128,35 @@ function createDemoHome(environmentId: string): ExpertHomeData {
   };
 }
 
+async function hidePublishedDrafts(
+  procedures: readonly ExpertProcedure[],
+  environmentId: string,
+  edgeToken?: string,
+) {
+  const approvedIds = new Set(
+    procedures.filter(({ status }) => status === 'approved').map(({ id }) => id),
+  );
+  const draftsWithApproval = procedures.filter(
+    ({ id, status }) => status === 'draft' && approvedIds.has(id),
+  );
+  if (draftsWithApproval.length === 0) return procedures;
+
+  // The home response includes the draft after publishing. Compare revisions before hiding it.
+  const drafts = getProcedureDraftRepository(edgeToken);
+  const publications = await Promise.allSettled(
+    draftsWithApproval.map(async ({ id }) => {
+      const draft = await drafts.load(environmentId, id);
+      return draft && (await loadEdgeProcedureApproval(draft, edgeToken)) ? id : undefined;
+    }),
+  );
+  const publishedIds = new Set(
+    publications.flatMap((result) =>
+      result.status === 'fulfilled' && result.value ? [result.value] : [],
+    ),
+  );
+  return procedures.filter(({ id, status }) => status !== 'draft' || !publishedIds.has(id));
+}
+
 export const loadExpertHome: LoadExpertHome = async (environmentId, edgeToken) => {
   if (!environmentId.trim()) throw new Error('작업 환경을 선택해 주세요.');
   if (isEdgeDataEnabled()) {
@@ -133,28 +164,39 @@ export const loadExpertHome: LoadExpertHome = async (environmentId, edgeToken) =
     if (
       typeof data?.displayName !== 'string' ||
       !Array.isArray(data.procedures) ||
+      !data.procedures.every(
+        (item) =>
+          item &&
+          typeof item.id === 'string' &&
+          typeof item.title === 'string' &&
+          typeof item.version === 'string' &&
+          (item.status === 'draft' || item.status === 'approved'),
+      ) ||
       !Array.isArray(data.results) ||
       !Array.isArray(data.recentWork)
     ) {
       throw new EdgeApiError({ kind: 'invalid-response' });
     }
     // Edge v0.1.0 reports both decisions as reviewed on the home response.
-    const results = await Promise.all(
-      data.results.map(async (item): Promise<ExpertResult> =>
-        item.status === 'reviewed'
-          ? {
-              ...item,
-              status: await loadEdgeReviewStatus(
-                edgeToken,
-                environmentId,
-                item.id,
-                item.procedureId,
-              ),
-            }
-          : item,
+    const [procedures, results] = await Promise.all([
+      hidePublishedDrafts(data.procedures, environmentId, edgeToken),
+      Promise.all(
+        data.results.map(async (item): Promise<ExpertResult> =>
+          item.status === 'reviewed'
+            ? {
+                ...item,
+                status: await loadEdgeReviewStatus(
+                  edgeToken,
+                  environmentId,
+                  item.id,
+                  item.procedureId,
+                ),
+              }
+            : item,
+        ),
       ),
-    );
-    return { ...data, results };
+    ]);
+    return { ...data, procedures, results };
   }
   if (__DEV__ || process.env.EXPO_PUBLIC_HANDSON_MAESTRO === '1') {
     const demo = createDemoHome(environmentId);

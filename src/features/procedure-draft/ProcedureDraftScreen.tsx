@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { useFocusEffect, usePreventRemove } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
+  AppBar,
   AppText,
   BottomSheet,
   Button,
@@ -21,18 +22,21 @@ import {
   stepNeedsCriteriaReview,
 } from '@/features/procedure-release/procedureReleaseRules';
 import { DraftEditForm, draftEditorLabel, editorLabels, type DraftEditor } from './DraftEditForm';
-import type { ProcedureDraftStep } from './procedureDraftRepository';
+import { EdgeDraftCriteriaForm } from './EdgeDraftCriteriaForm';
+import type { ProcedureDraftRepository, ProcedureDraftStep } from './procedureDraftRepository';
 import { useProcedureDraft } from './useProcedureDraft';
 
 interface ProcedureDraftScreenProps {
   environmentId: string;
   draftId: string;
+  repository?: ProcedureDraftRepository;
   onClose: () => void;
   onReview: (stepId: string) => void;
   onApproval: () => void;
 }
 
 type StepGroup = { index: number; steps: ProcedureDraftStep[] };
+type DraftPanel = DraftEditor | { kind: 'menu' };
 
 function groupSteps(steps: readonly ProcedureDraftStep[]) {
   const groups: StepGroup[] = [];
@@ -50,13 +54,19 @@ function groupSteps(steps: readonly ProcedureDraftStep[]) {
 export function ProcedureDraftScreen({
   environmentId,
   draftId,
+  repository,
   onClose,
   onReview,
   onApproval,
 }: ProcedureDraftScreenProps) {
-  const { state, retryLoad, updateDraft, saveDraft } = useProcedureDraft(environmentId, draftId);
-  const [panel, setPanel] = useState<DraftEditor | { kind: 'menu' } | null>(null);
+  const { state, retryLoad, updateDraft, saveDraft } = useProcedureDraft(
+    environmentId,
+    draftId,
+    repository,
+  );
+  const [panel, setPanel] = useState<DraftPanel | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [editingExecution, setEditingExecution] = useState(false);
   const [selectedId, setSelectedId] = useState<string>();
   const [expandedId, setExpandedId] = useState<string>();
   const [showSaved, setShowSaved] = useState(false);
@@ -65,8 +75,11 @@ export function ProcedureDraftScreen({
   const refreshCriteriaOnReturn = useRef(false);
 
   const draft = state.status === 'ready' ? state.draft : null;
+  const edge = draft?.edge;
   const dirty = state.status === 'ready' && state.draft !== state.persisted;
   const saving = state.status === 'ready' && state.saveStatus === 'saving';
+  const conflicted = state.status === 'ready' && state.saveStatus === 'conflict';
+  const needsExecution = edge?.execution === null;
   const selected = draft
     ? (draft.steps.find(({ id }) => id === selectedId) ??
       draft.steps.find((step) => stepNeedsCriteriaReview(draft, step)) ??
@@ -82,16 +95,21 @@ export function ProcedureDraftScreen({
   );
 
   usePreventRemove(
-    !discarding && (dirty || saving || showSaved || panel !== null),
+    !discarding && (dirty || saving || showSaved || panel !== null || editingExecution),
     ({ repeat }) => {
-      if (panel) setPanelOpen(false);
+      if (editingExecution) setEditingExecution(false);
+      else if (panel) setPanelOpen(false);
       else if (showSaved) setShowSaved(false);
       else if (!saving) setLeave({ proceed: repeat });
     },
   );
 
   async function review() {
-    if (saving || !draft || !selected) return;
+    if (saving || conflicted || !draft || !selected) return;
+    if (edge) {
+      setEditingExecution(true);
+      return;
+    }
     if ((dirty || draft.savedAt === null) && !(await saveDraft())) return;
     setSelectedId(selected.id);
     refreshCriteriaOnReturn.current = true;
@@ -99,9 +117,10 @@ export function ProcedureDraftScreen({
   }
 
   async function reviewApproval() {
-    if (saving || !draft?.savedAt) return;
+    if (saving || conflicted || !draft?.savedAt) return;
     if (dirty && !(await saveDraft())) return;
     setShowSaved(false);
+    if (edge) refreshCriteriaOnReturn.current = true;
     onApproval();
   }
 
@@ -128,6 +147,28 @@ export function ProcedureDraftScreen({
   const pendingItems = draft ? getUnresolvedDraftItems(draft) : [];
   const pendingCount = pendingItems.length;
 
+  if (editingExecution && draft) {
+    return (
+      <Screen>
+        <StatusBar />
+        <AppBar mode="back" title="실행 기준 검토" onBack={() => setEditingExecution(false)} />
+        <ScrollView
+          style={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.content}
+        >
+          <EdgeDraftCriteriaForm
+            draft={draft}
+            onApply={(update) => {
+              updateDraft(update);
+              setEditingExecution(false);
+            }}
+          />
+        </ScrollView>
+      </Screen>
+    );
+  }
+
   return (
     <Screen>
       <StatusBar />
@@ -140,7 +181,7 @@ export function ProcedureDraftScreen({
           icon="more"
           accessibilityLabel="더 보기"
           onPress={openMenu}
-          disabled={!draft || saving}
+          disabled={!draft || saving || conflicted}
         />
       </View>
 
@@ -176,16 +217,17 @@ export function ProcedureDraftScreen({
                     accessibilityRole="button"
                     accessibilityLabel={`미확정 항목 ${pendingCount}개 보기`}
                     onPress={openMenu}
-                    disabled={saving}
+                    disabled={saving || conflicted}
                   >
                     <StatusBadge label={`${pendingCount}개 미확정`} tone="warning" />
                   </Pressable>
                 ) : null}
               </View>
+              {edge ? <AppText variant="label">{draft.title}</AppText> : null}
               <AppText variant="heading">
                 {draft.steps.length}단계 · 준비물 {draft.materials.length}개
               </AppText>
-              <StatusBadge label={`초안 ${draft.version}`} />
+              <StatusBadge label={edge ? `리비전 ${edge.revision}` : `초안 ${draft.version}`} />
             </View>
 
             <View style={styles.warning}>
@@ -194,6 +236,11 @@ export function ProcedureDraftScreen({
                 AI 초안은 실행할 수 없으며 숙련자가 모든 기준을 검토해야 합니다.
               </AppText>
             </View>
+            {needsExecution ? (
+              <AppText variant="caption" color={colors.text.secondary}>
+                초안을 저장하려면 먼저 기준값 검토에서 거리와 반복 기준을 지정해 주세요.
+              </AppText>
+            ) : null}
 
             {groupSteps(draft.steps).map(({ index, steps }) => {
               const first = steps[0];
@@ -289,7 +336,7 @@ export function ProcedureDraftScreen({
                           <IconButton
                             icon="edit"
                             accessibilityLabel={`${step.title} 편집`}
-                            disabled={saving}
+                            disabled={saving || conflicted}
                             onPress={() => {
                               setSelectedId(step.id);
                               openEditor({ kind: 'step', stepId: step.id });
@@ -325,7 +372,14 @@ export function ProcedureDraftScreen({
             <Button label="초안으로 돌아가기" onPress={() => setShowSaved(false)} />
           ) : (
             <>
-              {state.saveStatus === 'error' ? (
+              {conflicted ? (
+                <>
+                  <AppText accessibilityRole="alert" color={colors.status.danger}>
+                    서버의 초안이 변경됐어요. 최신 초안을 불러오면 저장하지 않은 편집은 사라져요.
+                  </AppText>
+                  <Button label="최신 초안 불러오기" variant="secondary" onPress={retryLoad} />
+                </>
+              ) : state.saveStatus === 'error' ? (
                 <AppText accessibilityRole="alert" color={colors.status.danger}>
                   초안을 저장하지 못했어요. 다시 시도해 주세요.
                 </AppText>
@@ -335,12 +389,13 @@ export function ProcedureDraftScreen({
                   label={saving ? '저장 중' : '임시 저장'}
                   variant="secondary"
                   loading={saving}
+                  disabled={conflicted || needsExecution}
                   onPress={() => void save()}
                   style={styles.secondaryAction}
                 />
                 <Button
                   label="기준값 검토"
-                  disabled={!selected || saving}
+                  disabled={!selected || saving || conflicted}
                   onPress={() => void review()}
                   style={styles.primaryAction}
                 />
@@ -351,7 +406,7 @@ export function ProcedureDraftScreen({
             <Button
               label="최종 승인 검토"
               variant="tertiary"
-              disabled={saving}
+              disabled={saving || conflicted || (dirty && needsExecution)}
               onPress={() => void reviewApproval()}
             />
           ) : null}
@@ -382,11 +437,17 @@ export function ProcedureDraftScreen({
                   <AppText color={colors.text.secondary}>
                     {draft[kind].join('\n') || '등록된 항목이 없어요.'}
                   </AppText>
-                  <Button
-                    label={`${editorLabels[kind]} 편집`}
-                    variant="secondary"
-                    onPress={() => openEditor({ kind })}
-                  />
+                  {edge ? (
+                    <AppText variant="caption" color={colors.text.secondary}>
+                      현재 Edge에서는 조회만 할 수 있어요.
+                    </AppText>
+                  ) : (
+                    <Button
+                      label={`${editorLabels[kind]} 편집`}
+                      variant="secondary"
+                      onPress={() => openEditor({ kind })}
+                    />
+                  )}
                 </SurfaceCard>
               ))}
             </>

@@ -24,6 +24,7 @@ export function RecordingScreen({ environment }: { environment: WorkEnvironment 
   const [help, setHelp] = useState(false);
   const [recentRecordingId, setRecentRecordingId] = useState<string>();
   const canChooseWebFile = __DEV__ && Platform.OS === 'web' && Boolean(edgeApiBaseUrl);
+  const legacyEnvironmentId = environment.workProfile?.id;
   const setupError =
     Platform.OS !== 'android' && !canChooseWebFile
       ? '음성 녹음은 Android 앱에서 사용할 수 있어요.'
@@ -63,7 +64,7 @@ export function RecordingScreen({ environment }: { environment: WorkEnvironment 
             : undefined;
       let active = true;
       if (readRecent) {
-        void readRecent(environment.id).then(
+        void readRecent(environment.id, legacyEnvironmentId).then(
           (recent) => {
             if (active) setRecentRecordingId(recent?.id);
           },
@@ -75,7 +76,7 @@ export function RecordingScreen({ environment }: { environment: WorkEnvironment 
         focused.current = false;
         void session.interrupt();
       };
-    }, [canChooseWebFile, environment.id, session]),
+    }, [canChooseWebFile, environment.id, legacyEnvironmentId, session]),
   );
 
   const active = ['requesting', 'recording', 'paused', 'saving'].includes(snapshot.status);

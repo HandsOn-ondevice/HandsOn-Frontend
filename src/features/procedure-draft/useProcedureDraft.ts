@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  isDraftRevisionConflict,
   procedureDraftRepository,
   type ProcedureDraft,
   type ProcedureDraftRepository,
@@ -11,7 +12,7 @@ type DraftState =
       status: 'ready';
       draft: ProcedureDraft;
       persisted: ProcedureDraft;
-      saveStatus: 'idle' | 'saving' | 'saved' | 'error';
+      saveStatus: 'idle' | 'saving' | 'saved' | 'error' | 'conflict';
     };
 
 export function useProcedureDraft(
@@ -51,22 +52,22 @@ export function useProcedureDraft(
   function updateDraft(update: (draft: ProcedureDraft) => ProcedureDraft) {
     if (saving.current) return;
     setState((current) =>
-      current.status === 'ready'
+      current.status === 'ready' && current.saveStatus !== 'conflict'
         ? { ...current, draft: update(current.draft), saveStatus: 'idle' }
         : current,
     );
   }
 
   async function saveDraft() {
-    if (state.status !== 'ready' || saving.current) return false;
+    if (state.status !== 'ready' || state.saveStatus === 'conflict' || saving.current) return false;
     saving.current = true;
     setState({ ...state, saveStatus: 'saving' });
     try {
       const draft = await repository.save(environmentId, state.draft);
       setState({ status: 'ready', draft, persisted: draft, saveStatus: 'saved' });
       return true;
-    } catch {
-      setState({ ...state, saveStatus: 'error' });
+    } catch (error) {
+      setState({ ...state, saveStatus: isDraftRevisionConflict(error) ? 'conflict' : 'error' });
       return false;
     } finally {
       saving.current = false;

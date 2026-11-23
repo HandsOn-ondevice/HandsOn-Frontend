@@ -79,6 +79,8 @@ test('모바일에서 연결 실패 후 실제 Edge 상태와 작업 환경을 �
   await expect(page.getByText('Edge 서버에 연결할 수 없어요.')).toBeVisible();
   await expect(retryButton).toBeEnabled();
   await expect(continueButton).toBeDisabled();
+  await expect(tokenField).toBeHidden();
+  await page.screenshot({ path: testInfo.outputPath('01-connection-error.png') });
 
   const retryOffset = responses.length;
   await retryButton.click();
@@ -95,6 +97,8 @@ test('모바일에서 연결 실패 후 실제 Edge 상태와 작업 환경을 �
   await expect(page.getByText('Edge 서버 인증을 확인해 주세요.')).toBeVisible();
   await expect(page.getByText(`HTTP ${status} · ${error.code}`, { exact: true })).toBeVisible();
   await expect(retryButton).toBeDisabled();
+  await expect(tokenField).toHaveValue('');
+  await page.screenshot({ path: testInfo.outputPath('02-authentication-error.png') });
   try {
     await tokenField.fill(token);
   } catch {
@@ -151,7 +155,9 @@ test('모바일에서 연결 실패 후 실제 Edge 상태와 작업 환경을 �
   await expect(environmentField).toBeEnabled();
   await expect(retryButton).toBeHidden();
   await environmentField.click();
-  await page.getByRole('radio', { name: selected.name, exact: true }).click();
+  const environmentOption = page.getByRole('radio', { name: selected.name, exact: true });
+  await environmentOption.click();
+  await expect(environmentOption).toBeHidden();
   await expect(environmentField).toHaveAccessibleName(`연구실: ${selected.name}`);
   await expect(
     page.getByText(`작업 프로필 · ${profile.id} · ${profile.profileVersion}`, { exact: true }),
@@ -160,6 +166,8 @@ test('모바일에서 연결 실패 후 실제 Edge 상태와 작업 환경을 �
   await expect(page.getByText(`실행 장치 · ${selected.deviceName}`, { exact: true })).toBeVisible();
 
   await expect(continueButton).toBeEnabled();
+  await expect(tokenField).toBeHidden();
+  await page.screenshot({ path: testInfo.outputPath('03-work-profile.png') });
   const home = page.waitForResponse(
     (response) => new URL(response.url()).pathname === homePath && response.ok(),
   );

@@ -20,7 +20,10 @@ interface TranscriptionViewProps {
   recording?: SavedRecording;
   text?: string;
   busy: boolean;
+  textLocked?: boolean;
+  maxTextLength?: number;
   canGenerate: boolean;
+  generateLabel?: string;
   demo: boolean;
   feedback?: ReactNode;
   onChange: (text: string) => void;
@@ -33,7 +36,10 @@ export function TranscriptionView({
   recording,
   text,
   busy,
+  textLocked,
+  maxTextLength,
   canGenerate,
+  generateLabel = 'AI 절차 초안 생성',
   demo,
   feedback,
   onChange,
@@ -84,7 +90,8 @@ export function TranscriptionView({
                 value={text}
                 onChange={onChange}
                 multiline
-                disabled={busy}
+                disabled={busy || textLocked}
+                maxLength={maxTextLength}
                 support={text.trim() ? undefined : '초안을 생성할 텍스트를 입력해 주세요.'}
               />
               {feedback}
@@ -127,7 +134,7 @@ export function TranscriptionView({
       </SafeAreaView>
       <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.actions}>
         <Button
-          label={busy ? 'AI 절차 초안 생성 중' : 'AI 절차 초안 생성'}
+          label={busy ? 'AI 절차 초안 생성 중' : generateLabel}
           testID="transcription-generate"
           loading={busy}
           disabled={!busy && !canGenerate}

@@ -1,6 +1,8 @@
 import { File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 import type { ProcedureDetail } from '@/features/procedures/procedureModels';
+import { getEdgeBaseUrl } from '@/lib/edgeApi';
+import { createEdgeDraftRepository, type EdgeDraftMetadata } from './edgeProcedureDraft';
 import { createDemoProcedureDraft } from './procedureDraftFixtures';
 import { isProcedureDraftStepCriteria, type ProcedureDraftStepCriteria } from './stepCriteria';
 
@@ -37,6 +39,7 @@ export interface ProcedureDraft {
   readonly precautions: readonly string[];
   readonly pendingItems: readonly ProcedureDraftPendingItem[];
   readonly savedAt: string | null;
+  readonly edge?: EdgeDraftMetadata;
 }
 
 export interface ProcedureDraftRepository {
@@ -53,6 +56,14 @@ export interface ProcedureDraftRepository {
 
 type StoredDraft = ProcedureDraft & { readonly release?: ProcedureDetail };
 
+export {
+  approveEdgeProcedureDraft,
+  createEdgeProcedureDraft,
+  isDraftRevisionConflict,
+  isEdgeProcedureDraft,
+  loadEdgeProcedureApproval,
+  type EdgeDraftExecution,
+} from './edgeProcedureDraft';
 export { getDemoProcedureDraftId } from './procedureDraftFixtures';
 export type { ProcedureDraftStepCriteria } from './stepCriteria';
 
@@ -264,3 +275,23 @@ export const procedureDraftRepository: ProcedureDraftRepository = {
     return readSavedDrafts(demoStorageKey(environmentId)).filter(({ release }) => !release);
   },
 };
+
+let activeEdgeRepository:
+  { baseUrl: string; token?: string; repository: ProcedureDraftRepository } | undefined;
+
+export function getProcedureDraftRepository(token?: string) {
+  const baseUrl = getEdgeBaseUrl();
+  if (!baseUrl) return procedureDraftRepository;
+  if (
+    !activeEdgeRepository ||
+    activeEdgeRepository.baseUrl !== baseUrl ||
+    activeEdgeRepository.token !== token
+  ) {
+    activeEdgeRepository = {
+      baseUrl,
+      token,
+      repository: createEdgeDraftRepository(baseUrl, token),
+    };
+  }
+  return activeEdgeRepository.repository;
+}

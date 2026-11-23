@@ -5,6 +5,8 @@ export interface SavedTranscription {
   originalText: string;
   editedText: string;
   confirmedText?: string;
+  draftRequestId?: string;
+  draftId?: string;
 }
 
 export interface SavedEdgeTranscription {
@@ -100,6 +102,16 @@ function parseTranscription(stored: unknown): SavedTranscription {
   if ('confirmedText' in stored) {
     if (typeof stored.confirmedText !== 'string' || !stored.confirmedText.trim()) invalidSnapshot();
     text.confirmedText = stored.confirmedText;
+  }
+  if ('draftRequestId' in stored) {
+    if (!text.confirmedText || typeof stored.draftRequestId !== 'string' || !stored.draftRequestId)
+      invalidSnapshot();
+    text.draftRequestId = stored.draftRequestId;
+  }
+  if ('draftId' in stored) {
+    if (!text.draftRequestId || typeof stored.draftId !== 'string' || !stored.draftId)
+      invalidSnapshot();
+    text.draftId = stored.draftId;
   }
   return text;
 }

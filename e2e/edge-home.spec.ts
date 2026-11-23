@@ -36,7 +36,7 @@ type Session = {
   checks: { id: string; checked: boolean }[];
 };
 
-test.use({ viewport, isMobile: true, hasTouch: true });
+test.use({ viewport, isMobile: true, hasTouch: true, trace: 'off' });
 test.skip(!runAgainstEdge, 'Set HANDSON_E2E_EDGE_HOME=1 to run against an isolated Edge.');
 
 function isEdgeRequest(url: URL) {
@@ -88,7 +88,11 @@ async function selectEnvironment(page: Page, role: Role) {
 
   await page.goto('/');
   await page.getByRole('radio', { name: roleLabels[role] }).click();
-  await page.getByLabel('Edge 접속 토큰', { exact: true }).fill(token);
+  try {
+    await page.getByLabel('Edge 접속 토큰', { exact: true }).fill(token);
+  } catch {
+    throw new Error('Edge 접속 토큰을 입력하지 못했습니다.');
+  }
 
   const profilesResponse = waitForEdge(page, '/work-profiles');
   const environmentsResponse = waitForEdge(page, '/environments');
@@ -267,6 +271,19 @@ test('S00 → E01에서 Edge 응답의 초안·승인 절차·제출 결과를 �
   page,
 }, testInfo) => {
   const writes = collectWrites(page);
+  const procedureReads = new Map<string, Response>();
+  page.on('response', (response) => {
+    const url = new URL(response.url());
+    if (
+      isEdgeRequest(url) &&
+      url.pathname.startsWith('/api/v1/procedures/') &&
+      response.request().method() === 'GET'
+    ) {
+      procedureReads.set(url.pathname, response);
+    }
+  });
+  const readProcedure = (path: string) =>
+    procedureReads.get(`/api/v1${path}`) ?? waitForEdge(page, path);
   const environment = await selectEnvironment(page, 'expert');
   const homeResponse = waitForEdge(page, '/home/expert');
   await page.getByRole('button', { name: '설정하고 계속', exact: true }).click();
@@ -276,8 +293,32 @@ test('S00 → E01에서 Edge 응답의 초안·승인 절차·제출 결과를 �
   await expect(
     page.getByText(environment.name, { exact: true }).filter({ visible: true }),
   ).toBeVisible();
-  const drafts = home.procedures.filter(({ status }) => status === 'draft');
   const approved = home.procedures.filter(({ status }) => status === 'approved');
+  const rawDrafts = home.procedures.filter(({ status }) => status === 'draft');
+  const approvedIds = new Set(approved.map(({ id }) => id));
+  const revisions = await Promise.all(
+    rawDrafts
+      .filter(({ id }) => approvedIds.has(id))
+      .map(async ({ id }) => {
+        const path = `/procedures/${encodeURIComponent(id)}`;
+        const draftResponse = await readProcedure(`${path}/draft`);
+        const draft = await readEdge<{ revision: number }>(draftResponse);
+        const approvalResponse = await readProcedure(path);
+        const approval = await readEdge<{ draftRevision: number }>(approvalResponse);
+        return {
+          id,
+          revision: draft.revision,
+          approvedRevision: approval.draftRevision,
+          paths: [draftResponse, approvalResponse].map(describeRequest),
+        };
+      }),
+  );
+  const publishedIds = new Set(
+    revisions
+      .filter(({ revision, approvedRevision }) => revision === approvedRevision)
+      .map(({ id }) => id),
+  );
+  const drafts = rawDrafts.filter(({ id }) => !publishedIds.has(id));
   const pending = home.results.filter(({ status }) => status === 'pending');
   await expect(
     page.getByRole('button', { name: `초안, ${drafts.length}, 개`, exact: true }),
@@ -307,9 +348,15 @@ test('S00 → E01에서 Edge 응답의 초안·승인 절차·제출 결과를 �
 
   const draft = drafts[0];
   if (draft) {
+    const reopenedResponse = waitForEdge(page, `/procedures/${encodeURIComponent(draft.id)}/draft`);
     await page.getByRole('button', { name: draft.title }).first().click();
     await expect(page).toHaveURL(`/expert/drafts/${encodeURIComponent(draft.id)}`);
-    await page.getByRole('button', { name: '숙련자 홈으로', exact: true }).click();
+    const reopenedDraft = await readEdge<{ id: string; revision: number }>(await reopenedResponse);
+    expect(reopenedDraft.id).toBe(draft.id);
+    await expect(page.getByRole('heading', { name: 'AI 절차 초안', exact: true })).toBeVisible();
+    await expect(page.getByText(`리비전 ${reopenedDraft.revision}`, { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: '뒤로가기', exact: true }).click();
+    await expect(page).toHaveURL('/expert');
   }
   const result = pending[0];
   if (result) {
@@ -336,8 +383,18 @@ test('S00 → E01에서 Edge 응답의 초안·승인 절차·제출 결과를 �
         viewport,
         profileId,
         environmentId: environment.id,
-        paths: [...environment.requests, describeRequest(await homeResponse)],
+        paths: [
+          ...environment.requests,
+          describeRequest(await homeResponse),
+          ...revisions.flatMap(({ paths }) => paths),
+        ],
         draftIds: drafts.map(({ id }) => id),
+        hiddenApprovedDraftIds: [...publishedIds],
+        revisions: revisions.map(({ id, revision, approvedRevision }) => ({
+          id,
+          revision,
+          approvedRevision,
+        })),
         approvedProcedures: approved.map(({ id, version }) => ({ id, version })),
         resultIds: pending.map(({ id }) => id),
       },

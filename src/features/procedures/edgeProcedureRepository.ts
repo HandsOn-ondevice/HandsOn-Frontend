@@ -92,9 +92,10 @@ export function createEdgeProcedureRepository(
         return null;
       }
       const { summary, value } = procedure;
+      const execution = isRecord(value.execution) ? value.execution : undefined;
       return {
         ...summary,
-        conditions: readItems(value.conditions, isCondition),
+        conditions: readItems(execution?.conditions ?? value.conditions, isCondition),
         equipment: readItems(value.equipment, isText),
         criteria: readItems(value.criteria, isCriterion),
         steps: readItems(value.steps, isText),
