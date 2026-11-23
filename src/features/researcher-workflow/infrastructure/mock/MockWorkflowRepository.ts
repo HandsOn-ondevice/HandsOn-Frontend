@@ -214,6 +214,9 @@ export class MockWorkflowRepository implements WorkflowRepository {
 
   async executeCommand(sessionId: string, command: WorkflowCommand, context: CommandContext) {
     this.assertDevelopmentEnvironment();
+    if (command.type === 'resumePausedExecution') {
+      throw new WorkflowError('INVALID_STATE', 'Edge에서 일시정지된 세션만 재개할 수 있습니다.');
+    }
     // 한 JS 작업 안에서 조회·전환·저장한다. 같은 revision의 동시 명령은 하나만 적용된다.
     const session = this.sessions.get(sessionId);
     if (!session) throw new WorkflowError('NOT_FOUND', '세션을 찾을 수 없습니다.');

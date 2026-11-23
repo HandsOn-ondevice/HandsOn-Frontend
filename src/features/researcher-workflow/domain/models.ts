@@ -200,6 +200,7 @@ export type WorkflowCommand =
       readonly confirmed: boolean;
     }
   | { readonly type: 'resumeExecution'; readonly pauseEventId: string; readonly cursorId: string }
+  | { readonly type: 'resumePausedExecution'; readonly cursorId: string }
   | { readonly type: 'requestExecutionSample'; readonly cursorId: string }
   | {
       readonly type: 'requestRecovery';

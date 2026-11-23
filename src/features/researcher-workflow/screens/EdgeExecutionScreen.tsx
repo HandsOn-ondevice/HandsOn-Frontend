@@ -14,20 +14,32 @@ import { useWorkflowSession } from '../state/useWorkflowSession';
 export function EdgeExecutionScreen({
   sessionId,
   onBack,
+  onMenu,
+  onPause,
+  onRecovery,
 }: {
   sessionId: string;
   onBack: () => void;
+  onMenu: () => void;
+  onPause: () => void;
+  onRecovery: () => void;
 }) {
   const { session, loading, error, refresh } = useWorkflowSession(sessionId);
   const cursor = session?.phase === 'running' ? session.execution?.cursor : null;
   const conditions = session?.procedure.execution?.conditions;
   const condition = conditions?.find((item) => item.id === cursor?.conditionId);
   const first = cursor?.trialIndex === 1 && cursor.conditionId === conditions?.[0]?.id;
+  const userPaused = session?.phase === 'held' && session.holdReason?.code === 'USER_PAUSED';
 
   return (
     <SafeAreaView style={styles.root} edges={['top']} testID="execution-screen">
       <StatusBar tone="light" />
-      <AppBar title="핵심 실행 화면" mode="back" onBack={onBack} />
+      <AppBar
+        title="핵심 실행 화면"
+        mode="back"
+        onBack={onBack}
+        onMore={cursor ? onMenu : undefined}
+      />
       <ScrollView contentContainerStyle={styles.content}>
         {session ? <AppText variant="title">{session.procedure.title}</AppText> : null}
         {loading ? (
@@ -48,6 +60,19 @@ export function EdgeExecutionScreen({
               조건 {condition?.label ?? cursor.conditionId} · {cursor.trialIndex}회차
             </AppText>
             <AppText variant="caption">회차 ID {cursor.cursorId}</AppText>
+          </>
+        ) : session?.phase === 'held' ? (
+          <>
+            <FeedbackPanel
+              title={userPaused ? '실험이 일시정지되어 있습니다' : '실험이 보류되었습니다'}
+              subtitle={session.holdReason?.message}
+              tone="warning"
+            />
+            <Button
+              label={userPaused ? '일시정지 기록 확인' : '센서 오류와 작업 보류 확인'}
+              variant="secondary"
+              onPress={userPaused ? onPause : onRecovery}
+            />
           </>
         ) : session ? (
           <FeedbackPanel
