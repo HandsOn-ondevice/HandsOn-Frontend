@@ -1,58 +1,23 @@
+import { expect, test, type Locator, type Response } from '@playwright/test';
 import {
-  expect,
-  test,
-  type APIRequestContext,
-  type Locator,
-  type Page,
-  type Response,
-} from '@playwright/test';
+  button,
+  checkLayout,
+  currentKitProcedure,
+  enterProcedure,
+  enterStudentHome,
+  isolatedEdge,
+  reopen,
+  seedCompletedTrial,
+  sessionsPath,
+  simulationPath,
+  viewport,
+  type CommandBody,
+  type CreateBody,
+  type Session,
+  type SimulationConfig,
+} from './helpers/edge-session';
 
-const sessionsPath = '/api/v1/sessions';
-const simulationPath = '/api/v1/simulation';
-const viewport = { width: 360, height: 800 };
 const runAgainstEdge = process.env.HANDSON_E2E_EDGE_SESSION === '1';
-
-type Command =
-  | { type: 'setPreparationCheck'; checkId: string; checked: boolean }
-  | { type: 'requestExecutionSample'; cursorId: string }
-  | { type: 'completeExecutionStep'; cursorId: string; sampleAttemptId: string }
-  | { type: 'completePreparation' | 'startDeviceCheck' | 'startExecution' | 'cancel' };
-
-type CreateBody = {
-  requestId: string;
-  procedureId: string;
-  procedureVersion: string;
-  workProfileId: string;
-  operatorId: string;
-};
-type CommandBody = { requestId: string; expectedRevision: number; command: Command };
-type SimulationConfig = { scenario: string; distanceCm: number; ledFailure: boolean };
-type Cursor = { cursorId: string; conditionId: string; trialIndex: number };
-
-type Session = {
-  sessionId: string;
-  phase: string;
-  revision: number;
-  holdReason?: { code: string; message: string } | null;
-  dataOrigin: string;
-  checks: { id: string; checked: boolean }[];
-  procedure: {
-    procedureId: string;
-    version: string;
-    workProfileId: string;
-    title: string;
-    preparation: { id: string; title: string; owner: string }[];
-    execution: { conditions: { id: string; label: string }[] };
-  };
-  events: { type: string; requestId: string }[];
-  deviceChecks: {
-    attemptId: string;
-    status: string;
-    issue?: { code: string; message: string };
-  }[];
-  pendingJob: { kind: string; attemptId: string } | null;
-  execution?: { cursor: Cursor; attempts: { attemptId: string; status: string }[] };
-};
 
 type ObservedWrite = {
   path: string;
@@ -67,119 +32,6 @@ type ObservedWrite = {
 
 test.use({ viewport, isMobile: true, hasTouch: true });
 test.skip(!runAgainstEdge, 'Set HANDSON_E2E_EDGE_SESSION=1 to run against an isolated Edge.');
-
-function button(page: Page, name: string) {
-  return page.getByRole('button', { name, exact: true });
-}
-
-async function checkLayout(page: Page, locator: Locator) {
-  await locator.scrollIntoViewIfNeeded();
-  await expect(locator).toBeInViewport({ ratio: 1 });
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
-    viewport.width,
-  );
-}
-
-async function reopen(page: Page, path: string) {
-  // Keep the app's in-memory authentication while mounting the route from its session ID.
-  await page.evaluate((target) => {
-    history.pushState({}, '', target);
-    dispatchEvent(new PopStateEvent('popstate'));
-  }, path);
-  await expect(page).toHaveURL(path);
-}
-
-async function enterStudentHome(page: Page, token: string) {
-  await page.goto('/');
-  await page.getByRole('radio', { name: '신규 연구생, 승인된 절차 실행' }).click();
-  try {
-    await page.getByLabel(/Edge (?:접속|API) 토큰/).fill(token);
-  } catch {
-    throw new Error('Could not fill the local Edge credential field.');
-  }
-  await page.getByRole('button', { name: /^(작업 환경 불러오기|다시 시도)$/ }).click();
-  await page.getByRole('button', { name: /^연구실: / }).click();
-  await page.getByRole('radio', { name: '지급 키트 실습실', exact: true }).click();
-  await button(page, '설정하고 계속').click();
-}
-
-async function enterProcedure(page: Page, token: string, procedureTitle: string) {
-  await enterStudentHome(page, token);
-  await page.getByRole('tab', { name: '실험', exact: true }).click();
-  await expect(page).toHaveURL('/procedures?environmentId=kit-lab');
-  await page.getByRole('button', { name: `${procedureTitle}, 승인,` }).click();
-  await button(page, '선택한 절차 확인').click();
-  await expect(page).toHaveURL(/\/procedures\/kit-distance\?/);
-}
-
-function isolatedEdge(request: APIRequestContext) {
-  const origin = new URL(process.env.EXPO_PUBLIC_HANDSON_EDGE_BASE_URL ?? '');
-  if (!['127.0.0.1', 'localhost', '[::1]'].includes(origin.hostname)) {
-    throw new Error(
-      'Run session E2E only on a dedicated loopback Edge with its own data directory.',
-    );
-  }
-  const operatorToken = process.env.HANDSON_E2E_OPERATOR_TOKEN;
-  const expertToken = process.env.HANDSON_E2E_EXPERT_TOKEN;
-  if (!operatorToken || !expertToken) {
-    throw new Error('Set the operator and expert test tokens for the isolated Edge.');
-  }
-  const operatorHeaders = { Authorization: `Bearer ${operatorToken}` };
-  const expertHeaders = { Authorization: `Bearer ${expertToken}` };
-
-  return {
-    origin: origin.origin,
-    operatorToken,
-    async read<T>(path: string, role?: 'operator' | 'expert') {
-      const headers =
-        role === 'operator' ? operatorHeaders : role === 'expert' ? expertHeaders : undefined;
-      const response = await request.get(new URL(path, origin).href, { headers });
-      expect(response.status(), `GET ${path}`).toBe(200);
-      return (await response.json()) as T;
-    },
-    async create(procedure: Session['procedure']) {
-      const requestId = crypto.randomUUID();
-      const response = await request.post(`${origin.origin}${sessionsPath}`, {
-        headers: { ...operatorHeaders, 'Idempotency-Key': requestId },
-        data: {
-          requestId,
-          procedureId: procedure.procedureId,
-          procedureVersion: procedure.version,
-          workProfileId: procedure.workProfileId,
-          operatorId: 'operator-01',
-        } satisfies CreateBody,
-      });
-      expect(response.status(), `POST ${sessionsPath}`).toBe(201);
-      return (await response.json()) as Session;
-    },
-    async command(sessionId: string, expectedRevision: number, command: Command) {
-      const requestId = crypto.randomUUID();
-      const response = await request.post(`${origin.origin}${sessionsPath}/${sessionId}/commands`, {
-        headers: { ...operatorHeaders, 'Idempotency-Key': requestId },
-        data: { requestId, expectedRevision, command },
-      });
-      expect(response.status(), command.type).toBe(200);
-      return (await response.json()) as Session;
-    },
-    async configure(config: SimulationConfig) {
-      const response = await request.post(`${origin.origin}${simulationPath}`, {
-        headers: expertHeaders,
-        data: { requestId: crypto.randomUUID(), config },
-      });
-      expect(response.status()).toBe(200);
-    },
-  };
-}
-
-async function currentKitProcedure(edge: ReturnType<typeof isolatedEdge>) {
-  const procedures = await edge.read<Session['procedure'][]>(
-    '/api/v1/procedures?environmentId=kit-lab',
-    'operator',
-  );
-  const procedure = procedures.find(({ procedureId }) => procedureId === 'kit-distance');
-  if (!procedure) throw new Error('Isolated Edge has no approved kit-distance procedure.');
-  return procedure;
-}
 
 test('모바일 S03~S06에서 실제 Edge의 재전송, 점검 판정과 첫 회차를 확인한다', async ({
   page,
@@ -497,41 +349,6 @@ test('모바일 S03~S06에서 실제 Edge의 재전송, 점검 판정과 첫 회
     }
   }
 });
-
-async function seedCompletedTrial(edge: ReturnType<typeof isolatedEdge>, created: Session) {
-  let session = created;
-  const path = `${sessionsPath}/${session.sessionId}`;
-  async function send(command: Command) {
-    session = await edge.command(session.sessionId, session.revision, command);
-  }
-  async function waitForJob() {
-    await expect
-      .poll(async () => {
-        session = await edge.read<Session>(path, 'operator');
-        return session.pendingJob;
-      })
-      .toBeNull();
-  }
-
-  for (const { id, owner } of session.procedure.preparation) {
-    if (owner === 'operator')
-      await send({ type: 'setPreparationCheck', checkId: id, checked: true });
-  }
-  await send({ type: 'completePreparation' });
-  await send({ type: 'startDeviceCheck' });
-  await waitForJob();
-  expect(session.phase).toBe('readyToExecute');
-  await send({ type: 'startExecution' });
-  const cursorId = session.execution?.cursor.cursorId;
-  if (!cursorId) throw new Error('Edge did not return an execution cursor.');
-  await send({ type: 'requestExecutionSample', cursorId });
-  await waitForJob();
-  const attempt = session.execution?.attempts.at(-1);
-  if (!attempt) throw new Error('Edge did not return a measurement attempt.');
-  expect(attempt.status).toBe('ready');
-  await send({ type: 'completeExecutionStep', cursorId, sampleAttemptId: attempt.attemptId });
-  return session;
-}
 
 async function observedCommand(response: Response, command: 'pause' | 'resume') {
   const request = response.request();

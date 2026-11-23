@@ -315,6 +315,7 @@ for (const viewport of [
       procedureVersion: procedure.version,
       workProfileId: profileId,
       operatorId,
+      resumePolicyVersion: '2.0',
     });
     expect(api.creates.slice(1)).toEqual([api.creates[0], api.creates[0]]);
     expect(api.sessionsByKey.size).toBe(1);
