@@ -1,0 +1,49 @@
+{
+  "title": "환경 대응형 센서 노드 기본 동작 검증",
+  "transcript": "이번 작업은 환경 대응형 센서 노드의 기본 동작 검증입니다. 먼저 Orange Pi와 센서 연결 상태를 확인하고, 초음파 센서와 대상물 사이의 거리를 15cm에서 25cm 사이로 맞춰야 합니다. 그다음 조도 센서값을 확인하고, 조도값이 1500 이상이면 정상 환경으로 판단합니다. 거리와 조도 조건이 모두 정상이면 작업을 시작하고 LED가 정상적으로 켜지는지 확인합니다. 작업 중 조도값이 기준보다 낮아지면 작업을 보류하고, 환경을 다시 확인한 뒤 정상 상태가 되면 작업을 재개합니다. 모든 확인이 끝나면 현재 단계를 완료하고 작업을 종료합니다.",
+  "generator": "issue-53-fixed-draft",
+  "steps": [
+    {
+      "id": "device-connection",
+      "title": "장치 연결",
+      "description": "Orange Pi와 센서의 연결 상태를 확인합니다.",
+      "needsReview": true
+    },
+    {
+      "id": "distance-check",
+      "title": "거리 확인",
+      "description": "초음파 센서와 대상물 사이의 거리를 확인합니다.",
+      "needsReview": true
+    },
+    {
+      "id": "light-check",
+      "title": "조도 확인",
+      "description": "조도 센서값이 기준을 충족하는지 확인합니다.",
+      "needsReview": true
+    },
+    {
+      "id": "start-led",
+      "title": "시작·LED 확인",
+      "description": "거리와 조도가 모두 정상일 때 작업을 시작하고 LED가 켜지는지 확인합니다.",
+      "needsReview": true
+    },
+    {
+      "id": "hold",
+      "title": "보류",
+      "description": "작업 중 환경 조건이 벗어나면 작업을 보류합니다.",
+      "needsReview": true
+    },
+    {
+      "id": "resume",
+      "title": "재개",
+      "description": "환경을 다시 확인한 뒤 작업을 재개합니다.",
+      "needsReview": true
+    },
+    {
+      "id": "complete",
+      "title": "완료",
+      "description": "모든 확인이 끝나면 현재 단계를 완료하고 작업을 종료합니다.",
+      "needsReview": true
+    }
+  ]
+}
