@@ -1,0 +1,123 @@
+appId: com.handson.frontend
+name: Android 실험 실행 상단 뒤로가기의 일시정지와 같은 회차 재개
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: '연구실: 연구실을 선택해 주세요'
+    timeout: 30000
+- openLink: handson://researcher-workflow
+- extendedWaitUntil:
+    visible: 새 Mock 실험 준비 시작
+    timeout: 30000
+- tapOn: 새 Mock 실험 준비 시작
+- extendedWaitUntil:
+    visible: 실험 준비 체크
+    timeout: 10000
+- tapOn:
+    text: 필수 준비물 7개 확인
+    enabled: true
+- tapOn:
+    text: 장치 ID LED-M03 확인
+    enabled: true
+- scrollUntilVisible:
+    element: 전원 차단 확인
+    direction: DOWN
+- tapOn:
+    text: 전원 차단 확인
+    enabled: true
+- scrollUntilVisible:
+    element: 센서 배선 연결
+    direction: DOWN
+- tapOn:
+    text: 센서 배선 연결
+    enabled: true
+- scrollUntilVisible:
+    element: LED와 BH1750 거리 20cm
+    direction: DOWN
+- tapOn:
+    text: LED와 BH1750 거리 20cm
+    enabled: true
+- tapOn:
+    text: 확인 완료
+    enabled: true
+
+- extendedWaitUntil:
+    visible: 장치 상태 확인
+    timeout: 10000
+- tapOn: 더 보기
+- copyTextFrom:
+    text: '세션 mock-session-[a-z0-9-]+ · 절차 v1\.2'
+- evalScript: ${output.sessionLabel = maestro.copiedText.split(' · ')[0]}
+- tapOn: 하단 시트 닫기
+- scrollUntilVisible:
+    element: 장치·센서 점검 시작
+    direction: DOWN
+- tapOn: 장치·센서 점검 시작
+- tapOn:
+    text: 실험 측정 시작
+    enabled: true
+
+# 완료한 1회차가 있는 상태에서 상단 뒤로가기를 누릅니다.
+- extendedWaitUntil:
+    visible: 핵심 실행 화면
+    timeout: 10000
+- scrollUntilVisible:
+    element: 현재 회차 측정값 확인
+    direction: DOWN
+- tapOn: 현재 회차 측정값 확인
+- tapOn:
+    text: 완료 요청
+    enabled: true
+- scrollUntilVisible:
+    element:
+      text: '유효 측정 1 / 15회, 진행 중'
+    direction: UP
+- assertVisible: '(?s)0% 출력 · 2회차\s+측정을 진행하세요'
+- tapOn: 뒤로가기
+
+- extendedWaitUntil:
+    visible: 진행 상태를 안전하게 저장했어요
+    timeout: 10000
+- assertVisible: 일시정지 확인
+- assertVisible: ${output.sessionLabel}
+- assertVisible: '완료한 측정과 절차 v1\.2를 유지합니다\.'
+- assertVisible: 마지막 유효 측정 · 0% 1회차
+- assertVisible: 다음 작업 · 0% 2회차
+- assertVisible: '유효 측정 1 / 15회 · .*'
+- tapOn: 바로 재개
+
+- extendedWaitUntil:
+    visible: 재개 전 재확인
+    timeout: 10000
+- assertVisible: '(?s)0% 조건\s+2회차부터 재개합니다'
+- assertVisible:
+    text: 확인하고 재개
+    enabled: false
+- scrollUntilVisible:
+    element:
+      text: '센서 근거, .*필수 센서 3개 연결,.*'
+    direction: DOWN
+- tapOn: '센서 근거, .*필수 센서 3개 연결,.*'
+- scrollUntilVisible:
+    element:
+      text: '센서 근거, 공급 전압 확인 필요,.*'
+    direction: DOWN
+- tapOn: '센서 근거, 공급 전압 확인 필요,.*'
+- scrollUntilVisible:
+    element:
+      text: '작업자 확인, 거리 20cm와 지그 고정 확인,.*'
+    direction: DOWN
+- tapOn:
+    text: '작업자 확인, 거리 20cm와 지그 고정 확인,.*'
+    enabled: true
+- tapOn:
+    text: 확인하고 재개
+    enabled: true
+
+- extendedWaitUntil:
+    visible: 핵심 실행 화면
+    timeout: 10000
+- assertVisible: '절차 v1\.2'
+- assertVisible: '유효 측정 1 / 15회, 진행 중'
+- assertVisible: '(?s)0% 출력 · 2회차\s+측정을 진행하세요'

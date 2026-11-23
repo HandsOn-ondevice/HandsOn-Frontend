@@ -6,7 +6,7 @@ import { isEdgeWorkflowEnabled } from '@/features/researcher-workflow/state/work
 
 export default function ExecutionRoute() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
-  const onBack = () =>
+  const onDeviceCheck = () =>
     router.dismissTo({
       pathname: '/researcher-workflow/[sessionId]/device-check',
       params: { sessionId },
@@ -30,7 +30,7 @@ export default function ExecutionRoute() {
       <EdgeExecutionScreen
         key={sessionId}
         sessionId={sessionId}
-        onBack={onBack}
+        onDeviceCheck={onDeviceCheck}
         onMenu={onMenu}
         onRecovery={onRecovery}
         onPause={onPause}
@@ -59,7 +59,7 @@ export default function ExecutionRoute() {
         key={sessionId}
         sessionId={sessionId}
         onMenu={onMenu}
-        onBack={onBack}
+        onDeviceCheck={onDeviceCheck}
         onRecovery={onRecovery}
         onRemeasurement={() =>
           router.push({

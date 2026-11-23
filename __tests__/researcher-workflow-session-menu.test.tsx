@@ -81,7 +81,8 @@ describe('S06 세션 메뉴와 장치 상태 조회', () => {
       <WorkflowProvider repository={f.repo}>
         <ExecutionScreen
           sessionId={f.sessionId}
-          onBack={() => {}}
+          onDeviceCheck={() => {}}
+          onPause={() => {}}
           onClarification={() => {}}
           onMenu={onMenu}
         />

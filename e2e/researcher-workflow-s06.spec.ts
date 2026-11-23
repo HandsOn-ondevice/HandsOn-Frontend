@@ -48,7 +48,8 @@ test('412px에서 S06 완료·S05 재진입·S07 연결 왕복으로 상태를 �
   await complete.click();
   await expect(page.getByText('유효 측정 1 / 15회', { exact: true })).toBeVisible();
   await expect(complete).toBeDisabled();
-  await page.getByRole('button', { name: '뒤로가기', exact: true }).click();
+  await page.goBack();
+  await expect(page).toHaveURL(/\/device-check$/);
   await page.getByRole('button', { name: '실험 진행으로 돌아가기', exact: true }).click();
   await expect(page).toHaveURL(executionURL);
   await expect(page.getByText('유효 측정 1 / 15회', { exact: true })).toBeVisible();
