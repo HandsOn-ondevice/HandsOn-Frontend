@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { isEdgeDataEnabled } from '@/lib/edgeApi';
+import { createEdgeProcedureRepository } from './edgeProcedureRepository';
 import type { WorkEnvironment } from '@/features/entry/entryEnvironment';
 import type { PreparationRequest } from './PreparationHandoffProvider';
 import { ProcedureDetailView } from './ProcedureDetailView';
@@ -17,6 +19,7 @@ interface ProcedureDetailScreenProps {
   onPrepare: (request: PreparationRequest, sessionId?: string) => void;
   startSession?: (request: PreparationRequest) => Promise<string>;
   repository?: ProcedureRepository;
+  edgeToken?: string;
 }
 
 function matchesSelection(detail: ProcedureDetail | null, selection: ProcedureSelection) {
@@ -32,11 +35,17 @@ export function ProcedureDetailScreen({
   onBack,
   onPrepare,
   startSession,
-  repository = procedureRepository,
+  repository,
+  edgeToken,
 }: ProcedureDetailScreenProps) {
+  const source = useMemo(
+    () =>
+      repository ??
+      (isEdgeDataEnabled() ? createEdgeProcedureRepository(edgeToken) : procedureRepository),
+    [edgeToken, repository],
+  );
   const [attempt, setAttempt] = useState(0);
-  const environmentId = environment.environmentId ?? environment.id;
-  const requestKey = JSON.stringify([procedureId, approvedVersion, environmentId, attempt]);
+  const requestKey = JSON.stringify([procedureId, approvedVersion, environment.id, attempt]);
   const generation = useRef(0);
   const busy = useRef(false);
   const [result, setResult] = useState<{
@@ -56,8 +65,8 @@ export function ProcedureDetailScreen({
   useEffect(() => {
     const currentGeneration = ++generation.current;
     busy.current = false;
-    const selection = { procedureId, approvedVersion, environmentId };
-    void repository.getDetail(selection).then(
+    const selection = { procedureId, approvedVersion, environmentId: environment.id };
+    void source.getDetail(selection).then(
       (detail) => {
         if (currentGeneration !== generation.current) return;
         setResult({
@@ -74,14 +83,14 @@ export function ProcedureDetailScreen({
     return () => {
       generation.current = currentGeneration + 1;
     };
-  }, [approvedVersion, environmentId, procedureId, repository, requestKey]);
+  }, [approvedVersion, environment.id, procedureId, source, requestKey]);
 
   async function prepare() {
     if (busy.current || lookup.status !== 'ready' || !lookup.data || currentStart?.blocked) return;
     busy.current = true;
     const currentGeneration = generation.current;
     setStart({ key: requestKey, pending: true });
-    const selection = { procedureId, approvedVersion, environmentId };
+    const selection = { procedureId, approvedVersion, environmentId: environment.id };
     const request = Object.freeze({
       procedureId,
       approvedVersion,
@@ -97,7 +106,7 @@ export function ProcedureDetailScreen({
         return;
       }
 
-      const detail = await repository.getDetail(selection);
+      const detail = await source.getDetail(selection);
       if (currentGeneration !== generation.current) return;
       if (!matchesSelection(detail, selection)) {
         setStart({

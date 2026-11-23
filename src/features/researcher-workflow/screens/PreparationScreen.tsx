@@ -1,5 +1,5 @@
 import { procedureVersionLabel } from './procedure-version-label';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -12,10 +12,12 @@ import {
   FeedbackPanel,
   Icon,
   StatusBar,
+  SurfaceCard,
   StepProgress,
   colors,
   spacing,
 } from '@/design-system';
+import type { ExperimentSession } from '../domain/models';
 import { selectPreparation } from '../domain/preparation';
 import { useWorkflowSession } from '../state/useWorkflowSession';
 
@@ -24,11 +26,13 @@ export function PreparationScreen({
   onBack,
   onHome = onBack,
   onDeviceCheck,
+  renderResume,
 }: {
   sessionId: string;
   onBack: () => void;
   onHome?: () => void;
   onDeviceCheck: () => void;
+  renderResume?: (session: ExperimentSession) => ReactNode;
 }) {
   const {
     session,
@@ -46,6 +50,20 @@ export function PreparationScreen({
   const [details, setDetails] = useState(false);
   const progress = session ? selectPreparation(session) : null;
   const mock = session?.source === 'mock';
+  const [enteredPreparation, setEnteredPreparation] = useState(false);
+  // An open checklist continues to use its explicit navigation after its own commands.
+  if (
+    renderResume &&
+    !enteredPreparation &&
+    session?.source === 'api' &&
+    session.phase === 'preparing'
+  ) {
+    setEnteredPreparation(true);
+  }
+  const resumeDestination =
+    session && (mock || !enteredPreparation) ? renderResume?.(session) : null;
+  if (resumeDestination) return resumeDestination;
+
   const guidance =
     progress?.current?.guidance ??
     (session?.checks.find((check) => check.id === 'communication')?.checked
@@ -108,6 +126,12 @@ export function PreparationScreen({
         ) : null}
         {session && progress ? (
           <>
+            {session.source === 'api' ? (
+              <SurfaceCard
+                title={`${session.procedure.title} · ${procedureVersionLabel(session.procedure.version)}`}
+                subtitle={`세션 ${session.sessionId}`}
+              />
+            ) : null}
             <StepProgress
               title={`준비 진행도 · ${progress.completed} / ${progress.total} 항목 완료`}
               value={progress.percentage}

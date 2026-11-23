@@ -65,7 +65,12 @@ async function loseNextResponse<T>(page: Page, url: string) {
 
 async function enterRole(page: Page, origin: string, role: 'expert' | 'student') {
   await page.goto('/');
-  await expect(page.getByText('Edge 서버 인증을 확인해 주세요.', { exact: true })).toBeVisible();
+  await page
+    .getByRole('radio', {
+      name: role === 'expert' ? '숙련 연구생, 절차 생성·승인' : '신규 연구생, 승인된 절차 실행',
+      exact: true,
+    })
+    .click();
   try {
     await page
       .getByLabel('Edge 접속 토큰', { exact: true })
@@ -74,7 +79,8 @@ async function enterRole(page: Page, origin: string, role: 'expert' | 'student')
     throw new Error('작업 환경을 불러올 접속 토큰을 입력하지 못했습니다.');
   }
   const profiles = readEdgeResponse(page, origin, 'GET', profilesPath);
-  await page.getByRole('button', { name: '다시 시도', exact: true }).click();
+  const environments = readEdgeResponse(page, origin, 'GET', '/api/v1/environments');
+  await page.getByRole('button', { name: '작업 환경 불러오기', exact: true }).click();
   const response = await profiles;
   expect(response.status()).toBe(200);
   const [profile] = (await response.json()) as WorkProfile[];
@@ -84,14 +90,13 @@ async function enterRole(page: Page, origin: string, role: 'expert' | 'student')
     environmentId: expect.any(String),
   });
 
-  await page
-    .getByRole('radio', {
-      name: role === 'expert' ? '숙련 연구생, 절차 생성·승인' : '신규 연구생, 승인된 절차 실행',
-      exact: true,
-    })
-    .click();
+  const environmentResponse = await environments;
+  expect(environmentResponse.status()).toBe(200);
+  const workEnvironments = (await environmentResponse.json()) as { id: string; name: string }[];
+  const environment = workEnvironments.find((item) => item.id === profile.environmentId);
+  if (!environment) throw new Error('작업 프로필과 연결된 환경이 없습니다.');
   await page.getByRole('button', { name: /^연구실: / }).click();
-  await page.getByRole('radio', { name: profile.name, exact: true }).click();
+  await page.getByRole('radio', { name: environment.name, exact: true }).click();
   await page.getByRole('button', { name: '설정하고 계속', exact: true }).click();
   return profile;
 }
@@ -354,6 +359,12 @@ test('모바일에서 확정 전사문으로 초안을 한 번 생성하고 저�
   const release = (await approvalResponse.json()) as Procedure;
   expect(release).toEqual(lostApproval?.data);
   await expect(page.getByText(`${release.version} 승인·배포 완료`, { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '숙련자 홈으로', exact: true }).click();
+  await expect(page).toHaveURL('/expert');
+  await page.getByRole('tab', { name: '절차', exact: true }).click();
+  await expect(page.getByRole('button', { name: new RegExp(title) })).toHaveCount(0);
+  await page.getByRole('radio', { name: '승인 절차', exact: true }).click();
+  await expect(page.getByRole('button', { name: new RegExp(title) })).toBeVisible();
 
   const student = await context.newPage();
   const studentProfile = await enterRole(student, origin, 'student');

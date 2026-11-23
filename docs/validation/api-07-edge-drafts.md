@@ -1,10 +1,10 @@
 # API-07 Edge 초안 저장과 승인 검증
 
-2026-11-23에 Expo 웹 `http://localhost:8139`와 Chromium 모바일 뷰포트 412×920에서 실행했습니다. Edge v0.1.0을 `http://127.0.0.1:8039`에 띄우고 별도의 시뮬레이션 데이터 디렉터리를 사용했습니다. [검증한 Edge 소스](https://github.com/HandsOn-ondevice/HandsOn-Backend/tree/88b8b81bd42b7aca3f8cec59890e45adf67efff2)
+2026-11-23에 Expo 웹 `http://localhost:8139`(초안), `http://localhost:8143`(연결과 인증)과 Chromium 모바일 뷰포트 412×920에서 실행했습니다. Edge v0.1.0을 `http://127.0.0.1:8039`에 띄우고 별도의 시뮬레이션 데이터 디렉터리를 사용했습니다. [검증한 Edge 소스](https://github.com/HandsOn-ondevice/HandsOn-Backend/tree/88b8b81bd42b7aca3f8cec59890e45adf67efff2)
 
 ## 연결과 인증
 
-최초 `GET /api/v1/system/health`를 Playwright에서 중단해 연결 실패 안내와 **다시 시도**를 확인했습니다. 첫 재시도의 상태 조회는 `200`이었고, 인증 헤더가 없던 `GET /api/v1/work-profiles`는 실제 서버에서 `401 UNAUTHORIZED`를 반환했습니다. 인증 후 두 요청 모두 `200`이었고, 선택 화면의 지급 키트 실습실, 거리 확인, Orange Pi 5 Plus, 프로필 ID `kit-distance-v1`을 서버 응답과 대조했습니다. 초안과 승인 절차 API에는 이 프로필의 환경 ID `kit-lab`을 사용했습니다.
+연구생을 선택하고 임의의 잘못된 토큰을 입력한 뒤 최초 `GET /api/v1/system/health`를 Playwright에서 중단해 연결 실패 안내와 **다시 시도**를 확인했습니다. 첫 재시도의 상태 조회는 `200`이었고, 같은 토큰으로 보낸 `GET /api/v1/work-profiles`는 실제 서버에서 `401 UNAUTHORIZED`를 반환했습니다. 정상 토큰으로 재시도하자 상태, 작업 프로필, `GET /api/v1/environments`가 모두 `200`이었습니다. 선택 화면의 지급 키트 실습실, 거리 확인, `Orange Pi (simulation)`, 작업 프로필 `kit-distance-v1` 버전 `1.0.0`을 응답과 대조했습니다. 초안과 승인 절차 API에는 이 프로필과 연결된 환경 ID `kit-lab`을 사용했습니다.
 
 ## 초안부터 승인 버전까지
 
@@ -16,7 +16,7 @@
 | `POST /api/v1/procedures/{id}/approve`                                                       | 다른 클라이언트가 리비전 `3`을 저장한 뒤 리비전 `2`의 승인 요청이 `409`로 거절됐습니다. 최신 초안을 다시 확인하고 같은 승인 사유를 제출했습니다. `201` 응답 유실 후 동일 요청으로 재시도해 같은 `1.0.0` 버전이 표시됐습니다.                                                                       |
 | `GET /api/v1/procedures?environmentId=kit-lab`, `GET /api/v1/procedures/{id}?version=1.0.0`  | 연구생 목록과 상세에서 승인된 절차 ID, 버전, 단계 문구와 거리·반복 기준을 서버 응답과 대조했습니다. 서버 초안 목록에도 검증 제목으로 생성된 초안은 한 건이었습니다.                                                                                                                                |
 
-대표 ID는 녹음 `recording-74b96906f7644a819947a643152d615f`, 전사 `transcription-4d4b8b2e50294e449262ec8917091dc6`, 초안 및 절차 `procedure-d50b69c1826442c084b9287d98fe5ba1`입니다.
+대표 ID는 녹음 `recording-91e40a09594f4f8da48d32793b944c58`, 전사 `transcription-b003568525fd49ce9470f3ac6285f940`, 초안 및 절차 `procedure-e0f3f9326aa74829bf385e6f1e1c705b`입니다.
 
 ## 재실행과 검증 범위
 

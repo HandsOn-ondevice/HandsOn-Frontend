@@ -26,7 +26,7 @@ async function openRecording(page: Page) {
   } catch {
     throw new Error('Edge 접속 토큰을 입력하지 못했습니다.');
   }
-  await page.getByRole('button', { name: '다시 시도', exact: true }).click();
+  await page.getByRole('button', { name: '작업 환경 불러오기', exact: true }).click();
   await page.getByRole('button', { name: /^연구실: / }).click();
   const environment = page.getByRole('radio', { name: '지급 키트 실습실', exact: true });
   await environment.click();

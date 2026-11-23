@@ -36,7 +36,7 @@ export default function DraftApprovalRoute() {
 
   const editRoute = { pathname: '/expert/drafts/[draftId]' as const, params: { draftId } };
   const reviewedStepId = typeof stepId === 'string' ? stepId : undefined;
-  const environmentId = selection.environment.environmentId ?? selection.environment.id;
+  const environmentId = selection.environment.id;
 
   return (
     <DraftApprovalContext

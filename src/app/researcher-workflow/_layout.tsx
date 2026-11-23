@@ -1,10 +1,10 @@
-import { Stack, router } from 'expo-router';
+import { Redirect, Stack, router } from 'expo-router';
 import { AppBar, FeedbackPanel, Screen, StatusBar } from '@/design-system';
 import { useEntrySelection } from '@/features/entry/EntrySelectionProvider';
 import { WorkflowProvider } from '@/features/researcher-workflow/state/WorkflowProvider';
 import {
-  isEdgeWorkflowEnabled,
   getEdgeWorkflowRepository,
+  isEdgeWorkflowEnabled,
 } from '@/features/researcher-workflow/state/workflow-repository';
 
 const edgeScreens = new Set([
@@ -15,18 +15,19 @@ const edgeScreens = new Set([
 
 export default function ResearcherWorkflowLayout() {
   const { selection } = useEntrySelection();
-  const edgeToken = selection?.edgeToken;
 
   if (isEdgeWorkflowEnabled()) {
+    if (selection?.role !== 'student') return <Redirect href="/" />;
+
     return (
-      <WorkflowProvider repository={getEdgeWorkflowRepository(edgeToken)}>
+      <WorkflowProvider repository={getEdgeWorkflowRepository(selection.edgeToken)}>
         <Stack
           screenOptions={{ headerShown: false }}
           screenLayout={({ route, children }) =>
             edgeScreens.has(route.name) ? (
               children
             ) : (
-              <Screen>
+              <Screen scroll>
                 <StatusBar />
                 <AppBar
                   mode="back"

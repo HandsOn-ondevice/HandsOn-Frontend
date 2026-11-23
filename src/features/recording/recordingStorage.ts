@@ -113,7 +113,10 @@ export async function readSavedRecording(id: string): Promise<SavedRecording | n
   }
 }
 
-export async function readRecentSavedRecording(environmentId: string) {
+export async function readRecentSavedRecording(
+  environmentId: string,
+  legacyEnvironmentId?: string,
+) {
   const directory = recordingsDirectory();
   if (!directory.exists) return null;
 
@@ -127,7 +130,9 @@ export async function readRecentSavedRecording(environmentId: string) {
 
   for (const id of ids) {
     const recording = await readSavedRecording(id);
-    if (recording?.environment.id === environmentId) return recording;
+    if (recording && [environmentId, legacyEnvironmentId].includes(recording.environment.id)) {
+      return recording;
+    }
   }
   return null;
 }

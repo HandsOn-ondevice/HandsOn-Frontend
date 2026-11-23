@@ -9,7 +9,7 @@ export default function ProcedureDraftRoute() {
   const { selection } = useEntrySelection();
   if (selection?.role !== 'expert') return <Redirect href="/" />;
   if (typeof draftId !== 'string' || !draftId) return <Redirect href="/expert" />;
-  const environmentId = selection.environment.environmentId ?? selection.environment.id;
+  const environmentId = selection.environment.id;
 
   return (
     <ProcedureDraftScreen

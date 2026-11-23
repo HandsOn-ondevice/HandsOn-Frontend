@@ -2,7 +2,6 @@ import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEntrySelection } from '@/features/entry/EntrySelectionProvider';
 import { ProcedureDetailScreen } from '@/features/procedures/ProcedureDetailScreen';
 import { usePreparationHandoff } from '@/features/procedures/PreparationHandoffProvider';
-import { useSelectedProcedureRepository } from '@/features/procedures/useSelectedProcedureRepository';
 import {
   isEdgeWorkflowEnabled,
   startApprovedEdgeSession,
@@ -11,7 +10,6 @@ import {
 export default function Procedure() {
   const router = useRouter();
   const { selection } = useEntrySelection();
-  const repository = useSelectedProcedureRepository();
   const { setRequest } = usePreparationHandoff();
   const { procedureId, approvedVersion, environmentId } = useLocalSearchParams<{
     procedureId?: string | string[];
@@ -36,7 +34,7 @@ export default function Procedure() {
     <ProcedureDetailScreen
       key={JSON.stringify([procedureId, approvedVersion, environmentId])}
       environment={selection.environment}
-      repository={repository}
+      edgeToken={edgeToken}
       procedureId={procedureId}
       approvedVersion={approvedVersion}
       onBack={() => {

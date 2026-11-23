@@ -9,30 +9,41 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-test('같은 Edge에서 상태와 작업 환경을 GET으로 요청하고 서버의 프로필을 사용한다', async () => {
-  const profile = {
-    id: 'kit-profile',
-    environmentId: 'kit-lab',
+test('같은 Edge에서 조회한 작업 프로필과 연결된 환경의 ID를 구분한다', async () => {
+  const environment = {
+    id: 'kit-lab',
     name: '실습실',
     workType: '거리 확인',
     deviceName: '키트',
   };
+  const profile = {
+    ...environment,
+    id: 'kit-distance-v1',
+    environmentId: environment.id,
+    profileVersion: '1.0.0',
+    policy: {},
+  };
   const request = jest
     .spyOn(globalThis, 'fetch')
     .mockResolvedValueOnce(new Response(JSON.stringify({ api: 'alive' })))
-    .mockResolvedValueOnce(new Response(JSON.stringify([{ ...profile, policy: {} }])));
+    .mockResolvedValueOnce(new Response(JSON.stringify([profile])))
+    .mockResolvedValueOnce(new Response(JSON.stringify([environment])));
 
   await expect(
     loadEdgeWorkEnvironments({ baseUrl: `${baseUrl}/`, token: 'test-token' }),
-  ).resolves.toEqual([profile]);
-  expect(request).toHaveBeenCalledTimes(2);
+  ).resolves.toEqual([
+    { ...environment, workProfile: { id: profile.id, version: profile.profileVersion } },
+  ]);
+  expect(request).toHaveBeenCalledTimes(3);
   const options = expect.objectContaining({
     method: 'GET',
     credentials: 'omit',
+    redirect: 'error',
     headers: { Accept: 'application/json', Authorization: 'Bearer test-token' },
   });
   expect(request).toHaveBeenNthCalledWith(1, `${baseUrl}/api/v1/system/health`, options);
   expect(request).toHaveBeenNthCalledWith(2, `${baseUrl}/api/v1/work-profiles`, options);
+  expect(request).toHaveBeenNthCalledWith(3, `${baseUrl}/api/v1/environments`, options);
 });
 
 test('HTTP 응답의 상태와 Edge 오류 코드를 연결 실패와 구분한다', async () => {

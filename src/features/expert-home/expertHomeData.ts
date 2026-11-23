@@ -1,12 +1,14 @@
 import {
   getDemoProcedureDraftId,
+  getProcedureDraftRepository,
   listDemoProcedureReleases,
+  loadEdgeProcedureApproval,
   procedureDraftRepository,
 } from '@/features/procedure-draft/procedureDraftRepository';
 import { getDemoHomeReviews, type ReviewStatus } from '@/features/expert-review/reviewData';
 import { getUnresolvedDraftItems } from '@/features/procedure-release/procedureReleaseRules';
 import { demoLedProcedure } from '@/features/procedures/demoProcedures';
-import { createEdgeApi, EdgeApiError, getEdgeBaseUrl } from '@/lib/edgeApi';
+import { EdgeApiError, getEdge, isEdgeDataEnabled } from '@/lib/edgeApi';
 
 export interface ExpertProcedure {
   readonly id: string;
@@ -42,6 +44,7 @@ export type ExpertRecentWork = {
 );
 
 export interface ExpertHomeData {
+  readonly dataOrigin?: 'simulation' | 'hardware';
   readonly displayName: string;
   readonly procedures: readonly ExpertProcedure[];
   readonly results: readonly ExpertResult[];
@@ -126,12 +129,8 @@ function createDemoHome(environmentId: string): ExpertHomeData {
 
 export const loadExpertHome: LoadExpertHome = async (environmentId, edgeToken) => {
   if (!environmentId.trim()) throw new Error('작업 환경을 선택해 주세요.');
-  const baseUrl = getEdgeBaseUrl();
-  if (baseUrl) {
-    const edge = createEdgeApi({ baseUrl, token: edgeToken });
-    const data = (await edge.get(
-      `/home/expert?environmentId=${encodeURIComponent(environmentId)}`,
-    )) as ExpertHomeData | null;
+  if (isEdgeDataEnabled()) {
+    const data = await getEdge<ExpertHomeData>('/home/expert', { environmentId }, edgeToken);
     if (
       typeof data?.displayName !== 'string' ||
       !Array.isArray(data.procedures) ||
@@ -151,10 +150,28 @@ export const loadExpertHome: LoadExpertHome = async (environmentId, edgeToken) =
     const approvedIds = new Set(
       data.procedures.filter(({ status }) => status === 'approved').map(({ id }) => id),
     );
+    const draftsWithApproval = data.procedures.filter(
+      ({ id, status }) => status === 'draft' && approvedIds.has(id),
+    );
+    if (draftsWithApproval.length === 0) return data;
+
+    // The home response includes the draft after publishing. Compare revisions before hiding it.
+    const drafts = getProcedureDraftRepository(edgeToken);
+    const publications = await Promise.allSettled(
+      draftsWithApproval.map(async ({ id }) => {
+        const draft = await drafts.load(environmentId, id);
+        return draft && (await loadEdgeProcedureApproval(draft, edgeToken)) ? id : undefined;
+      }),
+    );
+    const publishedIds = new Set(
+      publications.flatMap((result) =>
+        result.status === 'fulfilled' && result.value ? [result.value] : [],
+      ),
+    );
     return {
       ...data,
       procedures: data.procedures.filter(
-        ({ id, status }) => status === 'approved' || !approvedIds.has(id),
+        ({ id, status }) => status !== 'draft' || !publishedIds.has(id),
       ),
     };
   }

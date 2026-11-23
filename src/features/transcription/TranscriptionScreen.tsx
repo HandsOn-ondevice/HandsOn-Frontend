@@ -80,7 +80,11 @@ export function TranscriptionScreen({ recordingId }: { recordingId: string }) {
   const operating = useRef(false);
   const recording = state.recording;
   const canOpenDraft =
-    selection?.role === 'expert' && selection.environment.id === recording?.environment.id;
+    selection?.role === 'expert' &&
+    recording !== undefined &&
+    [selection.environment.id, selection.environment.workProfile?.id].includes(
+      recording.environment.id,
+    );
 
   useFocusEffect(
     useCallback(() => {
@@ -292,7 +296,7 @@ export function TranscriptionScreen({ recordingId }: { recordingId: string }) {
         if (!(await persist(confirmation)) || !focused.current) return;
         const draft = await createEdgeProcedureDraft(
           {
-            environmentId: selection.environment.environmentId ?? selection.environment.id,
+            environmentId: selection.environment.id,
             requestId,
             title: recording.title,
             transcript: confirmation.confirmedText,

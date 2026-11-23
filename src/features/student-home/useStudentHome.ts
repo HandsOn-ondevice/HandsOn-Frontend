@@ -1,12 +1,15 @@
 import { useCallback, useState } from 'react';
 import { AppState } from 'react-native';
 import { useFocusEffect } from 'expo-router';
+import { getEdgeErrorMessage } from '@/lib/edgeApi';
 
 import type { WorkEnvironment } from '../entry/entryEnvironment';
 import { loadStudentHome, type LoadStudentHome, type StudentHomeData } from './studentHomeData';
 
 export type StudentHomeLookup =
-  { status: 'loading' | 'error' } | { status: 'ready'; data: StudentHomeData };
+  | { status: 'loading' }
+  | { status: 'error'; detail?: string }
+  | { status: 'ready'; data: StudentHomeData };
 
 interface HomeSnapshot {
   environment: WorkEnvironment;
@@ -40,8 +43,8 @@ export function useStudentHome(
         try {
           const data = await loadHome(environment);
           setLookup({ status: 'ready', data });
-        } catch {
-          setLookup({ status: 'error' });
+        } catch (error) {
+          setLookup({ status: 'error', detail: getEdgeErrorMessage(error) });
         }
       }
 

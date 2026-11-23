@@ -93,12 +93,19 @@ export async function readWebRecordingFile(recordingId: string): Promise<Blob | 
   return (await readEntry(recordingId))?.file ?? null;
 }
 
-export async function readRecentWebRecording(environmentId: string) {
-  const entries = await accessRecordings<WebRecording[]>('readonly', (store) =>
-    store.index(environmentIndex).getAll(environmentId),
+export async function readRecentWebRecording(environmentId: string, legacyEnvironmentId?: string) {
+  const environmentIds =
+    legacyEnvironmentId && legacyEnvironmentId !== environmentId
+      ? [environmentId, legacyEnvironmentId]
+      : [environmentId];
+  const entries = await Promise.all(
+    environmentIds.map((id) =>
+      accessRecordings<WebRecording[]>('readonly', (store) =>
+        store.index(environmentIndex).getAll(id),
+      ),
+    ),
   );
-  const latest = entries.reduce<SavedRecording | null>((latest, { recording }) => {
+  return entries.flat().reduce<SavedRecording | null>((latest, { recording }) => {
     return !latest || recording.createdAt > latest.createdAt ? recording : latest;
   }, null);
-  return latest;
 }

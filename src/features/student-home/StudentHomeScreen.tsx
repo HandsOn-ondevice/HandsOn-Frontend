@@ -20,6 +20,7 @@ import {
   spacing,
 } from '@/design-system';
 import type { WorkEnvironment } from '@/features/entry/entryEnvironment';
+import { isEdgeDataEnabled } from '@/lib/edgeApi';
 import type { StudentHomeDestination } from './studentHomeRoutes';
 import type { StudentHomeLookup } from './useStudentHome';
 
@@ -49,6 +50,7 @@ export function StudentHomeScreen({
   const changeEnvironmentAfterClose = useRef(false);
   const data = lookup.status === 'ready' ? lookup.data : null;
   const session = data?.ongoingSession;
+  const edge = isEdgeDataEnabled();
   const openProcedures = () => onNavigate({ type: 'procedures', environmentId: environment.id });
 
   return (
@@ -71,7 +73,11 @@ export function StudentHomeScreen({
             </AppText>
             {data ? (
               <StatusBadge
-                label={deviceLabels[data.deviceStatus]}
+                label={
+                  data.dataOrigin === 'simulation'
+                    ? `모의 장치 · ${deviceLabels[data.deviceStatus]}`
+                    : deviceLabels[data.deviceStatus]
+                }
                 tone={data.deviceStatus === 'connected' ? 'success' : 'warning'}
               />
             ) : null}
@@ -87,7 +93,7 @@ export function StudentHomeScreen({
           <View style={styles.group}>
             <FeedbackPanel
               title="홈을 불러오지 못했어요."
-              subtitle="연결 상태를 확인하고 다시 시도해 주세요."
+              subtitle={lookup.detail ?? '연결 상태를 확인하고 다시 시도해 주세요.'}
               tone="warning"
               icon="alert"
             />
@@ -97,7 +103,11 @@ export function StudentHomeScreen({
           <View style={styles.group}>
             <HeroPanel
               title={session.title}
-              subtitle={`${sessionLabels[session.status]} · ${session.savedAtLabel} 저장\n${session.conditionProgress}% 조건 · ${session.completedCycles} / ${session.totalCycles}회차`}
+              subtitle={
+                edge
+                  ? `${session.status === 'held' ? '보류' : '저장된 작업'} · ${session.completedCycles} / ${session.totalCycles}회차`
+                  : `${sessionLabels[session.status]} · ${session.savedAtLabel} 저장\n${session.conditionProgress}% 조건 · ${session.completedCycles} / ${session.totalCycles}회차`
+              }
             />
             <Button
               label="이어서 진행"
@@ -122,10 +132,18 @@ export function StudentHomeScreen({
             {data.approvedProcedures.length ? (
               data.approvedProcedures.map((procedure) => (
                 <Pressable
-                  key={procedure.id}
+                  key={JSON.stringify([procedure.id, procedure.version])}
                   accessibilityRole="button"
                   accessibilityLabel={`${procedure.title}, ${procedure.version}, 승인 절차 선택`}
-                  onPress={openProcedures}
+                  onPress={() => {
+                    if (!edge) return openProcedures();
+                    onNavigate({
+                      type: 'procedure',
+                      environmentId: environment.id,
+                      procedureId: procedure.id,
+                      approvedVersion: procedure.version,
+                    });
+                  }}
                   style={({ pressed }) => pressed && styles.pressed}
                 >
                   <SurfaceCard
@@ -205,7 +223,7 @@ export function StudentHomeScreen({
             />
           </View>
         </SurfaceCard>
-        {__DEV__ || process.env.EXPO_PUBLIC_HANDSON_MAESTRO === '1' ? (
+        {!edge && (__DEV__ || process.env.EXPO_PUBLIC_HANDSON_MAESTRO === '1') ? (
           <AppText variant="caption" color={colors.text.secondary}>
             개발용 예시 데이터입니다. 실제 장치 연결 상태와 다를 수 있어요.
           </AppText>

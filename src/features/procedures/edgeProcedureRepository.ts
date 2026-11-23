@@ -1,4 +1,4 @@
-import { createEdgeApi, EdgeApiError } from '@/lib/edgeApi';
+import { EdgeApiError, getEdge } from '@/lib/edgeApi';
 import type { ProcedureDetail } from './procedureModels';
 import type { ProcedureRepository } from './procedureRepository';
 
@@ -38,10 +38,7 @@ function readApproved(value: unknown, environmentId: string): ProcedureDetail | 
   ) {
     throw new EdgeApiError({ kind: 'invalid-response' });
   }
-  if (
-    value.approval !== 'approved' ||
-    (value.environmentId !== undefined && value.environmentId !== environmentId)
-  ) {
+  if (value.approval !== 'approved' || value.environmentId !== environmentId) {
     return null;
   }
 
@@ -57,6 +54,7 @@ function readApproved(value: unknown, environmentId: string): ProcedureDetail | 
     estimatedMinutes: isCount(value.estimatedMinutes) ? value.estimatedMinutes : null,
     stepCount: isCount(value.stepCount) ? value.stepCount : steps.length || undefined,
     category: value.category === 'led' || value.category === 'sensor' ? value.category : undefined,
+    lastUsedAt: isText(value.lastUsedAt) ? value.lastUsedAt : undefined,
     conditions: readItems(execution?.conditions ?? value.conditions, isCondition),
     equipment: readItems(value.equipment, isText),
     criteria: readItems(value.criteria, isCriterion),
@@ -65,14 +63,10 @@ function readApproved(value: unknown, environmentId: string): ProcedureDetail | 
   };
 }
 
-export function createEdgeProcedureRepository(
-  edge: Pick<ReturnType<typeof createEdgeApi>, 'get'>,
-): ProcedureRepository {
+export function createEdgeProcedureRepository(token?: string): ProcedureRepository {
   return {
     async list(environmentId) {
-      const response = await edge.get(
-        `/procedures?environmentId=${encodeURIComponent(environmentId)}`,
-      );
+      const response = await getEdge<unknown>('/procedures', { environmentId }, token);
       if (!Array.isArray(response)) throw new EdgeApiError({ kind: 'invalid-response' });
       return response
         .map((item) => readApproved(item, environmentId))
@@ -81,8 +75,10 @@ export function createEdgeProcedureRepository(
     async getDetail({ procedureId, approvedVersion, environmentId }) {
       let response: unknown;
       try {
-        response = await edge.get(
-          `/procedures/${encodeURIComponent(procedureId)}?version=${encodeURIComponent(approvedVersion)}`,
+        response = await getEdge<unknown>(
+          `/procedures/${encodeURIComponent(procedureId)}`,
+          { version: approvedVersion },
+          token,
         );
       } catch (error) {
         if (error instanceof EdgeApiError && error.status === 404) return null;

@@ -5,22 +5,25 @@ const host = process.env.EXPO_E2E_HOST ?? 'localhost';
 const baseURL = `http://${host}:${port}`;
 const verifyEdge = process.env.EXPO_E2E_EDGE === '1';
 const verifyEdgeDrafts = process.env.HANDSON_E2E_EDGE_DRAFTS === '1';
-const verifyEdgeTranscription = process.env.HANDSON_E2E_LIVE_EDGE === '1';
-const artifactsDir = verifyEdgeDrafts
-  ? 'artifacts/playwright/edge-drafts'
-  : verifyEdge
-    ? 'artifacts/playwright/edge'
+const useEdgeServer =
+  verifyEdge ||
+  verifyEdgeDrafts ||
+  process.env.HANDSON_E2E_EDGE_HOME === '1' ||
+  process.env.HANDSON_E2E_EDGE_SESSION === '1' ||
+  process.env.HANDSON_E2E_LIVE_EDGE === '1';
+const artifactsDir = verifyEdge
+  ? 'artifacts/playwright/edge'
+  : verifyEdgeDrafts
+    ? 'artifacts/playwright/edge-drafts'
     : 'artifacts/playwright';
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: verifyEdgeDrafts
-    ? 'edge-drafts.spec.ts'
-    : verifyEdge
-      ? 'edge-connection.spec.ts'
-      : verifyEdgeTranscription
-        ? 'edge-transcription.spec.ts'
-        : undefined,
+  testMatch: verifyEdge
+    ? 'edge-connection.spec.ts'
+    : verifyEdgeDrafts
+      ? 'edge-drafts.spec.ts'
+      : undefined,
   testIgnore: verifyEdge ? undefined : 'edge-connection.spec.ts',
   outputDir: `${artifactsDir}/test-results`,
   reporter: [['list'], ['html', { outputFolder: `${artifactsDir}/report`, open: 'never' }]],
@@ -31,16 +34,14 @@ export default defineConfig({
   webServer: {
     command: `npm run web -- --${host === 'localhost' ? 'localhost' : 'lan'} --port ${port}`,
     url: baseURL,
-    reuseExistingServer: !verifyEdge,
+    reuseExistingServer: !useEdgeServer,
     timeout: 120_000,
     env: {
       CI: '1',
       HANDSON_E2E_EDGE_TOKEN: '',
       HANDSON_E2E_EXPERT_TOKEN: '',
       HANDSON_E2E_OPERATOR_TOKEN: '',
-      ...(!verifyEdge &&
-        !verifyEdgeDrafts &&
-        !verifyEdgeTranscription && { EXPO_PUBLIC_HANDSON_EDGE_BASE_URL: '' }),
+      ...(!useEdgeServer && { EXPO_PUBLIC_HANDSON_EDGE_BASE_URL: '' }),
     },
   },
 });

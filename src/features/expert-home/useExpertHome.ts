@@ -1,20 +1,18 @@
 import { useCallback, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
+import { getEdgeErrorMessage } from '@/lib/edgeApi';
 
 import { loadExpertHome, type ExpertHomeData, type LoadExpertHome } from './expertHomeData';
 
 export type ExpertHomeState =
-  { status: 'loading' } | { status: 'error' } | { status: 'ready'; data: ExpertHomeData };
+  | { status: 'loading' }
+  | { status: 'error'; detail?: string }
+  | { status: 'ready'; data: ExpertHomeData };
 
-export function useExpertHome(
-  environmentId: string,
-  loadHome: LoadExpertHome = loadExpertHome,
-  edgeToken?: string,
-) {
+export function useExpertHome(environmentId: string, loadHome: LoadExpertHome = loadExpertHome) {
   const [lookup, setLookup] = useState({
     environmentId,
     loadHome,
-    edgeToken,
     state: { status: 'loading' } as ExpertHomeState,
   });
   const focused = useRef(false);
@@ -23,23 +21,27 @@ export function useExpertHome(
   const refresh = useCallback(() => {
     if (!focused.current) return;
     const currentRequest = ++request.current;
-    setLookup({ environmentId, loadHome, edgeToken, state: { status: 'loading' } });
+    setLookup({ environmentId, loadHome, state: { status: 'loading' } });
 
     void Promise.resolve()
-      .then(() => (edgeToken ? loadHome(environmentId, edgeToken) : loadHome(environmentId)))
+      .then(() => loadHome(environmentId))
       .then(
         (data) => {
           if (focused.current && request.current === currentRequest) {
-            setLookup({ environmentId, loadHome, edgeToken, state: { status: 'ready', data } });
+            setLookup({ environmentId, loadHome, state: { status: 'ready', data } });
           }
         },
-        () => {
+        (error: unknown) => {
           if (focused.current && request.current === currentRequest) {
-            setLookup({ environmentId, loadHome, edgeToken, state: { status: 'error' } });
+            setLookup({
+              environmentId,
+              loadHome,
+              state: { status: 'error', detail: getEdgeErrorMessage(error) },
+            });
           }
         },
       );
-  }, [edgeToken, environmentId, loadHome]);
+  }, [environmentId, loadHome]);
 
   useFocusEffect(
     useCallback(() => {
@@ -53,9 +55,7 @@ export function useExpertHome(
   );
 
   const state: ExpertHomeState =
-    lookup.environmentId === environmentId &&
-    lookup.loadHome === loadHome &&
-    lookup.edgeToken === edgeToken
+    lookup.environmentId === environmentId && lookup.loadHome === loadHome
       ? lookup.state
       : { status: 'loading' };
 
