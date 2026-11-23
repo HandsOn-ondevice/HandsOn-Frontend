@@ -30,6 +30,7 @@ export interface AppBarProps {
   tone?: 'light' | 'inverse';
   onBack?: () => void;
   onMore?: () => void;
+  navigationDisabled?: boolean;
   onProfile?: () => void;
   logoWidth?: number;
   style?: StyleProp<ViewStyle>;
@@ -42,6 +43,7 @@ export function AppBar({
   tone = 'light',
   onBack,
   onMore,
+  navigationDisabled = false,
   onProfile,
   logoWidth,
   style,
@@ -68,12 +70,24 @@ export function AppBar({
         </>
       ) : (
         <>
-          <IconButton icon="back" accessibilityLabel="뒤로가기" onPress={onBack} tone={tone} />
+          <IconButton
+            icon="back"
+            accessibilityLabel="뒤로가기"
+            onPress={onBack}
+            tone={tone}
+            disabled={navigationDisabled}
+          />
           <AppText variant="label" color={foreground} style={styles.appBarTitle}>
             {title}
           </AppText>
           {onMore ? (
-            <IconButton icon="more" accessibilityLabel="더 보기" onPress={onMore} tone={tone} />
+            <IconButton
+              icon="more"
+              accessibilityLabel="더 보기"
+              onPress={onMore}
+              tone={tone}
+              disabled={navigationDisabled}
+            />
           ) : (
             <View style={styles.appBarSpacer} />
           )}

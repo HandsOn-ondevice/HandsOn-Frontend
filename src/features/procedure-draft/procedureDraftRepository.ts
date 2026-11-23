@@ -1,5 +1,6 @@
 import { File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
+import type { ProcedureDetail } from '@/features/procedures/procedureModels';
 import { createDemoProcedureDraft } from './procedureDraftFixtures';
 import { isProcedureDraftStepCriteria, type ProcedureDraftStepCriteria } from './stepCriteria';
 
@@ -50,6 +51,8 @@ export interface ProcedureDraftRepository {
   listSaved(environmentId: string): Promise<readonly ProcedureDraft[]>;
 }
 
+type StoredDraft = ProcedureDraft & { readonly release?: ProcedureDetail };
+
 export { getDemoProcedureDraftId } from './procedureDraftFixtures';
 export type { ProcedureDraftStepCriteria } from './stepCriteria';
 
@@ -79,7 +82,40 @@ function isStepGroup(value: unknown): value is ProcedureDraftStepGroup {
   );
 }
 
-function isStoredDraft(value: unknown): value is ProcedureDraft {
+function isStoredRelease(value: unknown): value is ProcedureDetail {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.code === 'string' &&
+    typeof value.title === 'string' &&
+    typeof value.description === 'string' &&
+    typeof value.approvedVersion === 'string' &&
+    Boolean(value.approvedVersion.trim()) &&
+    typeof value.approvedBy === 'string' &&
+    (value.estimatedMinutes === null || Number.isFinite(value.estimatedMinutes)) &&
+    Number.isSafeInteger(value.stepCount) &&
+    value.category === 'led' &&
+    isStringList(value.equipment) &&
+    isStringList(value.steps) &&
+    isStringList(value.precautions) &&
+    Array.isArray(value.conditions) &&
+    value.conditions.every(
+      (condition) =>
+        isRecord(condition) &&
+        typeof condition.label === 'string' &&
+        Number.isSafeInteger(condition.repetitions),
+    ) &&
+    Array.isArray(value.criteria) &&
+    value.criteria.every(
+      (criterion) =>
+        isRecord(criterion) &&
+        typeof criterion.title === 'string' &&
+        typeof criterion.description === 'string',
+    )
+  );
+}
+
+function isStoredDraft(value: unknown): value is StoredDraft {
   return (
     isRecord(value) &&
     typeof value.id === 'string' &&
@@ -109,11 +145,12 @@ function isStoredDraft(value: unknown): value is ProcedureDraft {
         (item.stepId === undefined || typeof item.stepId === 'string'),
     ) &&
     typeof value.savedAt === 'string' &&
-    Number.isFinite(Date.parse(value.savedAt))
+    Number.isFinite(Date.parse(value.savedAt)) &&
+    (value.release === undefined || isStoredRelease(value.release))
   );
 }
 
-function readSavedDrafts(key: string): readonly ProcedureDraft[] {
+function readSavedDrafts(key: string): readonly StoredDraft[] {
   let stored: string | null;
   if (Platform.OS === 'web') {
     stored = globalThis.localStorage.getItem(key);
@@ -131,7 +168,7 @@ function readSavedDrafts(key: string): readonly ProcedureDraft[] {
   return parsed;
 }
 
-function writeSavedDrafts(key: string, drafts: readonly ProcedureDraft[]) {
+function writeSavedDrafts(key: string, drafts: readonly StoredDraft[]) {
   const data = JSON.stringify(drafts);
   if (Platform.OS === 'web') {
     globalThis.localStorage.setItem(key, data);
@@ -153,24 +190,53 @@ function writeSavedDrafts(key: string, drafts: readonly ProcedureDraft[]) {
   staging.rename(currentName);
 }
 
-function storeDraft(key: string, saved: readonly ProcedureDraft[], draft: ProcedureDraft) {
+function storeDraft(key: string, saved: readonly StoredDraft[], draft: ProcedureDraft) {
   const snapshot: ProcedureDraft = { ...draft, savedAt: new Date().toISOString() };
   writeSavedDrafts(key, [snapshot, ...saved.filter(({ id }) => id !== draft.id)]);
   return snapshot;
 }
 
+export function findSavedDemoDraft(environmentId: string, draftId: string) {
+  return readSavedDrafts(demoStorageKey(environmentId)).find(({ id }) => id === draftId) ?? null;
+}
+
+export function listDemoProcedureReleases(environmentId: string) {
+  return readSavedDrafts(demoStorageKey(environmentId)).flatMap(({ id, release }) =>
+    release ? [{ draftId: id, procedure: release }] : [],
+  );
+}
+
+export function recordDemoProcedureRelease(
+  environmentId: string,
+  draftId: string,
+  publish: (current: StoredDraft | null) => ProcedureDetail,
+) {
+  const key = demoStorageKey(environmentId);
+  const saved = readSavedDrafts(key);
+  const draft = saved.find(({ id }) => id === draftId);
+  const release = publish(draft ?? null);
+
+  // Keep the approved snapshot and its source draft in the same storage update.
+  if (draft && !draft.release) {
+    writeSavedDrafts(
+      key,
+      saved.map((item) => (item.id === draftId ? { ...item, release } : item)),
+    );
+  }
+  return release;
+}
+
 export const procedureDraftRepository: ProcedureDraftRepository = {
   async load(environmentId, draftId) {
-    const saved = readSavedDrafts(demoStorageKey(environmentId));
-    return (
-      saved.find((draft) => draft.id === draftId) ??
-      createDemoProcedureDraft(environmentId, draftId)
-    );
+    const saved = findSavedDemoDraft(environmentId, draftId);
+    if (saved) return saved.release ? null : saved;
+    return createDemoProcedureDraft(environmentId, draftId);
   },
   async save(environmentId, draft) {
     const key = demoStorageKey(environmentId);
     const saved = readSavedDrafts(key);
     const previous = saved.find(({ id }) => id === draft.id);
+    if (previous?.release) throw new Error('이미 승인·배포된 초안입니다.');
     const savedSteps = new Map(previous?.steps.map((step) => [step.id, step]));
     // The draft editor may still have the snapshot from before opening the criteria editor.
     const steps = draft.steps.map((step) => {
@@ -186,6 +252,7 @@ export const procedureDraftRepository: ProcedureDraftRepository = {
     const saved = readSavedDrafts(key);
     const draft = saved.find(({ id }) => id === draftId);
     if (!draft) throw new Error('저장된 초안을 찾을 수 없어요.');
+    if (draft.release) throw new Error('이미 승인·배포된 초안입니다.');
     if (!draft.steps.some(({ id }) => id === stepId)) {
       throw new Error('선택한 단계를 찾을 수 없어요.');
     }
@@ -194,6 +261,6 @@ export const procedureDraftRepository: ProcedureDraftRepository = {
     return storeDraft(key, saved, { ...draft, steps });
   },
   async listSaved(environmentId) {
-    return readSavedDrafts(demoStorageKey(environmentId));
+    return readSavedDrafts(demoStorageKey(environmentId)).filter(({ release }) => !release);
   },
 };

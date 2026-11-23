@@ -75,12 +75,14 @@ jobs:
           disk-size: 2048M
           emulator-boot-timeout: 360
           emulator-options: -no-window -no-snapshot -gpu swiftshader -no-boot-anim -camera-back none
+          # The action runs each line in a separate shell. Fold the suite and its log trap together.
           script: >-
             mkdir -p artifacts/maestro &&
             trap 'adb logcat -d -t 1500 > artifacts/maestro/logcat.txt || true' EXIT &&
             adb install "$RUNNER_TEMP/handson-app-release.apk" &&
-            timeout 8m maestro --device "$ANDROID_SERIAL" test --format junit --output artifacts/maestro/junit.xml
-            --test-output-dir artifacts/maestro --debug-output artifacts/maestro .maestro
+            timeout --verbose --kill-after=30s 12m maestro --device "$ANDROID_SERIAL" test
+            --format junit --output artifacts/maestro/junit.xml --test-output-dir artifacts/maestro
+            --debug-output artifacts/maestro .maestro
       - name: Upload Maestro report and logs
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

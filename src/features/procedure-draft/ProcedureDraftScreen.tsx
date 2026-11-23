@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { usePreventRemove } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
+import { useFocusEffect, usePreventRemove } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
   AppText,
@@ -16,6 +16,10 @@ import {
   radii,
   spacing,
 } from '@/design-system';
+import {
+  getUnresolvedDraftItems,
+  stepNeedsCriteriaReview,
+} from '@/features/procedure-release/procedureReleaseRules';
 import { DraftEditForm, draftEditorLabel, editorLabels, type DraftEditor } from './DraftEditForm';
 import type { ProcedureDraftStep } from './procedureDraftRepository';
 import { useProcedureDraft } from './useProcedureDraft';
@@ -25,6 +29,7 @@ interface ProcedureDraftScreenProps {
   draftId: string;
   onClose: () => void;
   onReview: (stepId: string) => void;
+  onApproval: () => void;
 }
 
 type StepGroup = { index: number; steps: ProcedureDraftStep[] };
@@ -47,6 +52,7 @@ export function ProcedureDraftScreen({
   draftId,
   onClose,
   onReview,
+  onApproval,
 }: ProcedureDraftScreenProps) {
   const { state, retryLoad, updateDraft, saveDraft } = useProcedureDraft(environmentId, draftId);
   const [panel, setPanel] = useState<DraftEditor | { kind: 'menu' } | null>(null);
@@ -56,14 +62,24 @@ export function ProcedureDraftScreen({
   const [showSaved, setShowSaved] = useState(false);
   const [leave, setLeave] = useState<{ proceed: () => void } | null>(null);
   const [discarding, setDiscarding] = useState(false);
+  const refreshCriteriaOnReturn = useRef(false);
 
   const draft = state.status === 'ready' ? state.draft : null;
   const dirty = state.status === 'ready' && state.draft !== state.persisted;
   const saving = state.status === 'ready' && state.saveStatus === 'saving';
-  const selected =
-    draft?.steps.find(({ id }) => id === selectedId) ??
-    draft?.steps.find(({ needsReview }) => needsReview) ??
-    draft?.steps[0];
+  const selected = draft
+    ? (draft.steps.find(({ id }) => id === selectedId) ??
+      draft.steps.find((step) => stepNeedsCriteriaReview(draft, step)) ??
+      draft.steps[0])
+    : undefined;
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!refreshCriteriaOnReturn.current) return;
+      refreshCriteriaOnReturn.current = false;
+      retryLoad();
+    }, [retryLoad]),
+  );
 
   usePreventRemove(
     !discarding && (dirty || saving || showSaved || panel !== null),
@@ -77,7 +93,16 @@ export function ProcedureDraftScreen({
   async function review() {
     if (saving || !draft || !selected) return;
     if ((dirty || draft.savedAt === null) && !(await saveDraft())) return;
+    setSelectedId(selected.id);
+    refreshCriteriaOnReturn.current = true;
     onReview(selected.id);
+  }
+
+  async function reviewApproval() {
+    if (saving || !draft?.savedAt) return;
+    if (dirty && !(await saveDraft())) return;
+    setShowSaved(false);
+    onApproval();
   }
 
   async function save() {
@@ -100,7 +125,8 @@ export function ProcedureDraftScreen({
     else onClose();
   }
 
-  const pendingCount = draft?.pendingItems.length ?? 0;
+  const pendingItems = draft ? getUnresolvedDraftItems(draft) : [];
+  const pendingCount = pendingItems.length;
 
   return (
     <Screen>
@@ -174,7 +200,7 @@ export function ProcedureDraftScreen({
               const expanded = expandedId === first.id;
               const grouped = steps.length > 1;
               const rangeSummary = grouped && first.group?.showRange ? first.group : undefined;
-              const unresolved = steps.some(({ needsReview }) => needsReview);
+              const unresolved = steps.some((step) => stepNeedsCriteriaReview(draft, step));
               const start = index + 1;
               const number = rangeSummary
                 ? `${start}–${index + steps.length}`
@@ -321,6 +347,14 @@ export function ProcedureDraftScreen({
               </View>
             </>
           )}
+          {draft?.savedAt ? (
+            <Button
+              label="최종 승인 검토"
+              variant="tertiary"
+              disabled={saving}
+              onPress={() => void reviewApproval()}
+            />
+          ) : null}
         </View>
       ) : null}
 
@@ -338,7 +372,7 @@ export function ProcedureDraftScreen({
             <>
               {pendingCount ? (
                 <SurfaceCard title={`미확정 항목 ${pendingCount}개`} tone="subtle">
-                  {draft.pendingItems.map(({ id, label }) => (
+                  {pendingItems.map(({ id, label }) => (
                     <AppText key={id}>{label}</AppText>
                   ))}
                 </SurfaceCard>
