@@ -337,6 +337,7 @@ export async function finishDemo(
 
     await button(expert, '더 보기').click();
     for (const label of [
+      '제출 정보',
       `연구생 · ${operatorId}`,
       `장치 · ${workProfile.deviceName}`,
       `절차 · ${procedure.title}`,
@@ -344,7 +345,7 @@ export async function finishDemo(
       `세션 · ${sessionId}`,
       submittedAt,
     ]) {
-      await expect(expert.getByText(label, { exact: true })).toBeVisible();
+      await expect(expert.getByText(label, { exact: true })).toBeInViewport({ ratio: 1 });
     }
     await capture(expert, info, '15-expert-submission-details');
     await closeWorkflowInformation(expert);
