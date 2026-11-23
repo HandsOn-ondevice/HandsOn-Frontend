@@ -217,6 +217,9 @@ export class MockWorkflowRepository implements WorkflowRepository {
     if (command.type === 'resumePausedExecution') {
       throw new WorkflowError('INVALID_STATE', 'Edge에서 일시정지된 세션만 재개할 수 있습니다.');
     }
+    if (command.type === 'requestCleanup' || command.type === 'submitResult') {
+      throw new WorkflowError('INVALID_STATE', 'Edge 정리·제출 명령은 서버 연결이 필요합니다.');
+    }
     // 한 JS 작업 안에서 조회·전환·저장한다. 같은 revision의 동시 명령은 하나만 적용된다.
     const session = this.sessions.get(sessionId);
     if (!session) throw new WorkflowError('NOT_FOUND', '세션을 찾을 수 없습니다.');

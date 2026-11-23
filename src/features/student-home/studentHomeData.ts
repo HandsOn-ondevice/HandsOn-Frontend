@@ -2,6 +2,7 @@ import { listDemoProcedureReleases } from '@/features/procedure-draft/procedureD
 import { demoLedProcedure } from '@/features/procedures/demoProcedures';
 import type { WorkEnvironment } from '../entry/entryEnvironment';
 import { EdgeApiError, getEdge, isEdgeDataEnabled } from '@/lib/edgeApi';
+import type { ExperimentSession } from '@/features/researcher-workflow/domain/models';
 
 export interface StudentHomeData {
   dataOrigin?: 'simulation' | 'hardware';
@@ -14,11 +15,13 @@ export interface StudentHomeData {
     environmentId: string;
     deviceId: string;
     status: 'running' | 'paused' | 'held';
+    phase?: ExperimentSession['phase'];
     savedAtLabel: string;
     conditionProgress: number;
     completedCycles: number;
     totalCycles: number;
   } | null;
+  pendingSessions?: readonly { sessionId: string; phase: ExperimentSession['phase'] }[];
   approvedProcedures: readonly {
     id: string;
     title: string;
@@ -52,6 +55,9 @@ export const loadStudentHome: LoadStudentHome = async (environment, edgeToken) =
       !Object.hasOwn(deviceStatuses, data.deviceStatus) ||
       !Array.isArray(data.approvedProcedures) ||
       !Array.isArray(data.recentResults) ||
+      (data.pendingSessions !== undefined &&
+        (!Array.isArray(data.pendingSessions) ||
+          data.pendingSessions.some((session) => typeof session?.sessionId !== 'string'))) ||
       (data.ongoingSession !== null && data.ongoingSession?.environmentId !== environment.id)
     ) {
       throw new EdgeApiError({ kind: 'invalid-response' });

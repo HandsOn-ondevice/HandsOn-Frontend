@@ -77,7 +77,7 @@ test('모바일 S03~S06에서 실제 Edge의 재전송, 점검 판정과 첫 회
         await route.fulfill({ response });
         return;
       }
-      if (req.method() !== 'POST') {
+      if (req.method() !== 'POST' || path.endsWith('/heartbeat')) {
         await route.continue();
         return;
       }
@@ -133,6 +133,8 @@ test('모바일 S03~S06에서 실제 Edge의 재전송, 점검 판정과 첫 회
     ]);
     const create = creates[0];
     expect(create.body).toMatchObject({
+      workflowVersion: '2.0',
+      resumePolicyVersion: '2.0',
       procedureId: procedure.procedureId,
       procedureVersion: procedure.version,
       workProfileId: procedure.workProfileId,
@@ -141,6 +143,7 @@ test('모바일 S03~S06에서 실제 Edge의 재전송, 점검 판정과 첫 회
     expect(creates[1].body).toEqual(create.body);
     expect(creates.map(({ key }) => key)).toEqual([create.body.requestId, create.body.requestId]);
     const created = create.data!;
+    expect(created).toMatchObject({ workflowVersion: '2.0', resumePolicyVersion: '2.0' });
     expect(creates[1].data?.sessionId).toBe(created.sessionId);
     const sessionPath = `${sessionsPath}/${created.sessionId}`;
     const commandPath = `${sessionPath}/commands`;
@@ -386,6 +389,7 @@ test('모바일에서 일시정지 후 점검을 통과하면 실제 Edge의 같
     // The test drives S10/S11 through the app. Setup records one valid simulation trial on Edge.
     await edge.configure(normalSimulation);
     created = await edge.create(procedure);
+    expect(created).toMatchObject({ workflowVersion: '2.0', resumePolicyVersion: '1.0' });
     const sessionId = created.sessionId;
     const beforePause = await seedCompletedTrial(edge, created);
     const execution = beforePause.execution;

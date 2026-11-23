@@ -254,8 +254,9 @@ test('새 세션을 2.0으로 만든 뒤 연구생 홈을 거쳐 재개하고 �
   expect(createdResponse.status()).toBe(201);
   const createBody = createdResponse.request().postDataJSON() as CreateBody;
   const created = track((await createdResponse.json()) as Session);
-  expect(createBody.resumePolicyVersion).toBe('2.0');
-  expect(created.resumePolicyVersion).toBe('2.0');
+  const versions = { workflowVersion: '2.0', resumePolicyVersion: '2.0' };
+  expect(createBody).toMatchObject(versions);
+  expect(created).toMatchObject(versions);
   await expect(page).toHaveURL(screenPath(created, 'preparation'));
   const running = await seedCompletedTrial(edge, created);
   const valid = running.execution?.attempts.find(({ status }) => status === 'valid');

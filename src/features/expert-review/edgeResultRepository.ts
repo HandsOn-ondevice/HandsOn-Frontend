@@ -7,10 +7,12 @@ import type {
   ExpertReviewRepository,
   ReviewCondition,
   ReviewOutcome,
+  ReviewResult,
   ReviewStatus,
 } from './reviewData';
 
 type JsonObject = Record<string, unknown>;
+type ResultExpectation = { sessionId?: string; procedureId?: string; preview?: true };
 
 function invalid(): never {
   throw new EdgeApiError({ kind: 'invalid-response' });
@@ -56,25 +58,44 @@ async function readResult(
   edgeToken: string | undefined,
   environmentId: string,
   resultId: string,
-  expected: { sessionId?: string; procedureId?: string },
+  expected: ResultExpectation,
 ) {
   const payload = object(await getEdge<unknown>(resultPath(resultId), undefined, edgeToken));
   const session = object(payload.session);
   const procedure = object(session.procedure);
   const sessionId = text(session.sessionId);
   const procedureId = text(procedure.procedureId);
+  const preview =
+    expected.preview === true &&
+    payload.publicationStatus === 'preview' &&
+    payload.resultId === resultId &&
+    session.workflowVersion === '2.0' &&
+    (session.phase === 'awaitingCleanup' || session.phase === 'readyToSubmit');
   if (
     payload.id !== resultId ||
-    session.phase !== 'completed' ||
+    (!preview && session.phase !== 'completed') ||
     session.environmentId !== environmentId ||
     (expected.sessionId !== undefined && sessionId !== expected.sessionId) ||
     (expected.procedureId !== undefined && procedureId !== expected.procedureId)
   ) {
     invalid();
   }
+  if (session.workflowVersion === '2.0' && !preview) {
+    const receipt = object(session.submission);
+    if (
+      payload.publicationStatus !== 'submitted' ||
+      payload.resultId !== resultId ||
+      receipt.status !== 'submitted' ||
+      receipt.resultId !== resultId ||
+      receipt.sessionId !== sessionId ||
+      text(receipt.submittedAt) !== payload.submittedAt
+    ) {
+      invalid();
+    }
+  }
   const reviews = session.reviews === undefined ? [] : rows(session.reviews);
   const outcome = reviews.length > 0 ? reviewOutcome(reviews.at(-1), sessionId) : undefined;
-  return { payload, session, sessionId, procedure, procedureId, outcome };
+  return { payload, session, sessionId, procedure, procedureId, outcome, preview };
 }
 
 export async function loadEdgeReviewStatus(
@@ -107,14 +128,10 @@ export async function loadEdgeResult(
   edgeToken: string | undefined,
   environmentId: string,
   resultId: string,
-  expected: { sessionId?: string; procedureId?: string } = {},
-) {
-  const { payload, session, sessionId, procedure, procedureId, outcome } = await readResult(
-    edgeToken,
-    environmentId,
-    resultId,
-    expected,
-  );
+  expected: ResultExpectation = {},
+): Promise<{ result: ReviewResult; evidenceByCondition: Map<string, ConditionEvidence> }> {
+  const { payload, session, sessionId, procedure, procedureId, outcome, preview } =
+    await readResult(edgeToken, environmentId, resultId, expected);
   const execution = object(session.execution);
   const attempts = rows(execution.attempts);
   const recoveries = rows(execution.recoveries ?? []);
@@ -230,7 +247,9 @@ export async function loadEdgeResult(
       approvedVersion: text(procedure.version),
       studentName: text(session.operatorId),
       deviceName: text(object(session.workProfile).deviceName),
-      submittedLabel: text(session.completedAt),
+      submittedLabel: preview
+        ? text(session.measurementCompletedAt)
+        : text(payload.submittedAt ?? session.completedAt),
       status: outcome?.status ?? ('pending' as const),
       comment: outcome?.comment ?? '',
       validCount,
@@ -238,6 +257,10 @@ export async function loadEdgeResult(
       unresolvedCount: totalCount - validCount,
       remeasurementCount: attempts.filter(({ purpose }) => purpose === 'remeasurement').length,
       unit,
+      dataOrigin:
+        payload.dataOrigin === 'hardware' || payload.dataOrigin === 'simulation'
+          ? payload.dataOrigin
+          : undefined,
       conditions,
       metricLabel: `조건별 ${text(metric?.label)} 평균`,
     },

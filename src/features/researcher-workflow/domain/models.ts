@@ -66,6 +66,9 @@ export interface Evidence {
     | 'recoveryRequested'
     | 'recoveryChecked'
     | 'cleanupOutputConfirmed'
+    | 'cleanupOutputStopped'
+    | 'cleanupOutputFailed'
+    | 'cleanupCheckConfirmed'
     | 'cleanupConfirmed'
     | 'cleanupRevoked'
     | 'experimentFinished'
@@ -106,6 +109,7 @@ export interface WorkflowEvent {
     | 'executionSampleReceived'
     | 'executionSampleRejected'
     | 'measurementAccepted'
+    | 'measurementCompleted'
     | 'voiceClarificationRequested'
     | 'voiceClarificationDismissed'
     | 'voiceClarificationResolved'
@@ -117,12 +121,15 @@ export interface WorkflowEvent {
     | 'cleanupOutputRequested'
     | 'cleanupOutputConfirmed'
     | 'cleanupOutputFailed'
+    | 'cleanupOutputStopped'
+    | 'cleanupCheckConfirmed'
     | 'cleanupConfirmed'
     | 'cleanupRevoked'
     | 'experimentFinished'
     | 'mockSubmissionRequested'
     | 'mockSubmissionFailed'
-    | 'mockResultSubmitted';
+    | 'mockResultSubmitted'
+    | 'resultSubmitted';
   readonly occurredAt: string;
   readonly evidenceId?: string;
   readonly checkId?: PreparationCheckId;
@@ -131,13 +138,49 @@ export interface WorkflowEvent {
   readonly commandId?: string;
   readonly voiceChoice?: VoiceChoice | 'cancel';
   readonly cleanupCheckId?: CleanupCheckId;
+  readonly resultId?: string;
 }
+
+export interface EdgeCleanupState {
+  readonly attempts: readonly {
+    readonly attemptId: string;
+    readonly status: 'passed' | 'failed';
+    readonly requestedAt: string;
+    readonly completedAt: string;
+    readonly validUntil: string;
+    readonly bootId: string;
+    readonly response: {
+      readonly success: boolean;
+      readonly state: 'off' | 'unknown' | 'on';
+      readonly dataOrigin: 'simulation' | 'hardware';
+    };
+    readonly evidenceId: string;
+    readonly issue?: DiagnosticIssue | null;
+  }[];
+  readonly checks: readonly {
+    readonly id: CleanupCheckId;
+    readonly checked: boolean;
+    readonly confirmedAt: string | null;
+    readonly evidenceId: string | null;
+  }[];
+  readonly deviceReleasedAt: string | null;
+}
+
+export type EdgeSubmission =
+  | { readonly status: 'not_submitted'; readonly resultId: null; readonly submittedAt: null }
+  | {
+      readonly status: 'submitted';
+      readonly sessionId: string;
+      readonly resultId: string;
+      readonly submittedAt: string;
+    };
 
 export interface ExperimentSession {
   readonly sessionId: string;
   readonly operatorId: string;
   readonly source: 'mock' | 'api';
   readonly dataOrigin?: 'simulation' | 'hardware';
+  readonly workflowVersion?: '1.0' | '2.0';
   readonly procedure: ProcedureSnapshot;
   readonly phase:
     | 'preparing'
@@ -148,6 +191,8 @@ export interface ExperimentSession {
     | 'held'
     | 'cancelled'
     | 'cleaningUp'
+    | 'awaitingCleanup'
+    | 'readyToSubmit'
     | 'completed'
     | 'submitted';
   readonly revision: number;
@@ -164,6 +209,11 @@ export interface ExperimentSession {
   readonly execution?: ExecutionState;
   readonly resumeChecks?: readonly ResumeCheckAttempt[];
   readonly completion?: CompletionState;
+  readonly measurementCompletedAt?: string | null;
+  readonly cleanup?: EdgeCleanupState | null;
+  readonly submission?: EdgeSubmission | null;
+  readonly resultId?: string | null;
+  readonly submittedAt?: string | null;
 }
 
 export type WorkflowCommand =
@@ -174,6 +224,7 @@ export type WorkflowCommand =
     }
   | { readonly type: 'startCleanup' }
   | { readonly type: 'retryCleanupOutput' }
+  | { readonly type: 'requestCleanup' }
   | {
       readonly type: 'setCleanupCheck';
       readonly checkId: CleanupCheckId;
@@ -181,6 +232,7 @@ export type WorkflowCommand =
     }
   | { readonly type: 'finishExperiment' }
   | { readonly type: 'submitMockResult' }
+  | { readonly type: 'submitResult' }
   | {
       readonly type: 'setPreparationCheck';
       readonly checkId: PreparationCheckId;
@@ -254,15 +306,33 @@ export type WorkflowErrorCode =
   | 'RESUME_CONFIRMATION_EXPIRED'
   | 'HOLD_ACTION_NOT_ALLOWED'
   | 'REQUEST_CONFLICT'
+  | 'WORKFLOW_VERSION_REQUIRED'
+  | 'CLEANUP_OUTPUT_FAILED'
+  | 'CLEANUP_OUTPUT_REQUIRED'
+  | 'CLEANUP_OUTPUT_EXPIRED'
+  | 'CLEANUP_CHECK_ORDER'
+  | 'CLEANUP_INCOMPLETE'
+  | 'CLEANUP_CHECK_IRREVERSIBLE'
+  | 'CLEANUP_DEVICE_RELEASED'
+  | 'MEASUREMENTS_INCOMPLETE'
+  | 'ALREADY_SUBMITTED'
   | 'OUTCOME_UNKNOWN'
   | 'EDGE_REJECTED';
 
 export class WorkflowError extends Error {
+  readonly session?: ExperimentSession;
+  readonly resultId?: string;
+  readonly replayed?: boolean;
+
   constructor(
     readonly code: WorkflowErrorCode,
     message: string,
+    details?: { session?: ExperimentSession; resultId?: string; replayed?: boolean },
   ) {
     super(message);
     this.name = 'WorkflowError';
+    this.session = details?.session;
+    this.resultId = details?.resultId;
+    this.replayed = details?.replayed;
   }
 }

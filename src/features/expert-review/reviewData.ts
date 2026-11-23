@@ -44,6 +44,7 @@ export interface ReviewResult {
   readonly remeasurementCount: number;
   readonly unit: string;
   readonly metricLabel?: string;
+  readonly dataOrigin?: 'hardware' | 'simulation';
   readonly conditions: readonly ReviewCondition[];
   readonly issue?: {
     readonly conditionId: string;

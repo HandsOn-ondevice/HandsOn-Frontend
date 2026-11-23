@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useIsFocused } from 'expo-router';
 import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,6 +26,7 @@ import {
 import { WorkflowProvider, useWorkflowRepository } from '../state/WorkflowProvider';
 import { useWorkflowSession } from '../state/useWorkflowSession';
 import { EdgeVoiceInput } from './EdgeVoiceInput';
+import { useEdgeExecutionHeartbeat } from './useEdgeExecutionHeartbeat';
 
 type Props = {
   sessionId: string;
@@ -35,6 +36,10 @@ type Props = {
   onRecovery: () => void;
   onClarification: () => void;
   onHome: () => void;
+  renderCompletion: (
+    phase: 'awaitingCleanup' | 'readyToSubmit' | 'completed',
+    outputFailed: boolean,
+  ) => ReactNode;
 };
 
 const POLL_INTERVAL_MS = 600;
@@ -79,11 +84,22 @@ function EdgeMeasurementContent({
   onRecovery,
   onClarification,
   onHome,
+  renderCompletion,
   base,
   request,
 }: Props & { base: WorkflowRepository; request: EdgeSessionRequest }) {
-  const { session, loading, error, refresh, execute, pending, canRetryCommand, retryCommand } =
-    useWorkflowSession(sessionId);
+  const {
+    session,
+    loading,
+    error,
+    refresh,
+    execute,
+    pending,
+    canRetryCommand,
+    retryCommand,
+    heartbeat,
+  } = useWorkflowSession(sessionId);
+  useEdgeExecutionHeartbeat(session?.phase === 'running', heartbeat);
   const repository = useWorkflowRepository();
   const focused = useIsFocused();
   const [stoppedPoll, setStoppedPoll] = useState<{
@@ -193,6 +209,17 @@ function EdgeMeasurementContent({
   const requestSampleAvailable =
     canSample && (needsFreshSample || attempt?.purpose !== 'remeasurement');
 
+  if (
+    session &&
+    !pending &&
+    !canRetryCommand &&
+    (session.phase === 'awaitingCleanup' ||
+      session.phase === 'readyToSubmit' ||
+      (session.phase === 'completed' && session.workflowVersion === '2.0'))
+  ) {
+    return renderCompletion(session.phase, session.cleanup?.attempts.at(-1)?.status === 'failed');
+  }
+
   return (
     <SafeAreaView style={styles.root} edges={['top']} testID="execution-screen">
       <StatusBar tone="light" />
@@ -204,6 +231,9 @@ function EdgeMeasurementContent({
       />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {session ? <AppText variant="title">{session.procedure.title}</AppText> : null}
+        {session?.dataOrigin === 'simulation' ? (
+          <AppText variant="caption">모의 장치</AppText>
+        ) : null}
         {loading ? (
           <AppText accessibilityLiveRegion="polite">실험 상태를 불러오고 있습니다.</AppText>
         ) : null}

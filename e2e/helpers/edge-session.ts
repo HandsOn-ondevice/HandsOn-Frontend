@@ -12,6 +12,7 @@ type Command =
 
 export type CreateBody = {
   requestId: string;
+  workflowVersion: '2.0';
   procedureId: string;
   procedureVersion: string;
   workProfileId: string;
@@ -27,6 +28,7 @@ export type Session = {
   phase: string;
   revision: number;
   holdReason?: { code: string; message: string } | null;
+  workflowVersion?: '1.0' | '2.0';
   resumePolicyVersion?: '1.0' | '2.0';
   hold?: {
     holdId: string;
@@ -139,6 +141,7 @@ export function isolatedEdge(request: APIRequestContext) {
         headers: { ...operatorHeaders, 'Idempotency-Key': requestId },
         data: {
           requestId,
+          workflowVersion: '2.0',
           procedureId: procedure.procedureId,
           procedureVersion: procedure.version,
           workProfileId: procedure.workProfileId,

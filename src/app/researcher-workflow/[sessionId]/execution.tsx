@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { ExecutionScreen } from '@/features/researcher-workflow/screens/ExecutionScreen';
 import { CompletionRouteGate } from '@/features/researcher-workflow/screens/CompletionRouteGate';
 import { EdgeExecutionScreen } from '@/features/researcher-workflow/screens/EdgeExecutionScreen';
@@ -36,6 +36,19 @@ export default function ExecutionRoute() {
         onPause={onPause}
         onClarification={onClarification}
         onHome={() => router.dismissTo('/student')}
+        renderCompletion={(phase, outputFailed) => (
+          <Redirect
+            href={{
+              pathname:
+                phase === 'awaitingCleanup'
+                  ? outputFailed
+                    ? '/researcher-workflow/[sessionId]/cleanup'
+                    : '/researcher-workflow/[sessionId]/review'
+                  : '/researcher-workflow/[sessionId]/results',
+              params: { sessionId },
+            }}
+          />
+        )}
       />
     );
   }

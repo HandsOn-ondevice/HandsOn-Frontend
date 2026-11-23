@@ -18,6 +18,7 @@ export interface CreateSessionInput {
 export interface WorkflowRepository {
   createSession(input: CreateSessionInput): Promise<ExperimentSession>;
   getSession(sessionId: string): Promise<ExperimentSession>;
+  heartbeat?(sessionId: string, signal?: AbortSignal): Promise<void>;
   executeCommand(
     sessionId: string,
     command: WorkflowCommand,
