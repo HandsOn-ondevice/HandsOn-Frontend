@@ -30,12 +30,22 @@ export function PreparationScreen({
   onHome?: () => void;
   onDeviceCheck: () => void;
 }) {
-  const { session, loading, pending, error, errorCode, execute, refresh } =
-    useWorkflowSession(sessionId);
+  const {
+    session,
+    loading,
+    pending,
+    error,
+    errorCode,
+    execute,
+    refresh,
+    canRetryCommand,
+    retryCommand,
+  } = useWorkflowSession(sessionId);
   const sessionNotFound = !session && errorCode === 'NOT_FOUND';
   const [notice, setNotice] = useState<string | null>(null);
   const [details, setDetails] = useState(false);
   const progress = session ? selectPreparation(session) : null;
+  const mock = session?.source === 'mock';
   const guidance =
     progress?.current?.guidance ??
     (session?.checks.find((check) => check.id === 'communication')?.checked
@@ -48,7 +58,7 @@ export function PreparationScreen({
       return;
     }
     const next = await execute({ type: 'completePreparation' });
-    if (next?.phase === 'awaitingDeviceCheck') onDeviceCheck();
+    if (next && selectPreparation(next).awaitingDeviceCheck) onDeviceCheck();
   };
 
   return (
@@ -59,9 +69,11 @@ export function PreparationScreen({
         <AppText variant="heading" accessibilityRole="header">
           실험 전, 하나씩 확인해요.
         </AppText>
-        <AppText variant="caption" color={colors.text.secondary}>
-          Mock 환경 · 실제 장비·음성 연동 없음
-        </AppText>
+        {mock ? (
+          <AppText variant="caption" color={colors.text.secondary}>
+            Mock 환경 · 실제 장비·음성 연동 없음
+          </AppText>
+        ) : null}
         {loading ? (
           <AppText accessibilityLiveRegion="polite">준비 상태를 불러오고 있습니다.</AppText>
         ) : null}
@@ -86,6 +98,14 @@ export function PreparationScreen({
             disabled={pending}
           />
         ) : null}
+        {canRetryCommand ? (
+          <Button
+            label="이전 요청 다시 시도"
+            variant="secondary"
+            disabled={pending || loading}
+            onPress={() => void retryCommand()}
+          />
+        ) : null}
         {session && progress ? (
           <>
             <StepProgress
@@ -104,13 +124,19 @@ export function PreparationScreen({
                     hour12: false,
                   })
                 : null;
+              const evidenceLabel =
+                requirement.owner === 'operator'
+                  ? '작업자 확인'
+                  : mock
+                    ? 'Mock 시스템 근거'
+                    : '서버 점검';
               return (
                 <CheckboxRow
                   key={requirement.id}
                   title={requirement.title}
                   subtitle={
                     checked
-                      ? `${requirement.owner === 'operator' ? '작업자 확인' : 'Mock 시스템 근거'} · ${time}`
+                      ? [evidenceLabel, time].filter(Boolean).join(' · ')
                       : requirement.description
                   }
                   checked={checked}
@@ -122,7 +148,10 @@ export function PreparationScreen({
                         : 'pending'
                   }
                   disabled={
-                    pending || requirement.verifiedAt !== 'S04' || progress.awaitingDeviceCheck
+                    pending ||
+                    canRetryCommand ||
+                    requirement.verifiedAt !== 'S04' ||
+                    progress.awaitingDeviceCheck
                   }
                   onChange={(value) => {
                     void execute({
@@ -134,15 +163,19 @@ export function PreparationScreen({
                 />
               );
             })}
-            <View style={styles.context}>
-              <Icon name="lock" size={15} color={colors.text.secondary} />
-              <AppText variant="caption" color={colors.text.secondary} style={styles.contextText}>
-                거리와 배선 방향은 센서값으로 자동 보증하지 않습니다.
-              </AppText>
-            </View>
+            {mock ? (
+              <View style={styles.context}>
+                <Icon name="lock" size={15} color={colors.text.secondary} />
+                <AppText variant="caption" color={colors.text.secondary} style={styles.contextText}>
+                  거리와 배선 방향은 센서값으로 자동 보증하지 않습니다.
+                </AppText>
+              </View>
+            ) : null}
             <AppText variant="caption" color={colors.text.secondary}>
               {progress.canContinue || progress.awaitingDeviceCheck
-                ? '작업자 확인 5개 완료 · 통신 점검은 S05에서 확인합니다.'
+                ? mock
+                  ? '작업자 확인 5개 완료 · 통신 점검은 S05에서 확인합니다.'
+                  : '작업자 확인 완료 · 통신 점검은 S05에서 확인합니다.'
                 : `필수 작업자 확인 ${progress.missing.length}개가 남았습니다. 통신 점검은 S05에서 확인합니다.`}
             </AppText>
           </>
@@ -153,8 +186,13 @@ export function PreparationScreen({
         safeArea
         primary="확인 완료"
         secondary="안내 다시 듣기"
-        layout="dual"
-        disabled={loading || !progress || (!progress.canContinue && !progress.awaitingDeviceCheck)}
+        layout={mock ? 'dual' : 'single'}
+        disabled={
+          loading ||
+          canRetryCommand ||
+          !progress ||
+          (!progress.canContinue && !progress.awaitingDeviceCheck)
+        }
         loading={pending}
         onPrimary={() => {
           void continuePreparation();
@@ -169,7 +207,7 @@ export function PreparationScreen({
         title="실험 준비 정보"
         icon="flask"
       >
-        <AppText>Mock 세션 · 앱을 재시작하면 초기화됩니다.</AppText>
+        {mock ? <AppText>Mock 세션 · 앱을 재시작하면 초기화됩니다.</AppText> : null}
         <AppText>
           {session
             ? `${session.procedure.title} · ${procedureVersionLabel(session.procedure.version)}`

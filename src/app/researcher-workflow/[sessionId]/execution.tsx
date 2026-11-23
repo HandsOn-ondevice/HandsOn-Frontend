@@ -1,9 +1,20 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { ExecutionScreen } from '@/features/researcher-workflow/screens/ExecutionScreen';
 import { CompletionRouteGate } from '@/features/researcher-workflow/screens/CompletionRouteGate';
+import { EdgeExecutionScreen } from '@/features/researcher-workflow/screens/EdgeExecutionScreen';
+import { isEdgeWorkflowEnabled } from '@/features/researcher-workflow/state/workflow-repository';
 
 export default function ExecutionRoute() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
+  const onBack = () =>
+    router.dismissTo({
+      pathname: '/researcher-workflow/[sessionId]/device-check',
+      params: { sessionId },
+    });
+  if (isEdgeWorkflowEnabled()) {
+    return <EdgeExecutionScreen key={sessionId} sessionId={sessionId} onBack={onBack} />;
+  }
+
   return (
     <CompletionRouteGate sessionId={sessionId} screen="execution">
       <ExecutionScreen
@@ -15,12 +26,7 @@ export default function ExecutionRoute() {
             params: { sessionId },
           })
         }
-        onBack={() =>
-          router.dismissTo({
-            pathname: '/researcher-workflow/[sessionId]/device-check',
-            params: { sessionId },
-          })
-        }
+        onBack={onBack}
         onRecovery={() =>
           router.push({
             pathname: '/researcher-workflow/[sessionId]/recovery',
