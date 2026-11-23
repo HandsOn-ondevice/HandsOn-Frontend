@@ -17,6 +17,17 @@ function getContinuationPath(session: ExperimentSession) {
     case 'awaitingDeviceCheck':
     case 'readyToExecute':
       return '/researcher-workflow/[sessionId]/device-check';
+    case 'awaitingCleanup':
+      return session.cleanup?.attempts.at(-1)?.status === 'failed' ||
+        session.cleanup?.deviceReleasedAt
+        ? '/researcher-workflow/[sessionId]/cleanup'
+        : '/researcher-workflow/[sessionId]/review';
+    case 'readyToSubmit':
+      return '/researcher-workflow/[sessionId]/results';
+    case 'completed':
+      if (session.submission?.status === 'submitted') {
+        return '/researcher-workflow/[sessionId]/results';
+      }
   }
 }
 

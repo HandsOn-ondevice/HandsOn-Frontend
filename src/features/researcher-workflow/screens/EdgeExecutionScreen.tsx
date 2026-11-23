@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -5,11 +6,13 @@ import {
   AppText,
   Button,
   FeedbackPanel,
+  SurfaceCard,
   StatusBar,
   colors,
   spacing,
 } from '@/design-system';
 import { useWorkflowSession } from '../state/useWorkflowSession';
+import { useEdgeExecutionHeartbeat } from './useEdgeExecutionHeartbeat';
 
 export function EdgeExecutionScreen({
   sessionId,
@@ -17,19 +20,52 @@ export function EdgeExecutionScreen({
   onMenu,
   onPause,
   onRecovery,
+  renderCompletion,
 }: {
   sessionId: string;
   onBack: () => void;
   onMenu: () => void;
   onPause: () => void;
   onRecovery: () => void;
+  renderCompletion: (
+    phase: 'awaitingCleanup' | 'readyToSubmit' | 'completed',
+    outputFailed: boolean,
+  ) => ReactNode;
 }) {
-  const { session, loading, error, refresh } = useWorkflowSession(sessionId);
+  const {
+    session,
+    loading,
+    error,
+    refresh,
+    pending,
+    execute,
+    canRetryCommand,
+    retryCommand,
+    heartbeat,
+  } = useWorkflowSession(sessionId);
+  useEdgeExecutionHeartbeat(session?.phase === 'running', heartbeat);
   const cursor = session?.phase === 'running' ? session.execution?.cursor : null;
   const conditions = session?.procedure.execution?.conditions;
   const condition = conditions?.find((item) => item.id === cursor?.conditionId);
   const first = cursor?.trialIndex === 1 && cursor.conditionId === conditions?.[0]?.id;
   const userPaused = session?.phase === 'held' && session.holdReason?.code === 'USER_PAUSED';
+  const attempt = cursor
+    ? session?.execution?.attempts.findLast((item) => item.cursor.cursorId === cursor.cursorId)
+    : undefined;
+  const samplePending = Boolean(session?.pendingJob);
+  const canComplete = attempt?.status === 'ready' && Boolean(attempt.report);
+  const sensors = attempt?.report?.diagnostics.sensors ?? [];
+
+  if (
+    session &&
+    !pending &&
+    !canRetryCommand &&
+    (session.phase === 'awaitingCleanup' ||
+      session.phase === 'readyToSubmit' ||
+      (session.phase === 'completed' && session.workflowVersion === '2.0'))
+  ) {
+    return renderCompletion(session.phase, session.cleanup?.attempts.at(-1)?.status === 'failed');
+  }
 
   return (
     <SafeAreaView style={styles.root} edges={['top']} testID="execution-screen">
@@ -42,13 +78,21 @@ export function EdgeExecutionScreen({
       />
       <ScrollView contentContainerStyle={styles.content}>
         {session ? <AppText variant="title">{session.procedure.title}</AppText> : null}
+        {session?.dataOrigin === 'simulation' ? (
+          <AppText variant="caption">모의 장치</AppText>
+        ) : null}
         {loading ? (
           <AppText accessibilityLiveRegion="polite">실험 상태를 불러오고 있습니다.</AppText>
         ) : null}
         {error ? (
           <>
-            <FeedbackPanel title="실험 상태를 불러오지 못했어요" subtitle={error} tone="danger" />
-            <Button label="실험 상태 다시 불러오기" variant="secondary" onPress={refresh} />
+            <FeedbackPanel title="실험 요청을 처리하지 못했어요" subtitle={error} tone="danger" />
+            <Button
+              label={canRetryCommand ? '같은 요청 다시 시도' : '실험 상태 다시 불러오기'}
+              variant="secondary"
+              disabled={pending}
+              onPress={canRetryCommand ? retryCommand : refresh}
+            />
           </>
         ) : null}
         {cursor ? (
@@ -60,6 +104,42 @@ export function EdgeExecutionScreen({
               조건 {condition?.label ?? cursor.conditionId} · {cursor.trialIndex}회차
             </AppText>
             <AppText variant="caption">회차 ID {cursor.cursorId}</AppText>
+            {samplePending ? (
+              <AppText accessibilityLiveRegion="polite">측정 응답을 기다리고 있어요.</AppText>
+            ) : null}
+            {sensors.map((sensor) => (
+              <SurfaceCard
+                key={sensor.sensorId}
+                title={
+                  session?.procedure.deviceCheck?.sensors.find(
+                    (item) => item.sensorId === sensor.sensorId,
+                  )?.title ?? sensor.sensorId
+                }
+                subtitle={sensor.issue?.message}
+              >
+                {sensor.readings.map(({ metricId, value, unit }) => (
+                  <AppText key={metricId}>{`${metricId} · ${value ?? '—'} ${unit}`}</AppText>
+                ))}
+              </SurfaceCard>
+            ))}
+            <Button
+              label="측정 요청"
+              variant={canComplete ? 'secondary' : 'primary'}
+              disabled={pending || samplePending || canRetryCommand}
+              onPress={() => execute({ type: 'requestExecutionSample', cursorId: cursor.cursorId })}
+            />
+            <Button
+              label="회차 완료"
+              disabled={pending || samplePending || canRetryCommand || !canComplete}
+              onPress={() =>
+                canComplete &&
+                execute({
+                  type: 'completeExecutionStep',
+                  cursorId: cursor.cursorId,
+                  sampleAttemptId: attempt.attemptId,
+                })
+              }
+            />
           </>
         ) : session?.phase === 'held' ? (
           <>
@@ -77,7 +157,7 @@ export function EdgeExecutionScreen({
         ) : session ? (
           <FeedbackPanel
             title="진행 중인 회차가 없습니다"
-            subtitle="장치 점검 화면에서 실험 상태를 확인해 주세요."
+            subtitle={session.holdReason?.message ?? '연구생 홈에서 실험 상태를 확인해 주세요.'}
           />
         ) : null}
       </ScrollView>

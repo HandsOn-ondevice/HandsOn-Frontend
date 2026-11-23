@@ -33,6 +33,10 @@ interface StudentHomeScreenProps {
 }
 
 const sessionLabels = { running: '진행 중', paused: '일시정지', held: '보류' } as const;
+const completionLabels = {
+  awaitingCleanup: '실험 정리 대기',
+  readyToSubmit: '결과 제출 대기',
+} as const;
 const deviceLabels = {
   connected: '장치 연결',
   disconnected: '장치 연결 끊김',
@@ -50,6 +54,15 @@ export function StudentHomeScreen({
   const changeEnvironmentAfterClose = useRef(false);
   const data = lookup.status === 'ready' ? lookup.data : null;
   const session = data?.ongoingSession;
+  const completionLabel =
+    session?.phase === 'awaitingCleanup' || session?.phase === 'readyToSubmit'
+      ? completionLabels[session.phase]
+      : null;
+  const pendingCompletion = data?.pendingSessions?.filter(
+    (item) =>
+      item.sessionId !== session?.id &&
+      (item.phase === 'awaitingCleanup' || item.phase === 'readyToSubmit'),
+  );
   const edge = isEdgeDataEnabled();
   const openProcedures = () => onNavigate({ type: 'procedures', environmentId: environment.id });
 
@@ -105,7 +118,7 @@ export function StudentHomeScreen({
               title={session.title}
               subtitle={
                 edge
-                  ? `${session.status === 'held' ? '보류' : '저장된 작업'} · ${session.completedCycles} / ${session.totalCycles}회차`
+                  ? `${completionLabel ?? (session.status === 'held' ? '보류' : '저장된 작업')} · ${session.completedCycles} / ${session.totalCycles}회차`
                   : `${sessionLabels[session.status]} · ${session.savedAtLabel} 저장\n${session.conditionProgress}% 조건 · ${session.completedCycles} / ${session.totalCycles}회차`
               }
             />
@@ -121,6 +134,29 @@ export function StudentHomeScreen({
             subtitle="승인된 절차를 선택하면 실험 준비를 시작할 수 있어요."
           />
         )}
+
+        {pendingCompletion?.length ? (
+          <>
+            <SectionHeader title="정리·제출 대기 중인 실험" />
+            {pendingCompletion.map((item) => (
+              <SurfaceCard
+                key={item.sessionId}
+                title={
+                  item.phase === 'readyToSubmit'
+                    ? completionLabels.readyToSubmit
+                    : completionLabels.awaitingCleanup
+                }
+                subtitle={`세션 ${item.sessionId}`}
+              >
+                <Button
+                  label={item.phase === 'readyToSubmit' ? '제출 이어서 진행' : '정리 이어서 진행'}
+                  variant="secondary"
+                  onPress={() => onNavigate({ type: 'resume', sessionId: item.sessionId })}
+                />
+              </SurfaceCard>
+            ))}
+          </>
+        ) : null}
 
         {!session ? (
           <Button label="승인 절차 선택" icon="approval" onPress={openProcedures} />

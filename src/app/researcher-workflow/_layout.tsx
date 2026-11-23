@@ -14,6 +14,10 @@ const edgeScreens = new Set([
   '[sessionId]/session-menu',
   '[sessionId]/paused',
   '[sessionId]/resume',
+  '[sessionId]/review',
+  '[sessionId]/cleanup',
+  '[sessionId]/results',
+  '[sessionId]/measurement-details',
 ]);
 
 export default function ResearcherWorkflowLayout() {
