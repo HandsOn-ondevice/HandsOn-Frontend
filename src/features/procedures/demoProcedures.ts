@@ -8,7 +8,7 @@ export interface DemoProcedureEntry {
 
 const environmentIds = ['demo-embedded-iot'];
 
-const led: ProcedureDetail = {
+export const demoLedProcedure: ProcedureDetail = {
   id: 'demo-led-characteristics',
   code: 'LED-M03',
   title: 'LED 출력 단계별\n조도·소비전력 특성 측정',
@@ -66,12 +66,17 @@ const sensor: ProcedureDetail = {
 
 /** Synthetic examples for development and Maestro; these are not server approvals. */
 export const demoProcedureCatalog: readonly DemoProcedureEntry[] = [
-  { status: 'approved', environmentIds, detail: led },
+  { status: 'approved', environmentIds, detail: demoLedProcedure },
   { status: 'approved', environmentIds, detail: sensor },
   {
     status: 'draft',
     environmentIds,
-    detail: { ...led, id: 'demo-led-draft', title: 'LED 측정 초안', approvedVersion: 'draft' },
+    detail: {
+      ...demoLedProcedure,
+      id: 'demo-led-draft',
+      title: 'LED 측정 초안',
+      approvedVersion: 'draft',
+    },
   },
   {
     status: 'revoked',

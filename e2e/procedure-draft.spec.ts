@@ -267,9 +267,9 @@ test('E05 기준 입력 오류와 저장 실패를 안내하고 재시도한 같
   await expect(verified).toBeChecked();
 
   await save.click();
-  await expectStepRoute('approval', '승인 검토');
+  await expectStepRoute('approval', '최종 승인과 버전 배포');
   await expect(page.getByText('기준을 저장했습니다', { exact: true })).toBeVisible();
-  await expect(page.getByText('필수 미확정 항목', { exact: true })).toBeVisible();
+  await expect(page.getByText(/필수 기준 미확정 · 센서값 최신성 기준/)).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('e06-criteria-saved.png') });
 
   const back = page.getByRole('button', { name: '뒤로가기', exact: true });
@@ -282,6 +282,7 @@ test('E05 기준 입력 오류와 저장 실패를 안내하고 재시도한 같
   await enterExpertHome(page);
   await page.getByRole('button', { name: /^최근 작업, .*임시 저장 완료$/ }).click();
   await expectDraftRoute(page, existingDraftId);
+  await page.getByRole('button', { name: '7단계 전원 인가와 범위 확인', exact: true }).click();
   await review.click();
   await expectStepRoute('review', '기준값과 오류 규칙 편집');
   await expect(voltageMin).toHaveValue('3.25');
