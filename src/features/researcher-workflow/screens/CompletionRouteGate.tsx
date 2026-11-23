@@ -10,11 +10,13 @@ export function CompletionRouteGate({
   sessionId,
   screen,
   resultId,
+  fromReview = false,
   children,
 }: {
   sessionId: string;
   screen: 'execution' | 'review' | 'cleanup' | 'results' | 'details';
   resultId?: string | readonly string[];
+  fromReview?: boolean;
   children: ReactNode;
 }) {
   const { session, loading } = useWorkflowSession(sessionId);
@@ -64,6 +66,7 @@ export function CompletionRouteGate({
       );
     if (
       screen === 'execution' &&
+      !fromReview &&
       session.phase === 'running' &&
       session.execution &&
       !session.execution.cursor

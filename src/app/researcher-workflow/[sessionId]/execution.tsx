@@ -5,7 +5,18 @@ import { EdgeExecutionScreen } from '@/features/researcher-workflow/screens/Edge
 import { isEdgeWorkflowEnabled } from '@/features/researcher-workflow/state/workflow-repository';
 
 export default function ExecutionRoute() {
-  const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
+  const { sessionId, fromReview } = useLocalSearchParams<{
+    sessionId: string;
+    fromReview?: string;
+  }>();
+  const onReview =
+    fromReview === '1'
+      ? () =>
+          router.replace({
+            pathname: '/researcher-workflow/[sessionId]/review',
+            params: { sessionId },
+          })
+      : undefined;
   const onDeviceCheck = () =>
     router.dismissTo({
       pathname: '/researcher-workflow/[sessionId]/device-check',
@@ -36,6 +47,7 @@ export default function ExecutionRoute() {
         onPause={onPause}
         onClarification={onClarification}
         onHome={() => router.dismissTo('/student')}
+        onReview={onReview}
         renderCompletion={(phase, outputFailed) => (
           <Redirect
             href={{
@@ -54,7 +66,7 @@ export default function ExecutionRoute() {
   }
 
   return (
-    <CompletionRouteGate sessionId={sessionId} screen="execution">
+    <CompletionRouteGate sessionId={sessionId} screen="execution" fromReview={!!onReview}>
       <ExecutionScreen
         key={sessionId}
         sessionId={sessionId}
@@ -69,6 +81,7 @@ export default function ExecutionRoute() {
         }
         onPause={onPause}
         onClarification={onClarification}
+        onReview={onReview}
       />
     </CompletionRouteGate>
   );

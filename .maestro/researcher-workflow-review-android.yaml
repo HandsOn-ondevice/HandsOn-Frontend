@@ -1,0 +1,57 @@
+appId: com.handson.frontend
+name: Android 누락·이상 검토에서 같은 실험 실행으로 복귀
+---
+- launchApp:
+    clearState: true
+- openLink: handson://researcher-workflow
+- extendedWaitUntil:
+    visible: Figma 검증용 2/6 상태 열기
+    timeout: 30000
+- tapOn: Figma 검증용 2/6 상태 열기
+- scrollUntilVisible:
+    element: 전원 차단 확인
+    direction: DOWN
+- tapOn: 전원 차단 확인
+- scrollUntilVisible:
+    element: 센서 배선 연결
+    direction: DOWN
+- tapOn: 센서 배선 연결
+- scrollUntilVisible:
+    element: LED와 BH1750 거리 20cm
+    direction: DOWN
+- tapOn: LED와 BH1750 거리 20cm
+- tapOn:
+    text: 확인 완료
+    enabled: true
+- scrollUntilVisible:
+    element: 장치·센서 점검 시작
+    direction: DOWN
+- tapOn: 장치·센서 점검 시작
+- tapOn:
+    text: 실험 측정 시작
+    enabled: true
+
+- repeat:
+    times: 15
+    commands:
+      - scrollUntilVisible:
+          element: 현재 회차 측정값 확인
+          direction: DOWN
+      - tapOn:
+          text: 현재 회차 측정값 확인
+          enabled: true
+      - tapOn:
+          text: 완료 요청
+          enabled: true
+
+- assertVisible:
+    id: 'completion-누락·이상 검토'
+- assertVisible: 장치 정리로 이동
+- tapOn: 뒤로가기
+- assertVisible:
+    id: execution-screen
+- assertVisible: '유효 측정 15 / 15회(, 완료)?'
+- tapOn: 누락·이상 검토
+- assertVisible:
+    id: 'completion-누락·이상 검토'
+- assertVisible: 장치 정리로 이동

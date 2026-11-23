@@ -30,6 +30,7 @@ export function ExecutionScreen({
   onRemeasurement,
   onPause,
   onMenu,
+  onReview,
 }: {
   sessionId: string;
   onDeviceCheck: () => void;
@@ -38,6 +39,7 @@ export function ExecutionScreen({
   onRemeasurement?: () => void;
   onPause: () => void;
   onMenu?: () => void;
+  onReview?: () => void;
 }) {
   const { session, loading, pending, error, refresh, execute, onHeaderBack, retryPause } =
     useExecutionSession(sessionId, onDeviceCheck, onPause);
@@ -242,16 +244,20 @@ export function ExecutionScreen({
         ) : null}
         {notice ? <AppText accessibilityLiveRegion="polite">{notice}</AppText> : null}
       </ScrollView>
-      <ActionShelf
-        safeArea
-        primary="완료 요청"
-        secondary="안내 반복"
-        layout="dual"
-        loading={pending}
-        disabled={loading || !state?.canComplete}
-        onPrimary={complete}
-        onSecondary={() => setNotice(`안내: ${state?.reason ?? '세션을 확인해 주세요.'}`)}
-      />
+      {onReview && session?.phase === 'running' && session.execution && !state?.cursor ? (
+        <ActionShelf safeArea primary="누락·이상 검토" onPrimary={onReview} />
+      ) : (
+        <ActionShelf
+          safeArea
+          primary="완료 요청"
+          secondary="안내 반복"
+          layout="dual"
+          loading={pending}
+          disabled={loading || !state?.canComplete}
+          onPrimary={complete}
+          onSecondary={() => setNotice(`안내: ${state?.reason ?? '세션을 확인해 주세요.'}`)}
+        />
+      )}
       <ExecutionInfoSheet
         session={session}
         pending={pending}

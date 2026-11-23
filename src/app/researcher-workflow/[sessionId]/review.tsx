@@ -6,15 +6,27 @@ import { isEdgeWorkflowEnabled } from '@/features/researcher-workflow/state/work
 
 export default function ReviewRoute() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
+  const onBack = () =>
+    router.replace({
+      pathname: '/researcher-workflow/[sessionId]/execution',
+      params: { sessionId, fromReview: '1' },
+    });
   if (isEdgeWorkflowEnabled()) {
-    return <EdgeCompletionScreen key={sessionId} stage="review" sessionId={sessionId} />;
+    return (
+      <EdgeCompletionScreen
+        key={sessionId}
+        stage="review"
+        sessionId={sessionId}
+        onReviewBack={onBack}
+      />
+    );
   }
   return (
     <CompletionRouteGate sessionId={sessionId} screen="review">
       <CompletionReviewScreen
         key={sessionId}
         sessionId={sessionId}
-        onBack={() => router.replace('/student')}
+        onBack={onBack}
         onExecution={() =>
           router.replace({
             pathname: '/researcher-workflow/[sessionId]/execution',
