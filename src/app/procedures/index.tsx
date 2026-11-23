@@ -14,6 +14,7 @@ export default function Procedures() {
   return (
     <ProcedureListScreen
       environment={selection.environment}
+      edgeToken={selection.edgeToken}
       onBack={() => {
         if (router.canGoBack()) router.back();
         else router.replace('/student');

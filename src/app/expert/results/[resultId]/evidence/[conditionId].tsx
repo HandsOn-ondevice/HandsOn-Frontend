@@ -3,14 +3,16 @@ import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEntrySelection } from '@/features/entry/EntrySelectionProvider';
 import { ExpertEvidenceScreen } from '@/features/expert-review/ExpertEvidenceScreen';
 import { createEdgeResultRepository } from '@/features/expert-review/edgeResultRepository';
+import { isEdgeDataEnabled } from '@/lib/edgeApi';
 
 export default function ResultEvidence() {
   const router = useRouter();
   const { selection } = useEntrySelection();
-  const access = selection?.edge;
+  const edgeToken = selection?.edgeToken;
+  const useEdge = isEdgeDataEnabled();
   const repository = useMemo(
-    () => (access ? createEdgeResultRepository(access) : undefined),
-    [access],
+    () => (useEdge ? createEdgeResultRepository(edgeToken) : undefined),
+    [edgeToken, useEdge],
   );
   const { resultId, procedureId, conditionId } = useLocalSearchParams<{
     resultId?: string;
@@ -26,7 +28,7 @@ export default function ResultEvidence() {
     return <Redirect href="/expert" />;
   }
 
-  const environmentId = selection.environment.edgeEnvironmentId ?? selection.environment.id;
+  const environmentId = selection.environment.id;
   return (
     <ExpertEvidenceScreen
       key={JSON.stringify([environmentId, resultId, procedureId, conditionId])}

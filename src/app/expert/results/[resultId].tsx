@@ -3,14 +3,16 @@ import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEntrySelection } from '@/features/entry/EntrySelectionProvider';
 import { ExpertReviewScreen } from '@/features/expert-review/ExpertReviewScreen';
 import { createEdgeResultRepository } from '@/features/expert-review/edgeResultRepository';
+import { isEdgeDataEnabled } from '@/lib/edgeApi';
 
 export default function ResultReview() {
   const router = useRouter();
   const { selection } = useEntrySelection();
-  const access = selection?.edge;
+  const edgeToken = selection?.edgeToken;
+  const useEdge = isEdgeDataEnabled();
   const repository = useMemo(
-    () => (access ? createEdgeResultRepository(access) : undefined),
-    [access],
+    () => (useEdge ? createEdgeResultRepository(edgeToken) : undefined),
+    [edgeToken, useEdge],
   );
   const { resultId, procedureId } = useLocalSearchParams<{
     resultId?: string;
@@ -21,7 +23,7 @@ export default function ResultReview() {
     return <Redirect href="/expert" />;
   }
 
-  const environmentId = selection.environment.edgeEnvironmentId ?? selection.environment.id;
+  const environmentId = selection.environment.id;
   return (
     <ExpertReviewScreen
       key={JSON.stringify([environmentId, resultId, procedureId])}
@@ -29,7 +31,7 @@ export default function ResultReview() {
       resultId={resultId}
       procedureId={procedureId}
       repository={repository}
-      lockFailedSubmission={Boolean(access)}
+      lockFailedSubmission={useEdge}
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/expert'))}
       onOpenEvidence={(conditionId, result) =>
         router.push({

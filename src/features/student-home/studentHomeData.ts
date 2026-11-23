@@ -1,9 +1,10 @@
 import { listDemoProcedureReleases } from '@/features/procedure-draft/procedureDraftRepository';
 import { demoLedProcedure } from '@/features/procedures/demoProcedures';
-import { createEdgeApi, EdgeApiError } from '@/lib/edgeApi';
-import type { EdgeAccess, WorkEnvironment } from '../entry/entryEnvironment';
+import type { WorkEnvironment } from '../entry/entryEnvironment';
+import { EdgeApiError, getEdge, isEdgeDataEnabled } from '@/lib/edgeApi';
 
 export interface StudentHomeData {
+  dataOrigin?: 'simulation' | 'hardware';
   researcherName: string;
   deviceStatus: 'connected' | 'disconnected' | 'unknown';
   ongoingSession: {
@@ -34,31 +35,29 @@ export interface StudentHomeData {
   }[];
 }
 
-export type LoadStudentHome = (environment: WorkEnvironment) => Promise<StudentHomeData>;
-
-export async function loadEdgeStudentHome(
+export type LoadStudentHome = (
   environment: WorkEnvironment,
-  edge: EdgeAccess,
-): Promise<StudentHomeData> {
-  const environmentId = environment.edgeEnvironmentId ?? environment.id;
-  const data = (await createEdgeApi(edge).get(
-    `/home/student?environmentId=${encodeURIComponent(environmentId)}`,
-  )) as StudentHomeData | null;
-  if (
-    typeof data?.researcherName !== 'string' ||
-    !['connected', 'disconnected', 'unknown'].includes(data.deviceStatus) ||
-    !Array.isArray(data.approvedProcedures) ||
-    !Array.isArray(data.recentResults) ||
-    !data.recentResults.every(
-      (item) => typeof item?.id === 'string' && typeof item.sessionId === 'string',
-    ) ||
-    (data.ongoingSession !== null && data.ongoingSession?.environmentId !== environmentId)
-  )
-    throw new EdgeApiError({ kind: 'invalid-response' });
-  return data;
-}
+  edgeToken?: string,
+) => Promise<StudentHomeData>;
 
-export const loadStudentHome: LoadStudentHome = async (environment) => {
+export const loadStudentHome: LoadStudentHome = async (environment, edgeToken) => {
+  if (isEdgeDataEnabled()) {
+    const data = await getEdge<StudentHomeData>(
+      '/home/student',
+      { environmentId: environment.id },
+      edgeToken,
+    );
+    if (
+      typeof data?.researcherName !== 'string' ||
+      !Object.hasOwn(deviceStatuses, data.deviceStatus) ||
+      !Array.isArray(data.approvedProcedures) ||
+      !Array.isArray(data.recentResults) ||
+      (data.ongoingSession !== null && data.ongoingSession?.environmentId !== environment.id)
+    ) {
+      throw new EdgeApiError({ kind: 'invalid-response' });
+    }
+    return data;
+  }
   if (!__DEV__ && process.env.EXPO_PUBLIC_HANDSON_MAESTRO !== '1') {
     throw new Error('연구생 홈 조회가 아직 연결되지 않았습니다.');
   }
@@ -119,3 +118,5 @@ export const loadStudentHome: LoadStudentHome = async (environment) => {
     ],
   };
 };
+
+const deviceStatuses = { connected: true, disconnected: true, unknown: true };

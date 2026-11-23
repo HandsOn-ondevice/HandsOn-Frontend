@@ -3,12 +3,11 @@ import {
   listDemoProcedureReleases,
   procedureDraftRepository,
 } from '@/features/procedure-draft/procedureDraftRepository';
-import type { EdgeAccess } from '@/features/entry/entryEnvironment';
 import { loadEdgeReviewStatus } from '@/features/expert-review/edgeResultRepository';
 import { getDemoHomeReviews, type ReviewStatus } from '@/features/expert-review/reviewData';
 import { getUnresolvedDraftItems } from '@/features/procedure-release/procedureReleaseRules';
 import { demoLedProcedure } from '@/features/procedures/demoProcedures';
-import { createEdgeApi, EdgeApiError } from '@/lib/edgeApi';
+import { EdgeApiError, getEdge, isEdgeDataEnabled } from '@/lib/edgeApi';
 
 export interface ExpertProcedure {
   readonly id: string;
@@ -44,48 +43,14 @@ export type ExpertRecentWork = {
 );
 
 export interface ExpertHomeData {
+  readonly dataOrigin?: 'simulation' | 'hardware';
   readonly displayName: string;
   readonly procedures: readonly ExpertProcedure[];
   readonly results: readonly ExpertResult[];
   readonly recentWork: readonly ExpertRecentWork[];
 }
 
-export type LoadExpertHome = (environmentId: string) => Promise<ExpertHomeData>;
-
-export async function loadEdgeExpertHome(
-  environmentId: string,
-  edge: EdgeAccess,
-): Promise<ExpertHomeData> {
-  const data = (await createEdgeApi(edge).get(
-    `/home/expert?environmentId=${encodeURIComponent(environmentId)}`,
-  )) as ExpertHomeData | null;
-  if (
-    typeof data?.displayName !== 'string' ||
-    !Array.isArray(data.procedures) ||
-    !Array.isArray(data.results) ||
-    !data.results.every(
-      (item) =>
-        typeof item?.id === 'string' &&
-        typeof item.procedureId === 'string' &&
-        ['pending', 'reviewed', 'remeasurementRequested'].includes(item.status),
-    ) ||
-    !Array.isArray(data.recentWork)
-  )
-    throw new EdgeApiError({ kind: 'invalid-response' });
-
-  // The Edge home reports both decisions as reviewed. The result holds the actual decision.
-  const results = await Promise.all(
-    data.results.map(async (item: ExpertResult) =>
-      item.status === 'reviewed'
-        ? {
-            ...item,
-            status: await loadEdgeReviewStatus(edge, environmentId, item.id, item.procedureId),
-          }
-        : item,
-    ),
-  );
-  return { ...data, results };
-}
+export type LoadExpertHome = (environmentId: string, edgeToken?: string) => Promise<ExpertHomeData>;
 
 function createDemoHome(environmentId: string): ExpertHomeData {
   const procedureId = (name: string) => `${environmentId}:procedure:${name}`;
@@ -161,8 +126,36 @@ function createDemoHome(environmentId: string): ExpertHomeData {
   };
 }
 
-export const loadExpertHome: LoadExpertHome = async (environmentId) => {
+export const loadExpertHome: LoadExpertHome = async (environmentId, edgeToken) => {
   if (!environmentId.trim()) throw new Error('작업 환경을 선택해 주세요.');
+  if (isEdgeDataEnabled()) {
+    const data = await getEdge<ExpertHomeData>('/home/expert', { environmentId }, edgeToken);
+    if (
+      typeof data?.displayName !== 'string' ||
+      !Array.isArray(data.procedures) ||
+      !Array.isArray(data.results) ||
+      !Array.isArray(data.recentWork)
+    ) {
+      throw new EdgeApiError({ kind: 'invalid-response' });
+    }
+    // Edge v0.1.0 reports both decisions as reviewed on the home response.
+    const results = await Promise.all(
+      data.results.map(async (item): Promise<ExpertResult> =>
+        item.status === 'reviewed'
+          ? {
+              ...item,
+              status: await loadEdgeReviewStatus(
+                edgeToken,
+                environmentId,
+                item.id,
+                item.procedureId,
+              ),
+            }
+          : item,
+      ),
+    );
+    return { ...data, results };
+  }
   if (__DEV__ || process.env.EXPO_PUBLIC_HANDSON_MAESTRO === '1') {
     const demo = createDemoHome(environmentId);
     const savedDrafts = await procedureDraftRepository.listSaved(environmentId);

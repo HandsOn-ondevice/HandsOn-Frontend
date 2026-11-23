@@ -1,6 +1,5 @@
 import { useCallback } from 'react';
 import { ActionShelf, AppText, StatusBadge, SurfaceCard } from '@/design-system';
-import type { EdgeAccess } from '@/features/entry/entryEnvironment';
 import { EvidenceView } from '@/features/expert-review/EvidenceView';
 import { ResultConditions } from '@/features/expert-review/ResultConditions';
 import {
@@ -14,7 +13,7 @@ import { reviewStatusLabels, type ReviewResult } from '@/features/expert-review/
 type ResultIdentity = Pick<ReviewResult, 'id' | 'sessionId'>;
 
 type StudentResultProps = {
-  access: EdgeAccess;
+  edgeToken?: string;
   environmentId: string;
   resultId: string;
   sessionId: string;
@@ -28,7 +27,7 @@ type StudentResultProps = {
 );
 
 export function StudentResultScreen({
-  access,
+  edgeToken,
   environmentId,
   resultId,
   sessionId,
@@ -37,15 +36,20 @@ export function StudentResultScreen({
   onOpenCondition,
 }: StudentResultProps) {
   const load = useCallback(async () => {
-    const { result, evidenceByCondition } = await loadEdgeResult(access, environmentId, resultId, {
-      sessionId,
-    });
+    const { result, evidenceByCondition } = await loadEdgeResult(
+      edgeToken,
+      environmentId,
+      resultId,
+      {
+        sessionId,
+      },
+    );
     if (!conditionId) return { kind: 'summary', result } as const;
     const condition = result.conditions.find(({ id }) => id === conditionId);
     const evidence = evidenceByCondition.get(conditionId);
     if (!condition || !evidence) throw new Error('선택한 측정 조건을 찾을 수 없어요.');
     return { kind: 'evidence', result, condition, evidence } as const;
-  }, [access, environmentId, resultId, sessionId, conditionId]);
+  }, [edgeToken, environmentId, resultId, sessionId, conditionId]);
   const { query, retry } = useReviewQuery(load);
   const data = query.status === 'ready' ? query.data : undefined;
   const result = data?.result;

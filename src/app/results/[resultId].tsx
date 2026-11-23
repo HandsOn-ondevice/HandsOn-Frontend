@@ -2,13 +2,14 @@ import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEntrySelection } from '@/features/entry/EntrySelectionProvider';
 import { HomeDestinationScreen } from '@/features/student-home/HomeDestinationScreen';
 import { StudentResultScreen } from '@/features/student-home/StudentResultScreen';
+import { isEdgeDataEnabled } from '@/lib/edgeApi';
 
 export default function Result() {
   const router = useRouter();
   const { selection } = useEntrySelection();
   const { resultId, sessionId } = useLocalSearchParams<{ resultId?: string; sessionId?: string }>();
   if (selection?.role !== 'student') return <Redirect href="/" />;
-  if (!selection.edge) {
+  if (!isEdgeDataEnabled()) {
     return (
       <HomeDestinationScreen
         title="작업 결과"
@@ -20,11 +21,11 @@ export default function Result() {
     return <Redirect href="/student" />;
   }
 
-  const environmentId = selection.environment.edgeEnvironmentId ?? selection.environment.id;
+  const environmentId = selection.environment.id;
   return (
     <StudentResultScreen
       key={JSON.stringify([environmentId, resultId, sessionId])}
-      access={selection.edge}
+      edgeToken={selection.edgeToken}
       environmentId={environmentId}
       resultId={resultId}
       sessionId={sessionId}

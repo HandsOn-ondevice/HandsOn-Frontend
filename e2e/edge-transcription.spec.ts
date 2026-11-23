@@ -12,7 +12,7 @@ const title = 'LED 원본 전사 연동';
 const fixtureText = 'LED 전원을 차단한 뒤 센서 배선을 확인합니다.';
 const editedText = 'LED 전원을 차단한 뒤 센서 배선과 측정 결과를 확인합니다.';
 const audioName = 'edge-transcription.m4a';
-const environmentId = 'demo-circuits';
+const environmentId = 'kit-lab';
 
 test.skip(!liveEdge, '실제 Edge 시뮬레이션 서버를 대상으로 실행하는 검사입니다.');
 // The token is entered as a password. Do not capture its value in an action trace.
@@ -21,8 +21,10 @@ test.use({ trace: 'off' });
 async function openRecording(page: Page) {
   await page.goto('/');
   await page.getByRole('radio', { name: '숙련 연구생, 절차 생성·승인' }).click();
+  await page.getByLabel('Edge 접속 토큰', { exact: true }).fill(edgeToken);
+  await page.getByRole('button', { name: '작업 환경 불러오기', exact: true }).click();
   await page.getByRole('button', { name: /^연구실: / }).click();
-  const environment = page.getByRole('radio', { name: '전자회로 실험실', exact: true });
+  const environment = page.getByRole('radio', { name: '지급 키트 실습실', exact: true });
   await environment.click();
   await expect(environment).toBeHidden();
   await page.getByRole('button', { name: '설정하고 계속' }).click();

@@ -213,7 +213,7 @@ async function enterHome(
   } catch {
     throw new Error('Could not fill the local Edge credential field.');
   }
-  await button(page, '다시 시도').click();
+  await button(page, '작업 환경 불러오기').click();
   await page.getByRole('button', { name: /^연구실: / }).click();
   await page.getByRole('radio', { name: '지급 키트 실습실', exact: true }).click();
 

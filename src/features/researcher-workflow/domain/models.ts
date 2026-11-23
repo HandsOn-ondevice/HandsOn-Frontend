@@ -157,6 +157,7 @@ export interface ExperimentSession {
   readonly events: readonly WorkflowEvent[];
   readonly deviceChecks: readonly DeviceCheckAttempt[];
   readonly pendingJob?: { readonly kind: string; readonly attemptId: string } | null;
+  readonly holdReason?: DiagnosticIssue | null;
   readonly execution?: ExecutionState;
   readonly resumeChecks?: readonly ResumeCheckAttempt[];
   readonly completion?: CompletionState;

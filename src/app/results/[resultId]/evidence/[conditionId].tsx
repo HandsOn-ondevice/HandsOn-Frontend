@@ -1,6 +1,7 @@
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEntrySelection } from '@/features/entry/EntrySelectionProvider';
 import { StudentResultScreen } from '@/features/student-home/StudentResultScreen';
+import { isEdgeDataEnabled } from '@/lib/edgeApi';
 
 export default function ResultEvidence() {
   const router = useRouter();
@@ -12,7 +13,7 @@ export default function ResultEvidence() {
   }>();
   if (selection?.role !== 'student') return <Redirect href="/" />;
   if (
-    !selection.edge ||
+    !isEdgeDataEnabled() ||
     typeof resultId !== 'string' ||
     !resultId ||
     typeof sessionId !== 'string' ||
@@ -23,11 +24,11 @@ export default function ResultEvidence() {
     return <Redirect href="/student" />;
   }
 
-  const environmentId = selection.environment.edgeEnvironmentId ?? selection.environment.id;
+  const environmentId = selection.environment.id;
   return (
     <StudentResultScreen
       key={JSON.stringify([environmentId, resultId, sessionId, conditionId])}
-      access={selection.edge}
+      edgeToken={selection.edgeToken}
       environmentId={environmentId}
       resultId={resultId}
       sessionId={sessionId}

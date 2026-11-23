@@ -1,24 +1,24 @@
 import type { UserRole } from '@/design-system';
 import { createEdgeApi, EdgeApiError } from '@/lib/edgeApi';
 
+const kitEnvironmentId = 'kit-lab';
+const kitWorkProfileId = 'kit-distance-v1';
+
 export interface WorkEnvironment {
   id: string;
   name: string;
   workType: string;
   deviceName: string;
-  edgeEnvironmentId?: string;
-}
-
-export interface EdgeAccess {
-  readonly baseUrl: string;
-  readonly token?: string;
+  workProfile?: { id: string; version: string };
 }
 
 export interface EntrySelection {
   role: UserRole;
   environment: WorkEnvironment;
-  edge?: EdgeAccess;
+  edgeToken?: string;
 }
+
+type EdgeWorkProfile = WorkEnvironment & { environmentId: string; profileVersion: string };
 
 type EnvironmentRequest = {
   token?: string;
@@ -44,29 +44,27 @@ const demoEnvironments: readonly WorkEnvironment[] = [
   },
 ];
 
-type EdgeWorkProfile = Omit<WorkEnvironment, 'edgeEnvironmentId'> & { environmentId?: string };
-
-function isWorkEnvironment(value: unknown): value is EdgeWorkProfile {
+function isWorkEnvironment(value: unknown): value is WorkEnvironment {
   if (!value || typeof value !== 'object') return false;
-  const { id, name, workType, deviceName, environmentId } = value as Partial<EdgeWorkProfile>;
-  return [
-    id,
-    name,
-    workType,
-    deviceName,
-    ...(environmentId === undefined ? [] : [environmentId]),
-  ].every((field) => typeof field === 'string' && field.trim().length > 0);
+  const { id, name, workType, deviceName } = value as Partial<WorkEnvironment>;
+  return [id, name, workType, deviceName].every(
+    (field) => typeof field === 'string' && field.trim().length > 0,
+  );
 }
 
-export function getEntryEdgeBaseUrl() {
-  const baseUrl = process.env.EXPO_PUBLIC_HANDSON_EDGE_BASE_URL?.trim();
-  return process.env.EXPO_PUBLIC_HANDSON_MAESTRO === '1' ? undefined : baseUrl;
+function isEdgeWorkProfile(value: unknown): value is EdgeWorkProfile {
+  if (!isWorkEnvironment(value)) return false;
+  const { environmentId, profileVersion } = value as Partial<EdgeWorkProfile>;
+  return [environmentId, profileVersion].every(
+    (field) => typeof field === 'string' && field.trim().length > 0,
+  );
 }
 
 export const loadWorkEnvironments: LoadWorkEnvironments = async (options) => {
-  const baseUrl = getEntryEdgeBaseUrl();
-  if (process.env.EXPO_PUBLIC_HANDSON_MAESTRO === '1' || (__DEV__ && !baseUrl))
+  const baseUrl = process.env.EXPO_PUBLIC_HANDSON_EDGE_BASE_URL?.trim();
+  if (process.env.EXPO_PUBLIC_HANDSON_MAESTRO === '1' || (__DEV__ && !baseUrl)) {
     return demoEnvironments;
+  }
   return loadEdgeWorkEnvironments({ baseUrl, ...options });
 };
 
@@ -82,17 +80,35 @@ export async function loadEdgeWorkEnvironments({
   }
 
   const profiles = await edge.get('/work-profiles', signal);
-  if (!Array.isArray(profiles) || !profiles.every(isWorkEnvironment)) {
+  if (!Array.isArray(profiles) || !profiles.every(isEdgeWorkProfile)) {
     throw new EdgeApiError({ kind: 'invalid-response' });
   }
   if (new Set(profiles.map(({ id }) => id)).size !== profiles.length) {
     throw new EdgeApiError({ kind: 'invalid-response' });
   }
-  return profiles.map(({ id, name, workType, deviceName, environmentId }) => ({
-    id,
-    name,
-    workType,
-    deviceName,
-    ...(environmentId && { edgeEnvironmentId: environmentId }),
-  }));
+
+  const environments = await edge.get('/environments', signal);
+  if (!Array.isArray(environments) || !environments.every(isWorkEnvironment)) {
+    throw new EdgeApiError({ kind: 'invalid-response' });
+  }
+  if (new Set(environments.map(({ id }) => id)).size !== environments.length) {
+    throw new EdgeApiError({ kind: 'invalid-response' });
+  }
+
+  // Edge v0.1.0 accepts this work profile for session creation and kit-lab for drafts.
+  const profile = profiles.find(
+    ({ id, environmentId }) => id === kitWorkProfileId && environmentId === kitEnvironmentId,
+  );
+  const environment = environments.find(({ id }) => id === kitEnvironmentId);
+  if (!profile || !environment) return [];
+  const { id, name, workType, deviceName } = environment;
+  return [
+    {
+      id,
+      name,
+      workType,
+      deviceName,
+      workProfile: { id: profile.id, version: profile.profileVersion },
+    },
+  ];
 }

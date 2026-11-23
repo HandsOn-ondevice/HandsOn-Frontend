@@ -1,6 +1,5 @@
-import type { EdgeAccess } from '@/features/entry/entryEnvironment';
 import { createRequestId } from '@/features/researcher-workflow/application/request-id';
-import { createEdgeApi, EdgeApiError } from '@/lib/edgeApi';
+import { createEdgeApi, edgeBaseUrl, EdgeApiError, getEdge } from '@/lib/edgeApi';
 import type {
   ConditionEvidence,
   EvidenceEvent,
@@ -54,12 +53,12 @@ function resultPath(resultId: string): `/results/${string}` {
 }
 
 async function readResult(
-  access: EdgeAccess,
+  edgeToken: string | undefined,
   environmentId: string,
   resultId: string,
   expected: { sessionId?: string; procedureId?: string },
 ) {
-  const payload = object(await createEdgeApi(access).get(resultPath(resultId)));
+  const payload = object(await getEdge<unknown>(resultPath(resultId), undefined, edgeToken));
   const session = object(payload.session);
   const procedure = object(session.procedure);
   const sessionId = text(session.sessionId);
@@ -79,12 +78,12 @@ async function readResult(
 }
 
 export async function loadEdgeReviewStatus(
-  access: EdgeAccess,
+  edgeToken: string | undefined,
   environmentId: string,
   resultId: string,
   procedureId: string,
 ): Promise<ReviewStatus> {
-  const { outcome } = await readResult(access, environmentId, resultId, { procedureId });
+  const { outcome } = await readResult(edgeToken, environmentId, resultId, { procedureId });
   return outcome?.status ?? 'pending';
 }
 
@@ -105,13 +104,13 @@ function extractMeasurement(attempt: JsonObject, metricId: string) {
 }
 
 export async function loadEdgeResult(
-  access: EdgeAccess,
+  edgeToken: string | undefined,
   environmentId: string,
   resultId: string,
   expected: { sessionId?: string; procedureId?: string } = {},
 ) {
   const { payload, session, sessionId, procedure, procedureId, outcome } = await readResult(
-    access,
+    edgeToken,
     environmentId,
     resultId,
     expected,
@@ -246,12 +245,12 @@ export async function loadEdgeResult(
   };
 }
 
-export function createEdgeResultRepository(access: EdgeAccess): ExpertReviewRepository {
+export function createEdgeResultRepository(edgeToken?: string): ExpertReviewRepository {
   const requestIds = new Map<string, string>();
   const loadedSessions = new Map<string, string>();
 
   async function load(environmentId: string, resultId: string, procedureId?: string) {
-    const data = await loadEdgeResult(access, environmentId, resultId, { procedureId });
+    const data = await loadEdgeResult(edgeToken, environmentId, resultId, { procedureId });
     loadedSessions.set(JSON.stringify([environmentId, resultId]), data.result.sessionId);
     return data;
   }
@@ -281,11 +280,14 @@ export function createEdgeResultRepository(access: EdgeAccess): ExpertReviewRepo
       const key = JSON.stringify([resultId, decision, comment]);
       const requestId = requestIds.get(key) ?? createRequestId();
       requestIds.set(key, requestId);
-      const response = await createEdgeApi(access).post(`${resultPath(resultId)}/reviews`, {
-        requestId,
-        decision,
-        comment,
-      });
+      const response = await createEdgeApi({ baseUrl: edgeBaseUrl, token: edgeToken }).post(
+        `${resultPath(resultId)}/reviews`,
+        {
+          requestId,
+          decision,
+          comment,
+        },
+      );
       const saved = reviewOutcome(response, sessionId);
       if (saved.status !== outcome.status || saved.comment !== comment) return invalid();
       return saved;
