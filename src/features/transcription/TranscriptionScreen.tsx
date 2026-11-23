@@ -9,7 +9,7 @@ import {
   type SitemapType,
 } from 'expo-router';
 
-import { AppText, BottomSheet, Button, FeedbackPanel } from '@/design-system';
+import { AppText, BottomSheet, Button, FeedbackPanel, TextField } from '@/design-system';
 import { useEntrySelection } from '@/features/entry/EntrySelectionProvider';
 import {
   procedureDraftRepository,
@@ -17,11 +17,24 @@ import {
 } from '@/features/procedure-draft/procedureDraftRepository';
 import type { SavedRecording } from '@/features/recording/recordingSession';
 import { deleteSavedRecording } from '@/features/recording/recordingStorage';
+import {
+  convertEdgeRecording,
+  edgeApiBaseUrl,
+  EdgeConnectionError,
+  EdgeConversionError,
+} from './edgeTranscription';
 import { TranscriptionView } from './TranscriptionView';
 import { readTranscriptionRecording, transcriptionService } from './transcriptionService';
-import { transcriptionStorage, type SavedTranscription } from './transcriptionStorage';
+import {
+  edgeTranscriptionStorage,
+  transcriptionStorage,
+  type SavedEdgeTranscription,
+  type SavedTranscription,
+} from './transcriptionStorage';
 
 const editorPath = '/expert/drafts/[draftId]';
+const requestTimeoutMs = 120_000;
+let edgeSessionToken = '';
 
 function hasDraftEditor(route: SitemapType | null): boolean {
   return Boolean(route && (route.href === editorPath || route.children.some(hasDraftEditor)));
@@ -30,7 +43,14 @@ function hasDraftEditor(route: SitemapType | null): boolean {
 type State =
   | { status: 'loading' | 'sourceError'; recording?: undefined }
   | {
-      status: 'converting' | 'unavailable' | 'conversionError' | 'ready';
+      status:
+        | 'tokenRequired'
+        | 'uploading'
+        | 'uploadError'
+        | 'converting'
+        | 'unavailable'
+        | 'conversionError'
+        | 'ready';
       recording: SavedRecording;
     };
 
@@ -41,6 +61,9 @@ export function TranscriptionScreen({ recordingId }: { recordingId: string }) {
   const [state, setState] = useState<State>({ status: 'loading' });
   const [text, setText] = useState<string>();
   const [attempt, setAttempt] = useState(0);
+  const [tokenInput, setTokenInput] = useState('');
+  const [tokenRejected, setTokenRejected] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -48,6 +71,7 @@ export function TranscriptionScreen({ recordingId }: { recordingId: string }) {
   const [generationError, setGenerationError] = useState(false);
   const [deletionError, setDeletionError] = useState(false);
   const edited = useRef<SavedTranscription>(null);
+  const edgeProgress = useRef<SavedEdgeTranscription>(null);
   const pendingDraft = useRef<{ text: string; result: ProcedureDraft }>(null);
   const focused = useRef(false);
   const operating = useRef(false);
@@ -73,6 +97,55 @@ export function TranscriptionScreen({ recordingId }: { recordingId: string }) {
 
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
+
+    function showText(recording: SavedRecording, saved: SavedTranscription) {
+      edited.current = saved;
+      setText(saved.editedText);
+      setConfirmed(Boolean(saved.confirmedText));
+      setState({ status: 'ready', recording });
+    }
+
+    async function convertOnEdge(recording: SavedRecording, baseUrl: string) {
+      const token = edgeSessionToken;
+      if (!token) {
+        setState({ status: 'tokenRequired', recording });
+        return;
+      }
+      const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
+      try {
+        const progress = await convertEdgeRecording({
+          recording,
+          baseUrl,
+          token,
+          saved: edgeProgress.current,
+          signal: controller.signal,
+          onPhase: (status) => {
+            if (active) setState({ status, recording });
+          },
+        });
+        if (!active) return;
+        edgeProgress.current = progress;
+        try {
+          edgeTranscriptionStorage.save(recording.id, progress);
+        } catch {
+          setStorageError(true);
+        }
+        showText(recording, progress.transcript);
+      } catch (error) {
+        if (!active) return;
+        if (error instanceof EdgeConnectionError && error.needsToken) {
+          if (edgeSessionToken === token) edgeSessionToken = '';
+          setTokenRejected(true);
+          setState({ status: 'tokenRequired', recording });
+        } else {
+          const uploadFailed = error instanceof EdgeConversionError && error.phase === 'uploading';
+          setState({ status: uploadFailed ? 'uploadError' : 'conversionError', recording });
+        }
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
 
     async function load() {
       let recording: SavedRecording | null = null;
@@ -83,12 +156,20 @@ export function TranscriptionScreen({ recordingId }: { recordingId: string }) {
           setState({ status: 'sourceError' });
           return;
         }
-        const saved = await transcriptionStorage.load(recording.id);
+        const baseUrl = edgeApiBaseUrl;
+        edgeProgress.current = baseUrl
+          ? edgeTranscriptionStorage.load(recording.id, baseUrl)
+          : null;
+        const saved = baseUrl
+          ? edgeProgress.current?.transcript
+          : await transcriptionStorage.load(recording.id);
         if (!active) return;
         if (saved) {
-          edited.current = saved;
-          setText(saved.editedText);
-          setState({ status: 'ready', recording });
+          showText(recording, saved);
+          return;
+        }
+        if (baseUrl) {
+          await convertOnEdge(recording, baseUrl);
           return;
         }
       } catch {
@@ -120,13 +201,13 @@ export function TranscriptionScreen({ recordingId }: { recordingId: string }) {
         if (active) setStorageError(true);
       }
       if (!active) return;
-      setText(converted);
-      setState({ status: 'ready', recording });
+      showText(recording, draft);
     }
 
     void load();
     return () => {
       active = false;
+      controller.abort();
     };
   }, [recordingId, attempt]);
 
@@ -137,8 +218,17 @@ export function TranscriptionScreen({ recordingId }: { recordingId: string }) {
 
   async function persist(snapshot: SavedTranscription) {
     try {
-      await transcriptionStorage.save(recordingId, snapshot);
-      if (edited.current === snapshot) setStorageError(false);
+      if (edgeProgress.current) {
+        const progress = { ...edgeProgress.current, transcript: snapshot };
+        edgeTranscriptionStorage.save(recordingId, progress);
+        edgeProgress.current = progress;
+      } else {
+        await transcriptionStorage.save(recordingId, snapshot);
+      }
+      if (edited.current === snapshot) {
+        setStorageError(false);
+        setConfirmed(Boolean(snapshot.confirmedText));
+      }
       return true;
     } catch {
       if (edited.current === snapshot) setStorageError(true);
@@ -148,9 +238,10 @@ export function TranscriptionScreen({ recordingId }: { recordingId: string }) {
 
   function changeText(value: string) {
     if (!edited.current || operating.current) return;
-    const next = { ...edited.current, editedText: value };
+    const next = { originalText: edited.current.originalText, editedText: value };
     edited.current = next;
     setText(value);
+    setConfirmed(false);
     setGenerationError(false);
     void persist(next);
   }
@@ -162,7 +253,7 @@ export function TranscriptionScreen({ recordingId }: { recordingId: string }) {
       !recording ||
       !canOpenDraft ||
       !snapshot?.editedText.trim() ||
-      !transcriptionService
+      (!edgeProgress.current && !transcriptionService)
     ) {
       return;
     }
@@ -171,12 +262,18 @@ export function TranscriptionScreen({ recordingId }: { recordingId: string }) {
     setGenerating(true);
     setGenerationError(false);
     try {
+      if (edgeProgress.current) {
+        const confirmation = { ...snapshot, confirmedText: snapshot.editedText };
+        edited.current = confirmation;
+        await persist(confirmation);
+        return;
+      }
       if (!(await persist(snapshot)) || !focused.current) return;
       const confirmedText = snapshot.editedText;
       const result =
         pendingDraft.current?.text === confirmedText
           ? pendingDraft.current.result
-          : await transcriptionService.generateDraft({
+          : await transcriptionService!.generateDraft({
               recordingId: recording.id,
               title: recording.title,
               confirmedText,
@@ -217,6 +314,7 @@ export function TranscriptionScreen({ recordingId }: { recordingId: string }) {
     try {
       await deleteSavedRecording(recordingId);
       await transcriptionStorage.remove(recordingId);
+      edgeTranscriptionStorage.remove(recordingId);
       if (!focused.current) return;
       allowRemoval();
       goBack();
@@ -248,6 +346,50 @@ export function TranscriptionScreen({ recordingId }: { recordingId: string }) {
       break;
     case 'unavailable':
       feedback = <FeedbackPanel title="STT 서비스 연결을 기다리고 있어요" icon="mic" />;
+      break;
+    case 'tokenRequired':
+      feedback = (
+        <>
+          <FeedbackPanel
+            title="Edge 연결 토큰"
+            subtitle={
+              tokenRejected
+                ? '숙련자 토큰을 확인하고 다시 입력해 주세요.'
+                : 'Edge 서버에 녹음을 보내려면 숙련자 토큰을 입력해 주세요.'
+            }
+            icon="lock"
+          />
+          <TextField
+            label="숙련자 토큰"
+            value={tokenInput}
+            onChange={setTokenInput}
+            secureTextEntry
+            autoComplete="off"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <Button
+            label="연결하고 진행"
+            disabled={!tokenInput.trim()}
+            onPress={() => {
+              edgeSessionToken = tokenInput.trim();
+              setTokenInput('');
+              retryLoad();
+            }}
+          />
+        </>
+      );
+      break;
+    case 'uploading':
+      feedback = <FeedbackPanel title="녹음을 업로드하고 있어요" icon="mic" />;
+      break;
+    case 'uploadError':
+      feedback = (
+        <>
+          <FeedbackPanel title="녹음을 업로드하지 못했어요" tone="warning" icon="alert" />
+          <Button label="업로드 다시 시도" variant="secondary" onPress={retryLoad} />
+        </>
+      );
       break;
     case 'converting':
       feedback = (
@@ -289,9 +431,11 @@ export function TranscriptionScreen({ recordingId }: { recordingId: string }) {
             icon="alert"
           />
         );
+      } else if (confirmed) {
+        feedback = <FeedbackPanel title="전사문을 확정했어요" tone="success" icon="check" />;
       } else if (!canOpenDraft) {
         feedback = <FeedbackPanel title="초안을 만들려면 녹음한 작업 환경으로 돌아가 주세요" />;
-      } else if (!transcriptionService) {
+      } else if (!edgeApiBaseUrl && !transcriptionService) {
         feedback = <FeedbackPanel title="AI 초안 생성 서비스 연결을 기다리고 있어요" />;
       }
       break;
@@ -304,9 +448,14 @@ export function TranscriptionScreen({ recordingId }: { recordingId: string }) {
         text={text}
         busy={generating}
         canGenerate={Boolean(
-          canOpenDraft && transcriptionService && text?.trim() && !storageError && !deleting,
+          canOpenDraft &&
+          (edgeApiBaseUrl || transcriptionService) &&
+          text?.trim() &&
+          !confirmed &&
+          !storageError &&
+          !deleting,
         )}
-        demo={Boolean(transcriptionService)}
+        demo={!edgeApiBaseUrl && Boolean(transcriptionService)}
         feedback={feedback}
         onChange={changeText}
         onGenerate={() => void generate()}
@@ -333,16 +482,22 @@ export function TranscriptionScreen({ recordingId }: { recordingId: string }) {
                 label="원본 삭제하고 돌아가기"
                 variant="danger"
                 loading={deleting}
-                disabled={generating || state.status === 'converting'}
+                disabled={
+                  generating || state.status === 'uploading' || state.status === 'converting'
+                }
                 onPress={() =>
-                  Alert.alert('음성 원본을 삭제할까요?', '녹음 파일과 변환 텍스트가 삭제됩니다.', [
-                    { text: '취소', style: 'cancel' },
-                    {
-                      text: '원본 삭제',
-                      style: 'destructive',
-                      onPress: () => void removeOriginal(),
-                    },
-                  ])
+                  Alert.alert(
+                    '음성 원본을 삭제할까요?',
+                    '이 기기의 녹음과 변환 텍스트가 삭제됩니다.',
+                    [
+                      { text: '취소', style: 'cancel' },
+                      {
+                        text: '원본 삭제',
+                        style: 'destructive',
+                        onPress: () => void removeOriginal(),
+                      },
+                    ],
+                  )
                 }
               />
             ) : null}
