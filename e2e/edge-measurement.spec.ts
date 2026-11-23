@@ -238,7 +238,10 @@ test('serializes polling and preserves the same deadline across navigation', asy
   releaseRead();
   await page.clock.fastForward(25_000);
 
-  await page.getByRole('button', { name: '뒤로가기' }).click();
+  await openEdgeMeasurementFixtureScreen(
+    page,
+    executionPath.replace('/execution', '/device-check'),
+  );
   await expect(page).toHaveURL(/\/device-check$/);
   await expect(waiting).toHaveCount(0);
   await page.waitForTimeout(200);

@@ -85,7 +85,7 @@ test('S04와 동일 세션으로 점검하고 6/6 복귀·S06 시작·재진입�
   await page.getByRole('button', { name: '실험 측정 시작', exact: true }).click();
   await expect(page).toHaveURL(deviceURL.replace('/device-check', '/execution'));
   await expect(page.getByText('유효 측정 0 / 15회', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '뒤로가기', exact: true }).click();
+  await page.goBack();
   await expect(page).toHaveURL(deviceURL);
   await expect(
     page.getByRole('button', { name: '장치·센서 다시 점검', exact: true }),

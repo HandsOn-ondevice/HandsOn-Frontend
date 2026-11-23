@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, jest, test } from '@jest/globals';
-import { fireEvent, render } from '@testing-library/react-native';
+import { act, fireEvent, render } from '@testing-library/react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import ExecutionRoute from '@/app/researcher-workflow/[sessionId]/execution';
 import PreparationRoute from '@/app/researcher-workflow/[sessionId]/preparation';
@@ -232,6 +232,49 @@ test('Edge 실행 메뉴는 결과를 받지 못한 일시정지 요청을 같�
   );
   expect(repository.executeCommand.mock.calls[1]).toEqual(repository.executeCommand.mock.calls[0]);
   expect(router.replace).toHaveBeenCalledWith({
+    pathname: '/researcher-workflow/[sessionId]/paused',
+    params: { sessionId },
+  });
+});
+
+test('Edge 실행 화면의 상단 뒤로가기는 같은 일시정지 요청의 수락을 확인한 뒤 S10을 연다', async () => {
+  jest.spyOn(workflowRepository, 'isEdgeWorkflowEnabled').mockReturnValue(true);
+  const { repository } = setup(running);
+  let confirmPause!: (session: ExperimentSession) => void;
+  const confirmation = new Promise<ExperimentSession>((resolve) => {
+    confirmPause = resolve;
+  });
+  repository.executeCommand
+    .mockRejectedValueOnce(new WorkflowError('OUTCOME_UNKNOWN', 'Edge 응답을 받지 못했어요.'))
+    .mockReturnValueOnce(confirmation);
+  const screen = await render(
+    <WorkflowProvider repository={repository}>
+      <ExecutionRoute />
+    </WorkflowProvider>,
+    { wrapper: EntrySelectionProvider },
+  );
+
+  await screen.findByText('조건 20 cm · 2회차');
+  await fireEvent.press(screen.getByRole('button', { name: '뒤로가기' }));
+  await screen.findByText('Edge 응답을 받지 못했어요.');
+  expect(router.dismissTo).not.toHaveBeenCalled();
+  expect(router.push).not.toHaveBeenCalled();
+
+  await fireEvent.press(screen.getByRole('button', { name: '같은 요청 다시 시도' }));
+  expect(screen.getByRole('button', { name: '뒤로가기' })).toBeDisabled();
+  expect(router.push).not.toHaveBeenCalled();
+  expect(repository.executeCommand).toHaveBeenCalledTimes(2);
+  expect(repository.executeCommand).toHaveBeenNthCalledWith(
+    1,
+    sessionId,
+    { type: 'pauseExecution', cursorId: 'cursor-1' },
+    { expectedRevision: running.revision, requestId: expect.any(String) },
+  );
+  expect(repository.executeCommand.mock.calls[1]).toEqual(repository.executeCommand.mock.calls[0]);
+
+  await act(() => confirmPause(paused));
+  expect(router.push).toHaveBeenCalledTimes(1);
+  expect(router.push).toHaveBeenCalledWith({
     pathname: '/researcher-workflow/[sessionId]/paused',
     params: { sessionId },
   });

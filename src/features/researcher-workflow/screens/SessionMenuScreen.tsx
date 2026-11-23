@@ -13,15 +13,9 @@ import {
   spacing,
 } from '@/design-system';
 import { selectExecution } from '../domain/execution';
-import type { ExperimentSession } from '../domain/models';
+import { isUserPaused } from '../domain/resume';
 import { useWorkflowSession } from '../state/useWorkflowSession';
 import { ExecutionInfoSheet } from './ExecutionInfoSheet';
-
-function isPaused(session: ExperimentSession | undefined | null) {
-  return session?.source === 'api'
-    ? session.phase === 'held' && session.holdReason?.code === 'USER_PAUSED'
-    : session?.phase === 'paused';
-}
 
 export function SessionMenuScreen({
   sessionId,
@@ -46,9 +40,10 @@ export function SessionMenuScreen({
   const pause = async () => {
     if (loading || pending) return;
     if (canRetryCommand) {
-      if (isPaused(await retryCommand())) onPause();
+      if (isUserPaused(await retryCommand())) onPause();
     } else if (canPause && cursor) {
-      if (isPaused(await execute({ type: 'pauseExecution', cursorId: cursor.cursorId }))) onPause();
+      if (isUserPaused(await execute({ type: 'pauseExecution', cursorId: cursor.cursorId })))
+        onPause();
     }
   };
   return (
@@ -106,7 +101,7 @@ export function SessionMenuScreen({
                 시뮬레이션 · 일시정지는 앱 상태를 보관하며 실제 장치를 제어하지 않습니다.
               </AppText>
             ) : null}
-            {isPaused(session) ? (
+            {isUserPaused(session) ? (
               <Button label="일시정지 기록 확인" variant="secondary" onPress={onPause} />
             ) : null}
           </>

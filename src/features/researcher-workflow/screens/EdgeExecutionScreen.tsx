@@ -17,6 +17,7 @@ import type { WorkflowRepository } from '../application/WorkflowRepository';
 import { currentEdgeHold } from '../domain/edge-hold';
 import { selectEdgeRecovery } from '../domain/edge-recovery';
 import { needsEdgeRemeasurement } from '../domain/edge-remeasurement';
+import { isUserPaused } from '../domain/resume';
 import { voiceChoiceLabels } from '../domain/voice-clarification';
 import { withEdgeMeasurement } from '../infrastructure/edge/edge-measurement';
 import {
@@ -24,13 +25,13 @@ import {
   type EdgeSessionRequest,
 } from '../infrastructure/edge/edge-session-request';
 import { WorkflowProvider, useWorkflowRepository } from '../state/WorkflowProvider';
-import { useWorkflowSession } from '../state/useWorkflowSession';
 import { EdgeVoiceInput } from './EdgeVoiceInput';
 import { useEdgeExecutionHeartbeat } from './useEdgeExecutionHeartbeat';
+import { useExecutionSession } from './useExecutionSession';
 
 type Props = {
   sessionId: string;
-  onBack: () => void;
+  onDeviceCheck: () => void;
   onMenu: () => void;
   onPause: () => void;
   onRecovery: () => void;
@@ -79,7 +80,7 @@ export function EdgeExecutionScreen(props: Props) {
 
 function EdgeMeasurementContent({
   sessionId,
-  onBack,
+  onDeviceCheck,
   onMenu,
   onPause,
   onRecovery,
@@ -100,7 +101,9 @@ function EdgeMeasurementContent({
     canRetryCommand,
     retryCommand,
     heartbeat,
-  } = useWorkflowSession(sessionId);
+    onHeaderBack,
+    retryPause,
+  } = useExecutionSession(sessionId, onDeviceCheck, onPause);
   useEdgeExecutionHeartbeat(session?.phase === 'running', heartbeat);
   const repository = useWorkflowRepository();
   const focused = useIsFocused();
@@ -203,8 +206,7 @@ function EdgeMeasurementContent({
   const pendingVoice = session?.execution?.pendingVoice;
   const lastVoiceResolution = session?.execution?.voiceResolutions?.at(-1);
   const hold = currentEdgeHold(session);
-  const userPaused =
-    session?.phase === 'held' && (hold?.reasonCode ?? session.holdReason?.code) === 'USER_PAUSED';
+  const userPaused = isUserPaused(session);
   const canConfirmOtherHold =
     !userPaused &&
     session?.resumePolicyVersion === '2.0' &&
@@ -229,8 +231,9 @@ function EdgeMeasurementContent({
       <AppBar
         title="핵심 실행 화면"
         mode="back"
-        onBack={onBack}
+        onBack={onHeaderBack}
         onMore={cursor ? onMenu : undefined}
+        navigationDisabled={loading || pending}
       />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {session ? <AppText variant="title">{session.procedure.title}</AppText> : null}
@@ -251,7 +254,7 @@ function EdgeMeasurementContent({
               label={canRetryCommand ? '같은 요청 다시 시도' : '실험 상태 다시 불러오기'}
               variant="secondary"
               disabled={pending}
-              onPress={canRetryCommand ? retryCommand : refresh}
+              onPress={retryPause ?? (canRetryCommand ? retryCommand : refresh)}
             />
           </>
         ) : null}
