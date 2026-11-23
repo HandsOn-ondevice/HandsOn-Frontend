@@ -19,14 +19,28 @@ async function returnHome(page: Page) {
   await expect(page.getByRole('button', { name: '이어서 진행' })).toBeVisible();
 }
 
-test('기존 세션과 최근 결과 식별자를 유지하며 홈의 작업 경로로 이동한다', async ({ page }) => {
+test('기존 세션과 최근 결과 식별자를 유지하며 홈의 작업 경로로 이동한다', async ({
+  page,
+}, testInfo) => {
   await enterStudentHome(page);
 
   await page.getByRole('button', { name: '이어서 진행' }).click();
   await expect(page).toHaveURL('/researcher-workflow/demo-session-led-m03/preparation');
-  await expect(
-    page.getByText('저장된 작업을 이어가는 화면을 준비하고 있어요. 홈에서 다시 확인해 주세요.'),
-  ).toBeVisible();
+  await expect(page.getByText('준비 진행도 · 0 / 6 항목 완료')).toBeVisible();
+  await expect(page.getByText('실험 세션을 찾을 수 없습니다')).toHaveCount(0);
+  await page.getByRole('checkbox', { name: '필수 준비물 7개 확인', exact: true }).click();
+  await expect(page.getByText('준비 진행도 · 1 / 6 항목 완료')).toBeVisible();
+  await returnHome(page);
+  await page.getByRole('button', { name: '이어서 진행' }).click();
+  await expect(page).toHaveURL('/researcher-workflow/demo-session-led-m03/preparation');
+  await expect(page.getByText('준비 진행도 · 1 / 6 항목 완료')).toBeVisible();
+  const materials = page.getByRole('checkbox', { name: '필수 준비물 7개 확인', exact: true });
+  await expect(materials).toContainText('작업자 확인 ·');
+  await materials.click();
+  await expect(page.getByText('준비 진행도 · 0 / 6 항목 완료')).toBeVisible();
+  await materials.click();
+  await expect(page.getByText('준비 진행도 · 1 / 6 항목 완료')).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('s01-s04-resume.png') });
   await returnHome(page);
 
   await page.getByRole('button', { name: '전체 보기' }).click();

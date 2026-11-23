@@ -1,10 +1,28 @@
-import { HomeDestinationScreen } from '@/features/student-home/HomeDestinationScreen';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
+import { PreparationScreen } from '@/features/researcher-workflow/screens/PreparationScreen';
+import { useWorkflowSession } from '@/features/researcher-workflow/state/useWorkflowSession';
 
-export default function SessionPreparation() {
+export default function PreparationRoute() {
+  const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
+  const { session } = useWorkflowSession(sessionId);
+  if (session?.phase === 'paused')
+    return (
+      <Redirect
+        href={{ pathname: '/researcher-workflow/[sessionId]/paused', params: { sessionId } }}
+      />
+    );
   return (
-    <HomeDestinationScreen
-      title="진행 중 작업"
-      message="저장된 작업을 이어가는 화면을 준비하고 있어요. 홈에서 다시 확인해 주세요."
+    <PreparationScreen
+      key={sessionId}
+      sessionId={sessionId}
+      onBack={() => (router.canGoBack() ? router.back() : router.replace('/researcher-workflow'))}
+      onHome={() => router.dismissTo('/student')}
+      onDeviceCheck={() =>
+        router.push({
+          pathname: '/researcher-workflow/[sessionId]/device-check',
+          params: { sessionId },
+        })
+      }
     />
   );
 }
