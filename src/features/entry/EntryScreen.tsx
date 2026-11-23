@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,7 +23,7 @@ import {
   spacing,
   type UserRole,
 } from '@/design-system';
-import { EdgeApiError } from '@/lib/edgeApi';
+import { EdgeApiError, isEdgeDataEnabled } from '@/lib/edgeApi';
 import {
   loadWorkEnvironments,
   type EntrySelection,
@@ -32,7 +32,7 @@ import {
 } from './entryEnvironment';
 
 type EnvironmentLookup =
-  | { status: 'loading' | 'editing-token' }
+  | { status: 'idle' | 'loading' }
   | { status: 'error'; error?: EdgeApiError }
   | { status: 'ready'; environments: readonly WorkEnvironment[] };
 
@@ -67,46 +67,68 @@ export function EntryScreen({
   onContinue,
   loadEnvironments = loadWorkEnvironments,
 }: EntryScreenProps) {
+  const edge = isEdgeDataEnabled();
   const [role, setRole] = useState<UserRole>();
-  const [environmentId, setEnvironmentId] = useState('');
-  const [lookup, setLookup] = useState<EnvironmentLookup>({ status: 'loading' });
-  const [attempt, setAttempt] = useState<{ token?: string }>({});
   const [tokenInput, setTokenInput] = useState('');
+  const [entryRequest, setEntryRequest] = useState<{ token?: string }>();
+  const currentRequest = useRef(entryRequest);
+  const [environmentId, setEnvironmentId] = useState('');
+  const [lookup, setLookup] = useState<EnvironmentLookup>({
+    status: edge ? 'idle' : 'loading',
+  });
 
   useEffect(() => {
+    if (edge && !entryRequest) return;
     const controller = new AbortController();
     const { signal } = controller;
-    void loadEnvironments({ token: attempt.token, signal }).then(
+    void loadEnvironments({ token: entryRequest?.token, signal }).then(
       (environments) => {
-        if (!signal.aborted) setLookup({ status: 'ready', environments });
+        if (!signal.aborted && entryRequest === currentRequest.current) {
+          setLookup({ status: 'ready', environments });
+        }
       },
       (error: unknown) => {
-        if (!signal.aborted) {
+        if (!signal.aborted && entryRequest === currentRequest.current) {
           setLookup({ status: 'error', error: error instanceof EdgeApiError ? error : undefined });
         }
       },
     );
     return () => controller.abort();
-  }, [attempt, loadEnvironments]);
+  }, [edge, entryRequest, loadEnvironments]);
 
   const environments = lookup.status === 'ready' ? lookup.environments : [];
   const environment = environments.find(({ id }) => id === environmentId);
   const loading = lookup.status === 'loading';
-  const unavailable = !loading && environments.length === 0;
+  const unavailable = lookup.status !== 'idle' && !loading && environments.length === 0;
   const error = lookup.status === 'error' ? lookup.error : undefined;
-  const editingToken = lookup.status === 'editing-token';
-  const showTokenInput = editingToken || isAuthError(error);
+  const authRequired = isAuthError(error);
+  const needsToken = authRequired || (edge && role && lookup.status === 'idle');
   const errorDetail = [error?.status && `HTTP ${error.status}`, error?.code]
     .filter(Boolean)
     .join(' · ');
   const showSymbol = role === 'expert';
 
-  function retry() {
-    const token = showTokenInput ? tokenInput.trim() : attempt.token;
-    setEnvironmentId('');
+  function selectRole(choice: UserRole) {
+    if (edge && role !== choice) resetEdgeLookup();
+    setRole(choice);
+  }
+
+  function resetEdgeLookup() {
+    currentRequest.current = undefined;
     setTokenInput('');
+    setEntryRequest(undefined);
+    setEnvironmentId('');
+    setLookup({ status: 'idle' });
+  }
+
+  function requestEnvironments() {
+    setEnvironmentId('');
     setLookup({ status: 'loading' });
-    setAttempt({ token });
+    const token = tokenInput.trim() || entryRequest?.token;
+    const request = { token };
+    currentRequest.current = request;
+    setEntryRequest(request);
+    setTokenInput('');
   }
 
   return (
@@ -151,13 +173,32 @@ export function EntryScreen({
               key={choice}
               role={choice}
               state={role === choice ? 'selected' : 'default'}
-              onPress={() => setRole(choice)}
+              onPress={() => selectRole(choice)}
               style={styles.role}
             />
           ))}
         </View>
 
         <SectionHeader title="작업 환경" />
+        {needsToken ? (
+          <TextField
+            label="Edge 접속 토큰"
+            value={tokenInput}
+            onChange={setTokenInput}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="off"
+            spellCheck={false}
+          />
+        ) : null}
+        {edge && lookup.status === 'idle' && role ? (
+          <Button
+            label="작업 환경 불러오기"
+            disabled={!tokenInput.trim()}
+            onPress={requestEnvironments}
+          />
+        ) : null}
         <SelectField
           label="연구실"
           value={environment?.id ?? ''}
@@ -173,53 +214,33 @@ export function EntryScreen({
             subtitle={environment.deviceName ? `실행 장치 · ${environment.deviceName}` : undefined}
           >
             <AppText variant="caption" color={colors.text.secondary}>
-              {`프로필 ID · ${environment.workProfileId ?? environment.id}`}
+              {environment.workProfile
+                ? `작업 프로필 · ${environment.workProfile.id} · ${environment.workProfile.version}`
+                : `프로필 ID · ${environment.id}`}
             </AppText>
           </SurfaceCard>
         ) : null}
-        {lookup.status === 'ready' && attempt.token ? (
-          <Button
-            label="Edge API 토큰 변경"
-            variant="tertiary"
-            onPress={() => {
-              setEnvironmentId('');
-              setTokenInput('');
-              setLookup({ status: 'editing-token' });
-            }}
-          />
+        {edge && lookup.status === 'ready' ? (
+          <Button label="Edge 접속 토큰 변경" variant="tertiary" onPress={resetEdgeLookup} />
         ) : null}
         {unavailable ? (
           <View style={styles.feedback}>
-            {!editingToken ? (
-              <FeedbackPanel
-                title={
-                  lookup.status === 'error'
-                    ? lookupErrorTitle(error)
-                    : '선택할 수 있는 작업 환경이 없어요.'
-                }
-                subtitle={errorDetail}
-                tone="warning"
-                icon="alert"
-              />
-            ) : null}
-            {showTokenInput ? (
-              <TextField
-                label="Edge 접속 토큰"
-                value={tokenInput}
-                onChange={setTokenInput}
-                secureTextEntry
-                autoCapitalize="none"
-                autoComplete="off"
-                autoCorrect={false}
-                spellCheck={false}
-              />
-            ) : null}
+            <FeedbackPanel
+              title={
+                lookup.status === 'error'
+                  ? lookupErrorTitle(error)
+                  : '선택할 수 있는 작업 환경이 없어요.'
+              }
+              subtitle={errorDetail || undefined}
+              tone="warning"
+              icon="alert"
+            />
             <Button
-              label={editingToken ? '작업 환경 불러오기' : '다시 시도'}
+              label="다시 시도"
               variant="secondary"
               icon="retry"
-              disabled={showTokenInput && !tokenInput.trim()}
-              onPress={retry}
+              disabled={authRequired && !tokenInput.trim()}
+              onPress={requestEnvironments}
             />
           </View>
         ) : null}
@@ -235,13 +256,10 @@ export function EntryScreen({
         primary="설정하고 계속"
         disabled={!role || !environment}
         onPrimary={() => {
-          if (role && environment) {
-            onContinue({
-              role,
-              environment,
-              ...(attempt.token && { edgeToken: attempt.token }),
-            });
-          }
+          if (role && environment)
+            onContinue(
+              edge ? { role, environment, edgeToken: entryRequest?.token } : { role, environment },
+            );
         }}
         safeArea
       />

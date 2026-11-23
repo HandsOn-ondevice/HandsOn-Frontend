@@ -111,6 +111,7 @@ export function parseEdgeSession(value: unknown, sessionId?: string): Experiment
     !isText(value.updatedAt) ||
     !isText(value.phase) ||
     !phases.has(value.phase) ||
+    (value.holdReason != null && !isIssue(value.holdReason)) ||
     !Number.isInteger(value.revision) ||
     Number(value.revision) < 0 ||
     (value.pendingJob !== null &&

@@ -1,19 +1,16 @@
-import { useMemo } from 'react';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEntrySelection } from '@/features/entry/EntrySelectionProvider';
 import { ProcedureDetailScreen } from '@/features/procedures/ProcedureDetailScreen';
 import { usePreparationHandoff } from '@/features/procedures/PreparationHandoffProvider';
-import { createEdgeProcedureRepository } from '@/features/procedures/procedureRepository';
-import { startApprovedEdgeSession } from '@/features/researcher-workflow/state/workflow-repository';
+import {
+  isEdgeWorkflowEnabled,
+  startApprovedEdgeSession,
+} from '@/features/researcher-workflow/state/workflow-repository';
 
 export default function Procedure() {
   const router = useRouter();
-  const { selection, edge } = useEntrySelection();
+  const { selection } = useEntrySelection();
   const { setRequest } = usePreparationHandoff();
-  const repository = useMemo(
-    () => (edge ? createEdgeProcedureRepository(edge) : undefined),
-    [edge],
-  );
   const { procedureId, approvedVersion, environmentId } = useLocalSearchParams<{
     procedureId?: string | string[];
     approvedVersion?: string | string[];
@@ -31,21 +28,22 @@ export default function Procedure() {
     return <Redirect href="/procedures" />;
   }
 
+  const { edgeToken } = selection;
+
   return (
     <ProcedureDetailScreen
       key={JSON.stringify([procedureId, approvedVersion, environmentId])}
       environment={selection.environment}
+      edgeToken={edgeToken}
       procedureId={procedureId}
       approvedVersion={approvedVersion}
-      repository={repository}
       onBack={() => {
         if (router.canGoBack()) router.back();
         else router.replace('/procedures');
       }}
       startSession={
-        edge
-          ? async (request) =>
-              (await startApprovedEdgeSession(request, selection.edgeToken)).sessionId
+        isEdgeWorkflowEnabled()
+          ? async (request) => (await startApprovedEdgeSession(request, edgeToken)).sessionId
           : undefined
       }
       onPrepare={(request, sessionId) => {

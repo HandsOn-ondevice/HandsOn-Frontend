@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { isEdgeDataEnabled } from '@/lib/edgeApi';
+import { createEdgeProcedureRepository } from './edgeProcedureRepository';
 import type { WorkEnvironment } from '@/features/entry/entryEnvironment';
 import { WorkflowError } from '@/features/researcher-workflow/domain/models';
 import type { PreparationRequest } from './PreparationHandoffProvider';
@@ -18,6 +20,7 @@ interface ProcedureDetailScreenProps {
   onPrepare: (request: PreparationRequest, sessionId?: string) => void;
   startSession?: (request: PreparationRequest) => Promise<string>;
   repository?: ProcedureRepository;
+  edgeToken?: string;
 }
 
 const invalidSelectionMessage =
@@ -46,55 +49,59 @@ export function ProcedureDetailScreen({
   onBack,
   onPrepare,
   startSession,
-  repository = procedureRepository,
+  repository,
+  edgeToken,
 }: ProcedureDetailScreenProps) {
+  const source = useMemo(
+    () =>
+      repository ??
+      (isEdgeDataEnabled() ? createEdgeProcedureRepository(edgeToken) : procedureRepository),
+    [edgeToken, repository],
+  );
   const [attempt, setAttempt] = useState(0);
   const requestKey = JSON.stringify([procedureId, approvedVersion, environment.id, attempt]);
   const generation = useRef(0);
   const busy = useRef(false);
   const [result, setResult] = useState<{
     key: string;
-    repository: ProcedureRepository;
+    source: ProcedureRepository;
     lookup: ProcedureLookup<ProcedureDetail | null>;
   }>();
   const [start, setStart] = useState<{
     key: string;
-    repository: ProcedureRepository;
+    source: ProcedureRepository;
     pending?: boolean;
     error?: string;
     blocked?: string;
     sessionId?: string;
   }>();
   const lookup: ProcedureLookup<ProcedureDetail | null> =
-    result?.key === requestKey && result.repository === repository
-      ? result.lookup
-      : { status: 'loading' };
-  const currentStart =
-    start?.key === requestKey && start.repository === repository ? start : undefined;
+    result?.key === requestKey && result.source === source ? result.lookup : { status: 'loading' };
+  const currentStart = start?.key === requestKey && start.source === source ? start : undefined;
 
   useEffect(() => {
     const currentGeneration = ++generation.current;
     busy.current = false;
     const selection = { procedureId, approvedVersion, environmentId: environment.id };
-    void repository.getDetail(selection).then(
+    void source.getDetail(selection).then(
       (detail) => {
         if (currentGeneration !== generation.current) return;
         setResult({
           key: requestKey,
-          repository,
+          source,
           lookup: { status: 'ready', data: matchesSelection(detail, selection) ? detail : null },
         });
       },
       () => {
         if (currentGeneration === generation.current) {
-          setResult({ key: requestKey, repository, lookup: { status: 'error' } });
+          setResult({ key: requestKey, source, lookup: { status: 'error' } });
         }
       },
     );
     return () => {
       generation.current = currentGeneration + 1;
     };
-  }, [approvedVersion, environment.id, procedureId, repository, requestKey]);
+  }, [approvedVersion, environment.id, procedureId, source, requestKey]);
 
   async function prepare() {
     if (busy.current || lookup.status !== 'ready' || !lookup.data || currentStart?.blocked) return;
@@ -110,7 +117,7 @@ export function ProcedureDetailScreen({
     }
     busy.current = true;
     const currentGeneration = generation.current;
-    const startState = { key: requestKey, repository };
+    const startState = { key: requestKey, source };
     setStart({ ...startState, pending: true });
     try {
       if (startSession) {
@@ -122,7 +129,7 @@ export function ProcedureDetailScreen({
         return;
       }
 
-      const detail = await repository.getDetail(selection);
+      const detail = await source.getDetail(selection);
       if (currentGeneration !== generation.current) return;
       if (!matchesSelection(detail, selection)) {
         setStart({

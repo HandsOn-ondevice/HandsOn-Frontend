@@ -86,7 +86,8 @@ async function enterProcedure(page: Page, token: string, procedureTitle: string)
   await page.getByRole('radio', { name: '지급 키트 실습실', exact: true }).click();
   await button(page, '설정하고 계속').click();
   await page.getByRole('tab', { name: '실험', exact: true }).click();
-  await page.getByRole('button', { name: new RegExp(procedureTitle) }).click();
+  await expect(page).toHaveURL('/procedures?environmentId=kit-lab');
+  await page.getByRole('button', { name: `${procedureTitle}, 승인,` }).click();
   await button(page, '선택한 절차 확인').click();
   await expect(page).toHaveURL(/\/procedures\/kit-distance\?/);
 }

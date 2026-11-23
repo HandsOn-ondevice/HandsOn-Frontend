@@ -107,9 +107,11 @@ async function interceptEdge(page: Page, mode: 'retry' | 'reject') {
       case 'GET /api/v1/home/student':
         return route.fulfill({
           json: {
-            environmentId: environment.id,
+            dataOrigin: 'simulation',
+            researcherName: '연구생',
+            deviceStatus: 'unknown',
             approvedProcedures: [],
-            activeSession: null,
+            ongoingSession: null,
             recentResults: [],
           },
         });
@@ -194,9 +196,13 @@ async function interceptEdge(page: Page, mode: 'retry' | 'reject') {
 async function openList(page: Page) {
   await page.goto('/');
   await page.getByRole('radio', { name: '신규 연구생, 승인된 절차 실행' }).click();
+  await page.getByLabel('Edge 접속 토큰', { exact: true }).fill('playwright-operator-token');
+  await page.getByRole('button', { name: '작업 환경 불러오기', exact: true }).click();
   await page.getByRole('button', { name: /^연구실: / }).click();
   await page.getByRole('radio', { name: environment.name, exact: true }).click();
-  await expect(page.getByText(`프로필 ID · ${profileId}`, { exact: true })).toBeVisible();
+  await expect(
+    page.getByText(`작업 프로필 · ${profileId} · ${workProfile.profileVersion}`, { exact: true }),
+  ).toBeVisible();
   await page.getByRole('button', { name: '설정하고 계속' }).click();
   await page.getByRole('tab', { name: '실험', exact: true }).click();
   await expect(page).toHaveURL(`/procedures?environmentId=${environment.id}`);

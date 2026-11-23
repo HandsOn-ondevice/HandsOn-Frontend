@@ -19,29 +19,23 @@ test.skip(!liveEdge, '실제 Edge 시뮬레이션 서버를 대상으로 실행�
 test.use({ trace: 'off' });
 
 async function openRecording(page: Page) {
-  const readProfiles = () =>
-    page.waitForResponse(
-      (response) =>
-        new URL(response.url()).pathname === '/api/v1/work-profiles' &&
-        response.request().method() === 'GET',
-    );
-  const initialProfiles = readProfiles();
   await page.goto('/');
-  let profiles = await initialProfiles;
-  if (profiles.status() === 401 || profiles.status() === 403) {
-    const retry = readProfiles();
-    await page.getByLabel('Edge 접속 토큰', { exact: true }).fill(edgeToken);
-    await page.getByRole('button', { name: '다시 시도', exact: true }).click();
-    profiles = await retry;
-  }
-  expect(profiles.ok()).toBe(true);
-  const workProfiles = (await profiles.json()) as { environmentId: string; name: string }[];
-  const selectedProfile = workProfiles.find((profile) => profile.environmentId === environmentId);
-  if (!selectedProfile) throw new Error(`작업 환경 ${environmentId}가 응답에 없습니다.`);
-
   await page.getByRole('radio', { name: '숙련 연구생, 절차 생성·승인' }).click();
+  await page.getByLabel('Edge 접속 토큰', { exact: true }).fill(edgeToken);
+  const readEnvironments = page.waitForResponse(
+    (response) =>
+      response.url() === `${edgeBaseUrl}/api/v1/environments` &&
+      response.request().method() === 'GET',
+  );
+  await page.getByRole('button', { name: '작업 환경 불러오기', exact: true }).click();
+  const response = await readEnvironments;
+  expect(response.ok()).toBe(true);
+  const environments = (await response.json()) as { id: string; name: string }[];
+  const selected = environments.find(({ id }) => id === environmentId);
+  if (!selected) throw new Error(`작업 환경 ${environmentId}가 응답에 없습니다.`);
+
   await page.getByRole('button', { name: /^연구실: / }).click();
-  const environment = page.getByRole('radio', { name: selectedProfile.name, exact: true });
+  const environment = page.getByRole('radio', { name: selected.name, exact: true });
   await environment.click();
   await expect(environment).toBeHidden();
   await page.getByRole('button', { name: '설정하고 계속' }).click();
