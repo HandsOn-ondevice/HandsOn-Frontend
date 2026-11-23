@@ -104,7 +104,10 @@ export class EdgeWorkflowRepository implements WorkflowRepository {
       command.type !== 'setPreparationCheck' &&
       command.type !== 'completePreparation' &&
       command.type !== 'startDeviceCheck' &&
-      command.type !== 'startExecution'
+      command.type !== 'startExecution' &&
+      command.type !== 'requestVoiceClarification' &&
+      command.type !== 'resolveVoiceClarification' &&
+      command.type !== 'dismissVoiceClarification'
     ) {
       throw new WorkflowError('INVALID_STATE', '이 단계의 Edge 명령은 아직 연결되지 않았어요.');
     }

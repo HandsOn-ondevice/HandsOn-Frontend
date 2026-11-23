@@ -16,15 +16,21 @@ import { useEntrySelection } from '@/features/entry/EntrySelectionProvider';
 import type { WorkflowRepository } from '../application/WorkflowRepository';
 import { selectEdgeRecovery } from '../domain/edge-recovery';
 import { needsEdgeRemeasurement } from '../domain/edge-remeasurement';
+import { voiceChoiceLabels } from '../domain/voice-clarification';
 import { withEdgeMeasurement } from '../infrastructure/edge/edge-measurement';
-import { createEdgeSessionRequest } from '../infrastructure/edge/edge-session-request';
+import {
+  createEdgeSessionRequest,
+  type EdgeSessionRequest,
+} from '../infrastructure/edge/edge-session-request';
 import { WorkflowProvider, useWorkflowRepository } from '../state/WorkflowProvider';
 import { useWorkflowSession } from '../state/useWorkflowSession';
+import { EdgeVoiceInput } from './EdgeVoiceInput';
 
 type Props = {
   sessionId: string;
   onBack: () => void;
   onRecovery: () => void;
+  onClarification: () => void;
   onHome: () => void;
 };
 
@@ -49,20 +55,15 @@ export function EdgeExecutionScreen(props: Props) {
     selection && 'edgeToken' in selection && typeof selection.edgeToken === 'string'
       ? selection.edgeToken
       : undefined;
-  const repository = useMemo(
+  const request = useMemo(
     () =>
-      withEdgeMeasurement(
-        base,
-        createEdgeSessionRequest(
-          process.env.EXPO_PUBLIC_HANDSON_EDGE_BASE_URL?.trim() ?? '',
-          token,
-        ),
-      ),
-    [base, token],
+      createEdgeSessionRequest(process.env.EXPO_PUBLIC_HANDSON_EDGE_BASE_URL?.trim() ?? '', token),
+    [token],
   );
+  const repository = useMemo(() => withEdgeMeasurement(base, request), [base, request]);
   return (
     <WorkflowProvider repository={repository}>
-      <EdgeMeasurementContent {...props} base={base} />
+      <EdgeMeasurementContent {...props} base={base} request={request} />
     </WorkflowProvider>
   );
 }
@@ -71,9 +72,11 @@ function EdgeMeasurementContent({
   sessionId,
   onBack,
   onRecovery,
+  onClarification,
   onHome,
   base,
-}: Props & { base: WorkflowRepository }) {
+  request,
+}: Props & { base: WorkflowRepository; request: EdgeSessionRequest }) {
   const { session, loading, error, refresh, execute, pending, canRetryCommand, retryCommand } =
     useWorkflowSession(sessionId);
   const repository = useWorkflowRepository();
@@ -167,12 +170,14 @@ function EdgeMeasurementContent({
   const condition = conditions?.find((item) => item.id === cursor?.conditionId);
   const first = cursor?.trialIndex === 1 && cursor.conditionId === conditions?.[0]?.id;
   const recovery = selectEdgeRecovery(session);
+  const pendingVoice = session?.execution?.pendingVoice;
+  const lastVoiceResolution = session?.execution?.voiceResolutions?.at(-1);
 
   return (
     <SafeAreaView style={styles.root} edges={['top']} testID="execution-screen">
       <StatusBar tone="light" />
       <AppBar title="핵심 실행 화면" mode="back" onBack={onBack} />
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {session ? <AppText variant="title">{session.procedure.title}</AppText> : null}
         {loading ? (
           <AppText accessibilityLiveRegion="polite">실험 상태를 불러오고 있습니다.</AppText>
@@ -293,6 +298,36 @@ function EdgeMeasurementContent({
               }}
             />
           </>
+        ) : null}
+        {lastVoiceResolution ? (
+          <AppText variant="caption">
+            음성 확인 결과 · {voiceChoiceLabels[lastVoiceResolution.choice]}
+          </AppText>
+        ) : null}
+        {cursor && session ? (
+          pendingVoice ? (
+            <Button
+              label="처리할 음성 명령 확인"
+              variant="secondary"
+              disabled={pending || canRetryCommand}
+              onPress={onClarification}
+            />
+          ) : (
+            <EdgeVoiceInput
+              request={request}
+              sessionId={sessionId}
+              revision={session.revision}
+              cursorId={cursor.cursorId}
+              canInterpret={canSample}
+              canSample={canSample && attempt?.purpose !== 'remeasurement'}
+              completableAttemptId={canComplete ? attempt?.attemptId : undefined}
+              execute={async (command) => {
+                const next = await execute(command);
+                if (next?.execution?.pendingVoice) onClarification();
+                return Boolean(next);
+              }}
+            />
+          )
         ) : null}
       </ScrollView>
     </SafeAreaView>

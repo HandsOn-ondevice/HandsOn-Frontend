@@ -11,6 +11,7 @@ const edgeScreens = new Set([
   '[sessionId]/preparation',
   '[sessionId]/device-check',
   '[sessionId]/execution',
+  '[sessionId]/voice-clarification',
   '[sessionId]/recovery',
   '[sessionId]/remeasurement',
 ]);

@@ -16,6 +16,11 @@ export default function ExecutionRoute() {
       pathname: '/researcher-workflow/[sessionId]/recovery',
       params: { sessionId },
     });
+  const onClarification = () =>
+    router.push({
+      pathname: '/researcher-workflow/[sessionId]/voice-clarification',
+      params: { sessionId },
+    });
   if (isEdgeWorkflowEnabled()) {
     return (
       <EdgeExecutionScreen
@@ -23,6 +28,7 @@ export default function ExecutionRoute() {
         sessionId={sessionId}
         onBack={onBack}
         onRecovery={onRecovery}
+        onClarification={onClarification}
         onHome={() => router.dismissTo('/student')}
       />
     );
@@ -53,12 +59,7 @@ export default function ExecutionRoute() {
             params: { sessionId },
           })
         }
-        onClarification={() =>
-          router.push({
-            pathname: '/researcher-workflow/[sessionId]/voice-clarification',
-            params: { sessionId },
-          })
-        }
+        onClarification={onClarification}
       />
     </CompletionRouteGate>
   );
