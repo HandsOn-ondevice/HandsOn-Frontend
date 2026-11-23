@@ -18,6 +18,25 @@ function isIssue(value: unknown) {
   return isRecord(value) && isText(value.code) && isText(value.message);
 }
 
+function isHold(value: unknown) {
+  return (
+    isRecord(value) &&
+    isText(value.holdId) &&
+    isText(value.heldAt) &&
+    isText(value.reasonCode) &&
+    isText(value.bootId) &&
+    (value.cursorId === null || isText(value.cursorId)) &&
+    isList(value.allowedCommands, isText) &&
+    (value.nextSampleCommand === null ||
+      value.nextSampleCommand === 'requestExecutionSample' ||
+      value.nextSampleCommand === 'requestRecoveryRemeasurement') &&
+    typeof value.requiresConfirmation === 'boolean' &&
+    Number.isInteger(value.confirmationValidityMs) &&
+    Number(value.confirmationValidityMs) > 0 &&
+    (value.resolvedAt === null || isText(value.resolvedAt))
+  );
+}
+
 function isCheckAttempt(value: unknown): value is DeviceCheckAttempt {
   if (
     !isRecord(value) ||
@@ -137,6 +156,11 @@ export function parseEdgeSession(value: unknown, sessionId?: string): Experiment
     !isText(value.phase) ||
     !phases.has(value.phase) ||
     (value.holdReason != null && !isIssue(value.holdReason)) ||
+    (value.resumePolicyVersion != null &&
+      value.resumePolicyVersion !== '1.0' &&
+      value.resumePolicyVersion !== '2.0') ||
+    (value.hold != null && !isHold(value.hold)) ||
+    (value.phase === 'held' && value.resumePolicyVersion === '2.0' && value.hold == null) ||
     !Number.isInteger(value.revision) ||
     Number(value.revision) < 0 ||
     (value.pendingJob !== null &&

@@ -11,6 +11,7 @@ import {
   colors,
   spacing,
 } from '@/design-system';
+import { currentEdgeHold } from '../domain/edge-hold';
 import { useWorkflowSession } from '../state/useWorkflowSession';
 import { procedureVersionLabel } from './procedure-version-label';
 
@@ -24,7 +25,12 @@ export function EdgePauseScreen({
   onResume: () => void;
 }) {
   const { session, loading, error, refresh } = useWorkflowSession(sessionId);
-  const hold = session?.phase === 'held' ? session.holdReason : undefined;
+  const hold = currentEdgeHold(session);
+  const holdReason = session?.holdReason;
+  const paused =
+    session?.phase === 'held' && (hold?.reasonCode ?? holdReason?.code) === 'USER_PAUSED';
+  const canResume =
+    paused && (hold?.allowedCommands.includes('resume') ?? session.resumePolicyVersion !== '2.0');
   const cursor = session?.execution?.cursor;
   const condition = session?.procedure.execution?.conditions.find(
     (item) => item.id === cursor?.conditionId,
@@ -52,9 +58,12 @@ export function EdgePauseScreen({
             />
             <Button label="상태 다시 불러오기" variant="secondary" onPress={refresh} />
           </>
-        ) : session && hold?.code === 'USER_PAUSED' ? (
+        ) : paused ? (
           <>
-            <FeedbackPanel title={hold.message} subtitle={session.procedure.title} />
+            <FeedbackPanel
+              title={holdReason?.message ?? '작업자가 실험을 일시정지했어요.'}
+              subtitle={session.procedure.title}
+            />
             <SurfaceCard>
               <AppText variant="caption">세션 {session.sessionId}</AppText>
               <AppText variant="caption">
@@ -81,7 +90,7 @@ export function EdgePauseScreen({
         safeArea
         primary="바로 재개"
         secondary="홈으로"
-        disabled={loading || !!error || hold?.code !== 'USER_PAUSED' || !cursor}
+        disabled={loading || !!error || !canResume || !cursor}
         onPrimary={onResume}
         onSecondary={onHome}
       />

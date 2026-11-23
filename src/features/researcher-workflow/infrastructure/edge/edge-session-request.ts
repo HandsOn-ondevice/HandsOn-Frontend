@@ -92,6 +92,21 @@ function toWorkflowError(reason: unknown) {
   const error = (body as { error?: { code?: unknown; message?: unknown } } | null)?.error;
   if (status === 401 || status === 403)
     return new WorkflowError('EDGE_REJECTED', 'Edge 접근 권한을 확인해 주세요.');
+  switch (error?.code) {
+    case 'RESUME_CONFIRMATION_REQUIRED':
+      return new WorkflowError(error.code, '실험 조건과 장치 설치 상태를 다시 확인해 주세요.');
+    case 'RESUME_CONFIRMATION_EXPIRED':
+      return new WorkflowError(
+        error.code,
+        '확인 유효시간이 지났어요. 두 항목을 다시 확인해 주세요.',
+      );
+    case 'RESUME_CONFIRMATION_MISMATCH':
+    case 'HOLD_ACTION_NOT_ALLOWED':
+      return new WorkflowError(
+        error.code,
+        '보류 상태가 바뀌었어요. 현재 상태를 다시 확인해 주세요.',
+      );
+  }
   const message =
     typeof error?.message === 'string'
       ? error.message

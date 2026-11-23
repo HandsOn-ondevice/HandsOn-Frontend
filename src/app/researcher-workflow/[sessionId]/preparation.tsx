@@ -1,5 +1,6 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { AppBar, Button, FeedbackPanel, Screen, StatusBar } from '@/design-system';
+import { currentEdgeHold } from '@/features/researcher-workflow/domain/edge-hold';
 import type { ExperimentSession } from '@/features/researcher-workflow/domain/models';
 import { PreparationScreen } from '@/features/researcher-workflow/screens/PreparationScreen';
 import { isEdgeWorkflowEnabled } from '@/features/researcher-workflow/state/workflow-repository';
@@ -11,7 +12,7 @@ function getContinuationPath(session: ExperimentSession) {
     case 'paused':
       return '/researcher-workflow/[sessionId]/paused';
     case 'held':
-      return session.holdReason?.code === 'USER_PAUSED'
+      return (currentEdgeHold(session)?.reasonCode ?? session.holdReason?.code) === 'USER_PAUSED'
         ? '/researcher-workflow/[sessionId]/paused'
         : '/researcher-workflow/[sessionId]/recovery';
     case 'awaitingDeviceCheck':
