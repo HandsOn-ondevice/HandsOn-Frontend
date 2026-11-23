@@ -1,8 +1,18 @@
 import { router, useLocalSearchParams } from 'expo-router';
+import { EdgeRecoveryScreen } from '@/features/researcher-workflow/screens/EdgeRecoveryScreen';
 import { RecoveryScreen } from '@/features/researcher-workflow/screens/RecoveryScreen';
+import { isEdgeWorkflowEnabled } from '@/features/researcher-workflow/state/workflow-repository';
 
 export default function RecoveryRoute() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
+  const onBack = () =>
+    router.dismissTo({
+      pathname: '/researcher-workflow/[sessionId]/execution',
+      params: { sessionId },
+    });
+  if (isEdgeWorkflowEnabled()) {
+    return <EdgeRecoveryScreen key={sessionId} sessionId={sessionId} onBack={onBack} />;
+  }
   return (
     <RecoveryScreen
       key={sessionId}
@@ -13,12 +23,7 @@ export default function RecoveryRoute() {
           params: { sessionId },
         })
       }
-      onBack={() =>
-        router.dismissTo({
-          pathname: '/researcher-workflow/[sessionId]/execution',
-          params: { sessionId },
-        })
-      }
+      onBack={onBack}
     />
   );
 }

@@ -14,6 +14,7 @@ import {
 } from '@/design-system';
 import { useEntrySelection } from '@/features/entry/EntrySelectionProvider';
 import type { WorkflowRepository } from '../application/WorkflowRepository';
+import { selectEdgeRecovery } from '../domain/edge-recovery';
 import { withEdgeMeasurement } from '../infrastructure/edge/edge-measurement';
 import { createEdgeSessionRequest } from '../infrastructure/edge/edge-session-request';
 import { WorkflowProvider, useWorkflowRepository } from '../state/WorkflowProvider';
@@ -22,6 +23,7 @@ import { useWorkflowSession } from '../state/useWorkflowSession';
 type Props = {
   sessionId: string;
   onBack: () => void;
+  onRecovery: () => void;
 };
 
 const POLL_INTERVAL_MS = 600;
@@ -63,7 +65,12 @@ export function EdgeExecutionScreen(props: Props) {
   );
 }
 
-function EdgeMeasurementContent({ sessionId, onBack, base }: Props & { base: WorkflowRepository }) {
+function EdgeMeasurementContent({
+  sessionId,
+  onBack,
+  onRecovery,
+  base,
+}: Props & { base: WorkflowRepository }) {
   const { session, loading, error, refresh, execute, pending, canRetryCommand, retryCommand } =
     useWorkflowSession(sessionId);
   const repository = useWorkflowRepository();
@@ -72,7 +79,7 @@ function EdgeMeasurementContent({ sessionId, onBack, base }: Props & { base: Wor
     attemptId: string;
     reason: 'error' | 'timeout';
   }>();
-  const sampling = session?.pendingJob?.kind === 'sample';
+  const sampling = session?.phase === 'running' && session.pendingJob?.kind === 'sample';
   const samplingAttemptId = sampling ? session?.pendingJob?.attemptId : undefined;
   const pollStopReason =
     stoppedPoll?.attemptId === samplingAttemptId ? stoppedPoll?.reason : undefined;
@@ -155,6 +162,7 @@ function EdgeMeasurementContent({ sessionId, onBack, base }: Props & { base: Wor
   const conditions = session?.procedure.execution?.conditions;
   const condition = conditions?.find((item) => item.id === cursor?.conditionId);
   const first = cursor?.trialIndex === 1 && cursor.conditionId === conditions?.[0]?.id;
+  const recovery = selectEdgeRecovery(session);
 
   return (
     <SafeAreaView style={styles.root} edges={['top']} testID="execution-screen">
@@ -217,10 +225,18 @@ function EdgeMeasurementContent({ sessionId, onBack, base }: Props & { base: Wor
             title="반복 측정 완료"
             subtitle="서버가 마지막 회차의 완료를 확인했습니다."
           />
-        ) : session ? (
+        ) : session && !recovery ? (
           <FeedbackPanel
             title="진행 중인 회차가 없습니다"
             subtitle="장치 점검 화면에서 실험 상태를 확인해 주세요."
+          />
+        ) : null}
+        {recovery ? (
+          <Button
+            label={recovery.recovered ? '센서 재확인 결과 보기' : '센서 오류와 작업 보류 확인'}
+            variant="secondary"
+            disabled={pending || canRetryCommand}
+            onPress={onRecovery}
           />
         ) : null}
         {attempt ? <AppText variant="caption">측정 시도 ID {attempt.attemptId}</AppText> : null}

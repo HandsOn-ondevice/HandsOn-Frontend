@@ -12,7 +12,11 @@ export function withEdgeMeasurement(
     getSession: (id) => base.getSession(id),
     subscribe: (id, listener, onReadError) => base.subscribe(id, listener, onReadError),
     async executeCommand(id, command, context) {
-      if (command.type !== 'requestExecutionSample' && command.type !== 'completeExecutionStep') {
+      if (
+        command.type !== 'requestExecutionSample' &&
+        command.type !== 'completeExecutionStep' &&
+        command.type !== 'requestRecovery'
+      ) {
         return base.executeCommand(id, command, context);
       }
       const payload = { ...context, command };
