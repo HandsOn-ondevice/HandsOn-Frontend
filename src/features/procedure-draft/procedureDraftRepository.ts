@@ -282,7 +282,11 @@ let activeEdgeRepository:
 export function getProcedureDraftRepository(token?: string) {
   const baseUrl = getEdgeBaseUrl();
   if (!baseUrl) return procedureDraftRepository;
-  if (activeEdgeRepository?.baseUrl !== baseUrl || activeEdgeRepository.token !== token) {
+  if (
+    !activeEdgeRepository ||
+    activeEdgeRepository.baseUrl !== baseUrl ||
+    activeEdgeRepository.token !== token
+  ) {
     activeEdgeRepository = {
       baseUrl,
       token,
