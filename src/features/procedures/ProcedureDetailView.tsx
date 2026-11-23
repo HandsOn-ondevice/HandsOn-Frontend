@@ -91,31 +91,34 @@ export function ProcedureDetailView({
         />
       ) : (
         <>
-          <View style={styles.stats}>
-            <SurfaceCard style={styles.stat}>
-              <AppText variant="caption" color={colors.text.secondary}>
-                승인자
-              </AppText>
-              <AppText variant="title" color={colors.text.secondary}>
-                {procedure.approvedBy}
-              </AppText>
-            </SurfaceCard>
-            {procedure.estimatedMinutes !== null ? (
-              <SurfaceCard style={styles.stat}>
-                <AppText variant="caption" color={colors.text.secondary}>
-                  예상 소요
-                </AppText>
-                <AppText variant="title" color={colors.text.secondary}>
-                  {procedure.estimatedMinutes}
-                </AppText>
-                <AppText variant="caption" color={colors.text.secondary}>
-                  {`분 · 약 ${procedure.estimatedMinutes}분`}
-                </AppText>
-              </SurfaceCard>
-            ) : null}
-          </View>
+          {procedure.approvedBy || typeof procedure.estimatedMinutes === 'number' ? (
+            <View style={styles.stats}>
+              {procedure.approvedBy ? (
+                <SurfaceCard style={styles.stat}>
+                  <AppText variant="caption" color={colors.text.secondary}>
+                    승인자
+                  </AppText>
+                  <AppText variant="title" color={colors.text.secondary}>
+                    {procedure.approvedBy}
+                  </AppText>
+                </SurfaceCard>
+              ) : null}
+              {typeof procedure.estimatedMinutes === 'number' ? (
+                <SurfaceCard style={styles.stat}>
+                  <AppText variant="caption" color={colors.text.secondary}>
+                    예상 소요
+                  </AppText>
+                  <AppText variant="title" color={colors.text.secondary}>
+                    {`약 ${procedure.estimatedMinutes}분`}
+                  </AppText>
+                </SurfaceCard>
+              ) : null}
+            </View>
+          ) : null}
 
-          <AppText color={colors.text.secondary}>{procedure.description}</AppText>
+          {procedure.description ? (
+            <AppText color={colors.text.secondary}>{procedure.description}</AppText>
+          ) : null}
 
           {procedure.conditions.length > 0 ? (
             <SurfaceCard style={styles.conditionsCard}>
@@ -133,62 +136,86 @@ export function ProcedureDetailView({
             </SurfaceCard>
           ) : null}
 
-          <SectionHeader title="필요 장비" />
-          <View style={styles.equipment}>
-            {procedure.equipment.map((item, index) => (
-              <AppText
-                key={`${item}-${index}`}
-                variant="caption"
-                color={colors.text.secondary}
-                style={styles.equipmentItem}
-              >
-                {item}
-              </AppText>
-            ))}
-          </View>
-
-          <SectionHeader title="핵심 기준" />
-          <View style={styles.stack}>
-            {procedure.criteria.map((criterion, index) => (
-              <View key={`${criterion.title}-${index}`} style={styles.criterion}>
-                <View style={styles.criterionIcon}>
-                  <Icon
-                    name={index === 0 ? 'device' : 'check'}
-                    color={colors.status.success}
-                    size={18}
-                  />
-                </View>
-                <View style={styles.criterionCopy}>
-                  <AppText variant="label">{criterion.title}</AppText>
-                  <AppText variant="caption" color={colors.text.secondary}>
-                    {criterion.description}
+          {procedure.equipment.length > 0 ? (
+            <>
+              <SectionHeader title="필요 장비" />
+              <View style={styles.equipment}>
+                {procedure.equipment.map((item, index) => (
+                  <AppText
+                    key={`${item}-${index}`}
+                    variant="caption"
+                    color={colors.text.secondary}
+                    style={styles.equipmentItem}
+                  >
+                    {item}
                   </AppText>
-                </View>
+                ))}
               </View>
-            ))}
-          </View>
+            </>
+          ) : null}
 
-          <SectionHeader title={`단계 요약 · 총 ${procedure.stepCount}단계`} />
-          <SurfaceCard style={styles.stack}>
-            {procedure.steps.map((step, index) => (
-              <View key={`${step}-${index}`} style={styles.step}>
-                <AppText variant="caption" color={colors.text.action}>
-                  {index + 1}
-                </AppText>
-                <AppText style={styles.flexText}>{step}</AppText>
+          {procedure.criteria.length > 0 ? (
+            <>
+              <SectionHeader title="핵심 기준" />
+              <View style={styles.stack}>
+                {procedure.criteria.map((criterion, index) => (
+                  <View key={`${criterion.title}-${index}`} style={styles.criterion}>
+                    <View style={styles.criterionIcon}>
+                      <Icon
+                        name={index === 0 ? 'device' : 'check'}
+                        color={colors.status.success}
+                        size={18}
+                      />
+                    </View>
+                    <View style={styles.criterionCopy}>
+                      <AppText variant="label">{criterion.title}</AppText>
+                      <AppText variant="caption" color={colors.text.secondary}>
+                        {criterion.description}
+                      </AppText>
+                    </View>
+                  </View>
+                ))}
               </View>
-            ))}
-          </SurfaceCard>
+            </>
+          ) : null}
 
-          <SectionHeader title="주의사항" />
-          <SurfaceCard tone="subtle" style={styles.stack}>
-            {procedure.precautions.map((precaution, index) => (
-              <View key={`${precaution}-${index}`} style={styles.step}>
-                <Icon name="alert" size={15} color={colors.status.warning} />
-                <AppText style={styles.flexText}>{precaution}</AppText>
-              </View>
-            ))}
-          </SurfaceCard>
+          {procedure.steps.length > 0 || procedure.stepCount !== undefined ? (
+            <>
+              <SectionHeader
+                title={
+                  procedure.stepCount === undefined
+                    ? '단계 요약'
+                    : `단계 요약 · 총 ${procedure.stepCount}단계`
+                }
+              />
+              {procedure.steps.length > 0 ? (
+                <SurfaceCard style={styles.stack}>
+                  {procedure.steps.map((step, index) => (
+                    <View key={`${step}-${index}`} style={styles.step}>
+                      <AppText variant="caption" color={colors.text.action}>
+                        {index + 1}
+                      </AppText>
+                      <AppText style={styles.flexText}>{step}</AppText>
+                    </View>
+                  ))}
+                </SurfaceCard>
+              ) : null}
+            </>
+          ) : null}
+
+          {procedure.precautions.length > 0 ? (
+            <>
+              <SectionHeader title="주의사항" />
+              <SurfaceCard tone="subtle" style={styles.stack}>
+                {procedure.precautions.map((precaution, index) => (
+                  <View key={`${precaution}-${index}`} style={styles.step}>
+                    <Icon name="alert" size={15} color={colors.status.warning} />
+                    <AppText style={styles.flexText}>{precaution}</AppText>
+                  </View>
+                ))}
+              </SurfaceCard>
+            </>
+          ) : null}
         </>
       )}
     </ProcedureFrame>

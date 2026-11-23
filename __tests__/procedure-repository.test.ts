@@ -1,6 +1,8 @@
 import { expect, jest, test } from '@jest/globals';
 
+import { EdgeApiError, type getEdge } from '../src/lib/edgeApi';
 import type { DemoProcedureEntry } from '../src/features/procedures/demoProcedures';
+import { createEdgeProcedureRepository } from '../src/features/procedures/edgeProcedureRepository';
 import type { ProcedureDetail } from '../src/features/procedures/procedureModels';
 import {
   createDemoProcedureRepository,
@@ -44,6 +46,79 @@ const catalog: readonly DemoProcedureEntry[] = [
 ];
 
 const developmentGlobals = globalThis as typeof globalThis & { __DEV__: boolean };
+
+const edgeSelection = {
+  procedureId: 'kit-distance',
+  approvedVersion: '1.0.0',
+  environmentId: 'kit-lab',
+};
+
+const edgeProcedure = {
+  procedureId: edgeSelection.procedureId,
+  version: edgeSelection.approvedVersion,
+  environmentId: edgeSelection.environmentId,
+  approval: 'approved',
+  title: '키트 거리 확인 절차',
+  approvedBy: 'seed-expert',
+  estimatedMinutes: 5,
+  conditions: [{ label: '거리 배치 확인', repetitions: 3 }],
+};
+
+test('Edge 응답의 절차 ID·버전·승인자·예상 소요 시간과 조건을 표시 값으로 사용한다', async () => {
+  const get = jest
+    .fn<typeof getEdge<unknown>>()
+    .mockResolvedValueOnce([
+      edgeProcedure,
+      {
+        ...edgeProcedure,
+        procedureId: 'other-lab-procedure',
+        environmentId: 'other-lab',
+      },
+    ])
+    .mockResolvedValueOnce(edgeProcedure);
+  const repository = createEdgeProcedureRepository('operator-token', get);
+  const displayFields = {
+    id: edgeSelection.procedureId,
+    approvedVersion: edgeSelection.approvedVersion,
+    title: edgeProcedure.title,
+    approvedBy: edgeProcedure.approvedBy,
+    estimatedMinutes: edgeProcedure.estimatedMinutes,
+  };
+
+  const list = await repository.list(edgeSelection.environmentId);
+  expect(list).toHaveLength(1);
+  expect(list[0]).toMatchObject(displayFields);
+  await expect(repository.getDetail(edgeSelection)).resolves.toMatchObject({
+    ...displayFields,
+    conditions: edgeProcedure.conditions,
+  });
+  expect(get.mock.calls).toEqual([
+    ['/procedures', { environmentId: 'kit-lab' }, 'operator-token'],
+    ['/procedures/kit-distance', { version: '1.0.0' }, 'operator-token'],
+  ]);
+});
+
+test.each([
+  { approval: 'revoked' },
+  { procedureId: 'another-procedure' },
+  { version: '2.0.0' },
+  { environmentId: 'another-lab' },
+])('선택한 승인 절차와 다른 Edge 상세 응답 %j을 준비 대상으로 표시하지 않는다', async (change) => {
+  const get = jest.fn<typeof getEdge<unknown>>().mockResolvedValue({ ...edgeProcedure, ...change });
+  const repository = createEdgeProcedureRepository(undefined, get);
+  await expect(repository.getDetail(edgeSelection)).resolves.toBeNull();
+});
+
+test('Edge 상세의 버전 미발견과 서버 오류를 구분한다', async () => {
+  const get = jest
+    .fn<typeof getEdge<unknown>>()
+    .mockRejectedValueOnce(new EdgeApiError({ kind: 'server', status: 404 }))
+    .mockRejectedValueOnce(new EdgeApiError({ kind: 'server', status: 503 }));
+  const repository = createEdgeProcedureRepository(undefined, get);
+
+  await expect(repository.getDetail(edgeSelection)).resolves.toBeNull();
+  await expect(repository.getDetail(edgeSelection)).rejects.toMatchObject({ status: 503 });
+});
 
 test('선택한 환경에 승인된 절차만 목록에 반환한다', async () => {
   const repository = createDemoProcedureRepository(catalog);

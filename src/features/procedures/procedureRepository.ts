@@ -8,7 +8,6 @@ export interface ProcedureSelection {
   environmentId: string;
 }
 
-/** Frontend boundary; this does not specify a server request/response contract. */
 export interface ProcedureRepository {
   list: (environmentId: string) => Promise<readonly ProcedureSummary[]>;
   getDetail: (selection: ProcedureSelection) => Promise<ProcedureDetail | null>;
