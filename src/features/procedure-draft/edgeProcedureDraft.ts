@@ -246,7 +246,6 @@ export function createEdgeDraftRepository(
         throw new Error('작업 환경의 초안을 다시 불러와 주세요.');
       }
       const { execution, revision } = draft.edge;
-      if (!execution) throw new Error('실행 기준을 먼저 입력해 주세요.');
 
       const payload = {
         expectedRevision: revision,
@@ -257,7 +256,9 @@ export function createEdgeDraftRepository(
           needsReview,
         })),
         pendingItems: draft.pendingItems.map(({ label }) => label),
-        execution: executionFields(execution),
+        materials: [...draft.materials],
+        precautions: [...draft.precautions],
+        ...(execution && { execution: executionFields(execution) }),
       };
       return writeDraft({ baseUrl, token }, 'PATCH', draftPath(draft.id), payload, (value) => {
         const saved = parseDraft(value);
