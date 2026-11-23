@@ -1,16 +1,28 @@
-import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  AppBar,
-  AppText,
-  Button,
-  FeedbackPanel,
-  Screen,
-  StatusBadge,
-  StatusBar,
-  SurfaceCard,
-} from '@/design-system';
+  Redirect,
+  useFocusEffect,
+  useLocalSearchParams,
+  usePreventRemove,
+  useRouter,
+} from 'expo-router';
+import { AppBar, Button, FeedbackPanel, Screen, StatusBar } from '@/design-system';
 import { useEntrySelection } from '@/features/entry/EntrySelectionProvider';
-import { useProcedureDraft } from '@/features/procedure-draft/useProcedureDraft';
+import type { ProcedureDetail } from '@/features/procedures/procedureModels';
+import { ProcedureReleasePreview } from '@/features/procedure-release/ProcedureReleasePreview';
+import {
+  ProcedureReleaseResult,
+  ProcedureReleaseView,
+} from '@/features/procedure-release/ProcedureReleaseView';
+import {
+  ProcedureReleaseRejected,
+  procedureReleaseRepository,
+} from '@/features/procedure-release/procedureReleaseRepository';
+
+type Review = NonNullable<Awaited<ReturnType<typeof procedureReleaseRepository.load>>>;
+
+type ReviewState =
+  { status: 'loading' | 'error' | 'missing' } | { status: 'ready'; review: Review };
 
 export default function DraftApprovalRoute() {
   const { draftId, stepId } = useLocalSearchParams<{ draftId: string; stepId?: string }>();
@@ -19,23 +31,26 @@ export default function DraftApprovalRoute() {
   if (selection?.role !== 'expert') return <Redirect href="/" />;
   if (typeof draftId !== 'string' || !draftId) return <Redirect href="/expert" />;
 
+  const editRoute = { pathname: '/expert/drafts/[draftId]' as const, params: { draftId } };
+  const reviewedStepId = typeof stepId === 'string' ? stepId : undefined;
+
   return (
     <DraftApprovalContext
-      key={JSON.stringify([selection.environment.id, draftId, stepId])}
+      key={JSON.stringify([selection.environment.id, draftId, reviewedStepId])}
       draftId={draftId}
-      stepId={stepId}
+      stepId={reviewedStepId}
       environmentId={selection.environment.id}
       onBack={() => {
         if (router.canGoBack()) router.back();
-        else if (stepId) {
+        else if (reviewedStepId) {
           router.replace({
             pathname: '/expert/drafts/[draftId]/review',
-            params: { draftId, stepId },
+            params: { draftId, stepId: reviewedStepId },
           });
-        } else {
-          router.replace({ pathname: '/expert/drafts/[draftId]', params: { draftId } });
-        }
+        } else router.replace(editRoute);
       }}
+      onEdit={() => router.dismissTo(editRoute)}
+      onHome={() => router.dismissTo('/expert')}
     />
   );
 }
@@ -45,54 +60,173 @@ function DraftApprovalContext({
   stepId,
   environmentId,
   onBack,
+  onEdit,
+  onHome,
 }: {
   draftId: string;
   stepId?: string;
   environmentId: string;
   onBack: () => void;
+  onEdit: () => void;
+  onHome: () => void;
 }) {
-  const { state, retryLoad } = useProcedureDraft(environmentId, draftId);
-  const draft = state.status === 'ready' && state.draft.savedAt ? state.draft : null;
-  const step = draft?.steps.find(({ id }) => id === stepId);
+  const [state, setState] = useState<ReviewState>({ status: 'loading' });
+  const [equipmentConfirmed, setEquipmentConfirmed] = useState(false);
+  const [reviewConfirmed, setReviewConfirmed] = useState(false);
+  const [preview, setPreview] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [published, setPublished] = useState<ProcedureDetail | null>(null);
+  const [leaving, setLeaving] = useState(false);
+  const mounted = useRef(false);
+  const inFlight = useRef(false);
+  const focused = useRef(false);
+  const loadRequest = useRef(0);
+  const lastReview = useRef<string | null>(null);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  const loadReview = useCallback(async () => {
+    if (!focused.current) return;
+    const request = ++loadRequest.current;
+    setState({ status: 'loading' });
+    try {
+      const review = await procedureReleaseRepository.load(environmentId, draftId);
+      if (loadRequest.current !== request) return;
+      const snapshot = review ? JSON.stringify(review) : null;
+      if (lastReview.current !== snapshot) {
+        lastReview.current = snapshot;
+        setEquipmentConfirmed(false);
+        setReviewConfirmed(false);
+      }
+      setState(review ? { status: 'ready', review } : { status: 'missing' });
+      if (review?.published) setPublished(review.published);
+    } catch {
+      if (loadRequest.current === request) setState({ status: 'error' });
+    }
+  }, [draftId, environmentId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      focused.current = true;
+      void loadReview();
+      return () => {
+        focused.current = false;
+        loadRequest.current += 1;
+      };
+    }, [loadReview]),
+  );
+
+  const allowRemoval = usePreventRemove(
+    !leaving && (preview || submitting || published !== null),
+    () => {
+      if (inFlight.current) return;
+      if (preview) setPreview(false);
+      else if (published) goHome();
+    },
+  );
+
+  function goHome() {
+    setLeaving(true);
+    allowRemoval();
+    onHome();
+  }
+
+  async function approve() {
+    if (
+      inFlight.current ||
+      state.status !== 'ready' ||
+      state.review.blockers.length > 0 ||
+      !equipmentConfirmed ||
+      !reviewConfirmed
+    ) {
+      return;
+    }
+
+    inFlight.current = true;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const procedure = await procedureReleaseRepository.publish({
+        environmentId,
+        draft: state.review.draft,
+        equipmentConfirmed,
+        reviewConfirmed,
+      });
+      if (mounted.current) setPublished(procedure);
+    } catch (failure) {
+      if (!mounted.current) return;
+      if (failure instanceof ProcedureReleaseRejected) {
+        setError(failure.message);
+        setEquipmentConfirmed(false);
+        setReviewConfirmed(false);
+        void loadReview();
+      } else {
+        setError('승인·배포 요청에 실패했어요. 다시 시도해 주세요.');
+      }
+    } finally {
+      inFlight.current = false;
+      if (mounted.current) setSubmitting(false);
+    }
+  }
+
+  if (published) return <ProcedureReleaseResult procedure={published} onHome={goHome} />;
+
+  if (state.status === 'ready') {
+    const { draft, blockers, proposedVersion, approverName } = state.review;
+    if (preview) {
+      return (
+        <ProcedureReleasePreview
+          draft={draft}
+          proposedVersion={proposedVersion}
+          onBack={() => setPreview(false)}
+        />
+      );
+    }
+
+    const reviewedStep = stepId ? draft.steps.find(({ id }) => id === stepId) : undefined;
+    return (
+      <ProcedureReleaseView
+        draft={draft}
+        blockers={blockers}
+        proposedVersion={proposedVersion}
+        approverName={approverName}
+        reviewConfirmed={reviewConfirmed}
+        equipmentConfirmed={equipmentConfirmed}
+        submitting={submitting}
+        error={error}
+        reviewedStep={reviewedStep?.criteria ? reviewedStep : undefined}
+        onEquipmentChange={setEquipmentConfirmed}
+        onReviewChange={setReviewConfirmed}
+        onApprove={() => void approve()}
+        onBack={onBack}
+        onEdit={onEdit}
+        onPreview={() => setPreview(true)}
+      />
+    );
+  }
 
   return (
     <Screen scroll>
       <StatusBar />
-      <AppBar title="승인 검토" mode="back" onBack={onBack} />
-      {draft && step?.criteria ? (
-        <>
-          <AppText variant="heading" accessibilityRole="header">
-            {draft.title}
-          </AppText>
-          <FeedbackPanel
-            title="기준을 저장했습니다"
-            subtitle="최종 승인과 배포 기능은 준비 중이에요."
-            tone="success"
-            icon="check"
-          />
-          <SurfaceCard
-            title={step.title}
-            subtitle={step.criteria.equipmentVerified ? '실장비 확인 기록됨' : '실장비 확인 필요'}
-          >
-            <StatusBadge label="승인 전 초안" tone="warning" />
-          </SurfaceCard>
-          {draft.pendingItems.length ? (
-            <SurfaceCard title="필수 미확정 항목" tone="subtle">
-              {draft.pendingItems.map(({ id, label }) => (
-                <AppText key={id}>{label}</AppText>
-              ))}
-            </SurfaceCard>
-          ) : null}
-        </>
-      ) : state.status === 'loading' ? (
+      <AppBar title="최종 승인과 버전 배포" mode="back" onBack={onBack} />
+      {state.status === 'loading' ? (
         <FeedbackPanel title="저장된 초안을 불러오는 중이에요." />
       ) : state.status === 'error' ? (
         <>
-          <FeedbackPanel title="초안을 불러오지 못했어요." tone="warning" icon="alert" />
-          <Button label="다시 시도" variant="secondary" onPress={retryLoad} />
+          <FeedbackPanel title="승인 정보를 불러오지 못했어요." tone="warning" icon="alert" />
+          <Button label="다시 시도" variant="secondary" onPress={() => void loadReview()} />
         </>
       ) : (
-        <FeedbackPanel title="저장된 기준을 찾을 수 없어요." tone="warning" icon="alert" />
+        <>
+          <FeedbackPanel title="저장된 초안을 찾을 수 없어요." tone="warning" icon="alert" />
+          <Button label="편집으로 돌아가기" variant="secondary" onPress={onEdit} />
+        </>
       )}
     </Screen>
   );

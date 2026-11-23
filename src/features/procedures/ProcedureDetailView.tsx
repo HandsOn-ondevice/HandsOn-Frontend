@@ -91,7 +91,7 @@ export function ProcedureDetailView({
         />
       ) : (
         <>
-          {procedure.approvedBy || procedure.estimatedMinutes !== undefined ? (
+          {procedure.approvedBy || typeof procedure.estimatedMinutes === 'number' ? (
             <View style={styles.stats}>
               {procedure.approvedBy ? (
                 <SurfaceCard style={styles.stat}>
@@ -103,7 +103,7 @@ export function ProcedureDetailView({
                   </AppText>
                 </SurfaceCard>
               ) : null}
-              {procedure.estimatedMinutes !== undefined ? (
+              {typeof procedure.estimatedMinutes === 'number' ? (
                 <SurfaceCard style={styles.stat}>
                   <AppText variant="caption" color={colors.text.secondary}>
                     예상 소요

@@ -37,7 +37,7 @@ function selectionKey(procedure: ProcedureSummary) {
 function procedureMeta({ approvedVersion, stepCount, estimatedMinutes }: ProcedureSummary) {
   const parts = [approvedVersion];
   if (stepCount !== undefined) parts.push(`${stepCount}단계`);
-  if (estimatedMinutes !== undefined) parts.push(`약 ${estimatedMinutes}분`);
+  if (typeof estimatedMinutes === 'number') parts.push(`약 ${estimatedMinutes}분`);
   return parts.join(' · ');
 }
 

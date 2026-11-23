@@ -8,7 +8,7 @@ export interface DemoProcedureEntry {
 
 const environmentIds = ['demo-embedded-iot'];
 
-const led: ProcedureDetail = {
+export const demoLedProcedure = {
   id: 'demo-led-characteristics',
   code: 'LED-M03',
   title: 'LED 출력 단계별\n조도·소비전력 특성 측정',
@@ -38,7 +38,7 @@ const led: ProcedureDetail = {
     '배선이나 LED 모듈을 변경하기 전 전원을 차단하세요.',
     '과전류가 감지되거나 센서값이 갱신되지 않으면 측정을 보류하세요.',
   ],
-};
+} satisfies ProcedureDetail;
 
 const sensor: ProcedureDetail = {
   id: 'demo-i2c-address-check',
@@ -66,12 +66,17 @@ const sensor: ProcedureDetail = {
 
 /** Synthetic examples for development and Maestro; these are not server approvals. */
 export const demoProcedureCatalog: readonly DemoProcedureEntry[] = [
-  { status: 'approved', environmentIds, detail: led },
+  { status: 'approved', environmentIds, detail: demoLedProcedure },
   { status: 'approved', environmentIds, detail: sensor },
   {
     status: 'draft',
     environmentIds,
-    detail: { ...led, id: 'demo-led-draft', title: 'LED 측정 초안', approvedVersion: 'draft' },
+    detail: {
+      ...demoLedProcedure,
+      id: 'demo-led-draft',
+      title: 'LED 측정 초안',
+      approvedVersion: 'draft',
+    },
   },
   {
     status: 'revoked',
