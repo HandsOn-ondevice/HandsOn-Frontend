@@ -53,51 +53,70 @@ export function createEdgeApi({ baseUrl, token }: { baseUrl?: string; token?: st
   const bearerToken = token?.trim();
   if (bearerToken) headers.Authorization = `Bearer ${bearerToken}`;
 
-  return {
-    async get(path: `/${string}`, signal?: AbortSignal): Promise<unknown> {
-      const controller = new AbortController();
-      const abort = () => controller.abort();
-      const timer = setTimeout(abort, REQUEST_TIMEOUT_MS);
-      if (signal?.aborted) abort();
-      signal?.addEventListener('abort', abort);
+  async function request(
+    path: `/${string}`,
+    init: Pick<RequestInit, 'method' | 'headers' | 'body'>,
+    signal?: AbortSignal,
+  ): Promise<unknown> {
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    const timer = setTimeout(abort, REQUEST_TIMEOUT_MS);
+    if (signal?.aborted) abort();
+    signal?.addEventListener('abort', abort);
 
+    try {
+      let response: Response;
       try {
-        let response: Response;
-        try {
-          response = await fetch(`${origin}/api/v1${path}`, {
-            method: 'GET',
-            credentials: 'omit',
-            redirect: 'error',
-            headers,
-            signal: controller.signal,
-          });
-        } catch {
-          throw new EdgeApiError({ kind: 'network' });
-        }
-
-        let body: unknown;
-        try {
-          body = await response.json();
-        } catch {
-          if (response.ok) {
-            throw new EdgeApiError({
-              kind: controller.signal.aborted ? 'network' : 'invalid-response',
-            });
-          }
-        }
-
-        if (!response.ok) {
-          throw new EdgeApiError({
-            kind: 'server',
-            status: response.status,
-            code: readErrorCode(body),
-          });
-        }
-        return body;
-      } finally {
-        clearTimeout(timer);
-        signal?.removeEventListener('abort', abort);
+        response = await fetch(`${origin}/api/v1${path}`, {
+          ...init,
+          credentials: 'omit',
+          redirect: 'error',
+          headers: { ...headers, ...init.headers },
+          signal: controller.signal,
+        });
+      } catch {
+        throw new EdgeApiError({ kind: 'network' });
       }
+
+      let body: unknown;
+      try {
+        body = await response.json();
+      } catch {
+        if (response.ok) {
+          throw new EdgeApiError({
+            kind: controller.signal.aborted ? 'network' : 'invalid-response',
+          });
+        }
+      }
+
+      if (!response.ok) {
+        throw new EdgeApiError({
+          kind: 'server',
+          status: response.status,
+          code: readErrorCode(body),
+        });
+      }
+      return body;
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', abort);
+    }
+  }
+
+  return {
+    get(path: `/${string}`, signal?: AbortSignal) {
+      return request(path, { method: 'GET' }, signal);
+    },
+    post<T extends { requestId: string }>(path: `/${string}`, payload: T, signal?: AbortSignal) {
+      return request(
+        path,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Idempotency-Key': payload.requestId },
+          body: JSON.stringify(payload),
+        },
+        signal,
+      );
     },
   };
 }

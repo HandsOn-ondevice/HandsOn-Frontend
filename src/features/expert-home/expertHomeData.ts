@@ -3,6 +3,7 @@ import {
   listDemoProcedureReleases,
   procedureDraftRepository,
 } from '@/features/procedure-draft/procedureDraftRepository';
+import { loadEdgeReviewStatus } from '@/features/expert-review/edgeResultRepository';
 import { getDemoHomeReviews, type ReviewStatus } from '@/features/expert-review/reviewData';
 import { getUnresolvedDraftItems } from '@/features/procedure-release/procedureReleaseRules';
 import { demoLedProcedure } from '@/features/procedures/demoProcedures';
@@ -137,7 +138,23 @@ export const loadExpertHome: LoadExpertHome = async (environmentId, edgeToken) =
     ) {
       throw new EdgeApiError({ kind: 'invalid-response' });
     }
-    return data;
+    // Edge v0.1.0 reports both decisions as reviewed on the home response.
+    const results = await Promise.all(
+      data.results.map(async (item): Promise<ExpertResult> =>
+        item.status === 'reviewed'
+          ? {
+              ...item,
+              status: await loadEdgeReviewStatus(
+                edgeToken,
+                environmentId,
+                item.id,
+                item.procedureId,
+              ),
+            }
+          : item,
+      ),
+    );
+    return { ...data, results };
   }
   if (__DEV__ || process.env.EXPO_PUBLIC_HANDSON_MAESTRO === '1') {
     const demo = createDemoHome(environmentId);

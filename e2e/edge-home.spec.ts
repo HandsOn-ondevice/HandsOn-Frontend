@@ -322,7 +322,8 @@ test('S00 → E01에서 Edge 응답의 초안·승인 절차·제출 결과를 �
     await expect(page).toHaveURL(
       `/expert/results/${encodeURIComponent(result.id)}?procedureId=${encodeURIComponent(result.procedureId)}`,
     );
-    await page.getByRole('button', { name: '숙련자 홈으로', exact: true }).click();
+    await expect(page.getByText('연구생 결과 검토', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: '뒤로가기', exact: true }).click();
   }
   await approvedButton.click();
   for (const procedure of approved) {
