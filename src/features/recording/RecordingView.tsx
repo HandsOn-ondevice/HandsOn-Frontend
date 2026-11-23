@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -35,6 +36,8 @@ export interface RecordingViewProps {
   onSettings: () => void;
   onHelp: () => void;
   onPreviewTranscription?: () => void;
+  onOpenRecentRecording?: () => void;
+  webFilePicker?: ReactNode;
 }
 
 const prompts = ['준비물', '작업 순서', '주의사항', '완료 기준'];
@@ -128,6 +131,8 @@ export function RecordingView({
   onSettings,
   onHelp,
   onPreviewTranscription,
+  onOpenRecentRecording,
+  webFilePicker,
 }: RecordingViewProps) {
   const busy = status === 'requesting' || status === 'saving';
   const hasRecording = status === 'recording' || status === 'paused';
@@ -149,17 +154,21 @@ export function RecordingView({
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.status} testID="recording-status">
-            <StatusBadge
-              label={status === 'recording' ? 'REC · 녹음 중' : statusLabels[status]}
-              tone={hasRecording ? 'danger' : showFailure ? 'warning' : 'info'}
-            />
-          </View>
+          {webFilePicker ? null : (
+            <View style={styles.status} testID="recording-status">
+              <StatusBadge
+                label={status === 'recording' ? 'REC · 녹음 중' : statusLabels[status]}
+                tone={hasRecording ? 'danger' : showFailure ? 'warning' : 'info'}
+              />
+            </View>
+          )}
           <AppText variant="heading" accessibilityRole="header">
-            {'실제 작업 순서를\n자연스럽게 설명하세요'}
+            {webFilePicker ? '준비된 오디오로 전사하기' : '실제 작업 순서를\n자연스럽게 설명하세요'}
           </AppText>
           <AppText color={colors.text.secondary}>
-            준비물, 순서, 주의사항, 완료 기준을 함께 말해주세요.
+            {webFilePicker
+              ? '절차 이름을 입력하고 준비된 M4A 파일을 선택해 주세요.'
+              : '준비물, 순서, 주의사항, 완료 기준을 함께 말해주세요.'}
           </AppText>
           <TextField
             label="절차 이름"
@@ -169,70 +178,87 @@ export function RecordingView({
             disabled={busy || hasRecording || status === 'saved'}
             maxLength={120}
             returnKeyType="done"
-            support={titleMissing ? '절차 이름을 입력한 뒤 녹음을 시작해 주세요.' : undefined}
+            support={
+              titleMissing && !webFilePicker
+                ? '절차 이름을 입력한 뒤 녹음을 시작해 주세요.'
+                : undefined
+            }
           />
           <SurfaceCard tone="subtle" title="작업 환경" subtitle={environmentName} />
-          <SurfaceCard style={styles.waveformCard}>
-            <View
-              style={styles.waveform}
-              accessible={false}
-              importantForAccessibility="no-hide-descendants"
-            >
-              {bars.map((sample, index) => (
+          {onOpenRecentRecording ? (
+            <Button
+              label="최근 녹음 다시 열기"
+              variant="secondary"
+              onPress={onOpenRecentRecording}
+            />
+          ) : null}
+          {webFilePicker ? null : (
+            <>
+              <SurfaceCard style={styles.waveformCard}>
                 <View
-                  key={index}
-                  style={[
-                    styles.waveformBar,
-                    {
-                      height:
-                        6 +
-                        (Number.isFinite(sample)
-                          ? Math.max(0, Math.min(1, (sample + 60) / 60))
-                          : 0) *
-                          50,
-                      opacity: samples.length ? 1 : 0.35,
-                    },
-                  ]}
-                />
-              ))}
-            </View>
-            <AppText
-              variant="measurement"
-              color={colors.text.action}
-              testID="recording-duration"
-              accessibilityLabel={`녹음 시간 ${time}`}
-            >
-              {time}
-            </AppText>
-          </SurfaceCard>
+                  style={styles.waveform}
+                  accessible={false}
+                  importantForAccessibility="no-hide-descendants"
+                >
+                  {bars.map((sample, index) => (
+                    <View
+                      key={index}
+                      style={[
+                        styles.waveformBar,
+                        {
+                          height:
+                            6 +
+                            (Number.isFinite(sample)
+                              ? Math.max(0, Math.min(1, (sample + 60) / 60))
+                              : 0) *
+                              50,
+                          opacity: samples.length ? 1 : 0.35,
+                        },
+                      ]}
+                    />
+                  ))}
+                </View>
+                <AppText
+                  variant="measurement"
+                  color={colors.text.action}
+                  testID="recording-duration"
+                  accessibilityLabel={`녹음 시간 ${time}`}
+                >
+                  {time}
+                </AppText>
+              </SurfaceCard>
 
-          {status === 'permissionDenied' ? (
-            <FeedbackPanel
-              title="마이크 권한이 필요해요"
-              subtitle={
-                message ??
-                (requiresSettings
-                  ? '설정에서 마이크 권한을 허용한 뒤 돌아와 녹음을 시작해 주세요.'
-                  : '마이크 사용을 허용하면 절차 설명을 녹음할 수 있어요.')
-              }
-              tone="warning"
-              icon="mic"
-            />
-          ) : showFailure ? (
-            <FeedbackPanel
-              title={status === 'interrupted' ? '녹음이 중단되었어요' : '녹음을 마치지 못했어요'}
-              subtitle={message ?? '새로 녹음해 주세요.'}
-              tone="warning"
-              icon="alert"
-            />
-          ) : (
-            <VoicePanel {...recordingCopy(status)} />
+              {status === 'permissionDenied' ? (
+                <FeedbackPanel
+                  title="마이크 권한이 필요해요"
+                  subtitle={
+                    message ??
+                    (requiresSettings
+                      ? '설정에서 마이크 권한을 허용한 뒤 돌아와 녹음을 시작해 주세요.'
+                      : '마이크 사용을 허용하면 절차 설명을 녹음할 수 있어요.')
+                  }
+                  tone="warning"
+                  icon="mic"
+                />
+              ) : showFailure ? (
+                <FeedbackPanel
+                  title={
+                    status === 'interrupted' ? '녹음이 중단되었어요' : '녹음을 마치지 못했어요'
+                  }
+                  subtitle={message ?? '새로 녹음해 주세요.'}
+                  tone="warning"
+                  icon="alert"
+                />
+              ) : (
+                <VoicePanel {...recordingCopy(status)} />
+              )}
+              <View style={styles.prompts} accessibilityLabel="설명에 포함할 내용">
+                {prompts.map((prompt) => (
+                  <StatusBadge key={prompt} label={prompt} />
+                ))}
+              </View>
+            </>
           )}
-          <View style={styles.prompts} accessibilityLabel="설명에 포함할 내용">
-            {prompts.map((prompt) => (
-              <StatusBadge key={prompt} label={prompt} />
-            ))}
-          </View>
           {onPreviewTranscription ? (
             <Button
               label="STT 확인 화면 미리보기"
@@ -244,36 +270,37 @@ export function RecordingView({
       </SafeAreaView>
 
       <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.actions}>
-        {controlsVisible ? (
-          <>
+        {webFilePicker ??
+          (controlsVisible ? (
+            <>
+              <Button
+                label={status === 'paused' ? '녹음 재개' : '일시정지'}
+                testID={status === 'paused' ? 'recording-resume' : 'recording-pause'}
+                variant="secondary"
+                onPress={status === 'paused' ? onResume : onPause}
+                disabled={busy}
+                style={styles.secondaryAction}
+              />
+              <Button
+                label="녹음 종료"
+                testID="recording-finish"
+                onPress={onFinish}
+                disabled={busy || titleMissing || durationMs <= 0}
+                loading={status === 'saving'}
+                style={styles.primaryAction}
+              />
+            </>
+          ) : (
             <Button
-              label={status === 'paused' ? '녹음 재개' : '일시정지'}
-              testID={status === 'paused' ? 'recording-resume' : 'recording-pause'}
-              variant="secondary"
-              onPress={status === 'paused' ? onResume : onPause}
-              disabled={busy}
-              style={styles.secondaryAction}
+              label={requiresSettings ? '설정 열기' : '녹음 시작'}
+              testID={requiresSettings ? 'recording-settings' : 'recording-start'}
+              onPress={requiresSettings ? onSettings : onStart}
+              icon={requiresSettings ? undefined : 'mic'}
+              disabled={busy || (!requiresSettings && titleMissing) || status === 'saved'}
+              loading={status === 'requesting'}
+              style={styles.singleAction}
             />
-            <Button
-              label="녹음 종료"
-              testID="recording-finish"
-              onPress={onFinish}
-              disabled={busy || titleMissing || durationMs <= 0}
-              loading={status === 'saving'}
-              style={styles.primaryAction}
-            />
-          </>
-        ) : (
-          <Button
-            label={requiresSettings ? '설정 열기' : '녹음 시작'}
-            testID={requiresSettings ? 'recording-settings' : 'recording-start'}
-            onPress={requiresSettings ? onSettings : onStart}
-            icon={requiresSettings ? undefined : 'mic'}
-            disabled={busy || (!requiresSettings && titleMissing) || status === 'saved'}
-            loading={status === 'requesting'}
-            style={styles.singleAction}
-          />
-        )}
+          ))}
       </SafeAreaView>
     </View>
   );
