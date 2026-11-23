@@ -16,6 +16,7 @@ import { selectExecution } from '../domain/execution';
 import type { ExperimentSession } from '../domain/models';
 import { useWorkflowSession } from '../state/useWorkflowSession';
 import { ExecutionInfoSheet } from './ExecutionInfoSheet';
+import { useEdgeExecutionHeartbeat } from './useEdgeExecutionHeartbeat';
 
 function isPaused(session: ExperimentSession | undefined | null) {
   return session?.source === 'api'
@@ -34,8 +35,18 @@ export function SessionMenuScreen({
   onDeviceStatus: () => void;
   onPause: () => void;
 }) {
-  const { session, loading, pending, error, execute, canRetryCommand, retryCommand, refresh } =
-    useWorkflowSession(sessionId);
+  const {
+    session,
+    loading,
+    pending,
+    error,
+    execute,
+    canRetryCommand,
+    retryCommand,
+    refresh,
+    heartbeat,
+  } = useWorkflowSession(sessionId);
+  useEdgeExecutionHeartbeat(session?.source === 'api' && session.phase === 'running', heartbeat);
   const mock = session?.source === 'mock';
   const cursor = session?.execution?.cursor;
   const condition = session?.procedure.execution?.conditions.find(
@@ -87,14 +98,12 @@ export function SessionMenuScreen({
                 void pause();
               }}
             />
-            {mock ? (
-              <Button
-                label="장치 상태 확인"
-                icon="device"
-                variant="secondary"
-                onPress={onDeviceStatus}
-              />
-            ) : null}
+            <Button
+              label="장치 상태 확인"
+              icon="device"
+              variant="secondary"
+              onPress={onDeviceStatus}
+            />
             {cursor ? (
               <AppText variant="caption" color={colors.text.secondary}>
                 {condition?.label ?? cursor.conditionId} 조건 · {cursor.trialIndex}회차 · 절차{' '}

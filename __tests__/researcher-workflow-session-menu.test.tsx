@@ -17,6 +17,7 @@ import { SessionMenuScreen } from '../src/features/researcher-workflow/screens/S
 import { SessionDeviceStatusScreen } from '../src/features/researcher-workflow/screens/SessionDeviceStatusScreen';
 
 jest.mock('expo-router', () => ({
+  useFocusEffect: jest.fn(),
   useLocalSearchParams: jest.fn(),
   Redirect: jest.fn(() => null),
   router: { replace: jest.fn(), dismissTo: jest.fn() },
@@ -73,6 +74,7 @@ describe('S06 세션 메뉴와 장치 상태 조회', () => {
     measured = await f.measure();
     const commands = jest.spyOn(f.repo, 'executeCommand');
     const onMenu = jest.fn();
+    const onBack = jest.fn();
     const onExecution = jest.fn();
     const onDeviceStatus = jest.fn();
     const execution = (
@@ -105,13 +107,20 @@ describe('S06 세션 메뉴와 장치 상태 조회', () => {
     expect(onDeviceStatus).toHaveBeenCalledTimes(1);
     await screen.rerender(
       <WorkflowProvider repository={f.repo}>
-        <SessionDeviceStatusScreen sessionId={f.sessionId} onExecution={onExecution} />
+        <SessionDeviceStatusScreen
+          sessionId={f.sessionId}
+          onBack={onBack}
+          onExecution={onExecution}
+        />
       </WorkflowProvider>,
     );
     await screen.findByText('18.4 lx');
     expect(screen.getByText('5.01 V · 83 mA · 416 mW')).toBeTruthy();
     expect(screen.getByText('24.3 °C · 46 %')).toBeTruthy();
     expect(screen.getByText(/시뮬레이션 · 실제 장치 연결/)).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: '뒤로가기' }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+    expect(onExecution).not.toHaveBeenCalled();
     await fireEvent.press(screen.getByRole('button', { name: '현재 작업으로 돌아가기' }));
     expect(onExecution).toHaveBeenCalledTimes(1);
     await screen.rerender(execution);
@@ -127,7 +136,11 @@ describe('S06 세션 메뉴와 장치 상태 조회', () => {
     const commands = jest.spyOn(f.repo, 'executeCommand');
     const screen = await render(
       <WorkflowProvider repository={f.repo}>
-        <SessionDeviceStatusScreen sessionId={f.sessionId} onExecution={() => {}} />
+        <SessionDeviceStatusScreen
+          sessionId={f.sessionId}
+          onBack={() => {}}
+          onExecution={() => {}}
+        />
       </WorkflowProvider>,
     );
     await screen.findByText('Orange Pi 5+ 실행 응답 없음');
@@ -150,7 +163,11 @@ describe('S06 세션 메뉴와 장치 상태 조회', () => {
     const commands = jest.spyOn(f.repo, 'executeCommand');
     const screen = await render(
       <WorkflowProvider repository={f.repo}>
-        <SessionDeviceStatusScreen sessionId={f.sessionId} onExecution={() => {}} />
+        <SessionDeviceStatusScreen
+          sessionId={f.sessionId}
+          onBack={() => {}}
+          onExecution={() => {}}
+        />
       </WorkflowProvider>,
     );
     await screen.findByText(/통신 오류/);

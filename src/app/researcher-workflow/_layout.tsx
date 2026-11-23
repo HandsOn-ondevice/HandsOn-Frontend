@@ -15,6 +15,7 @@ const edgeScreens = new Set([
   '[sessionId]/recovery',
   '[sessionId]/remeasurement',
   '[sessionId]/session-menu',
+  '[sessionId]/device-status',
   '[sessionId]/paused',
   '[sessionId]/resume',
   '[sessionId]/review',
