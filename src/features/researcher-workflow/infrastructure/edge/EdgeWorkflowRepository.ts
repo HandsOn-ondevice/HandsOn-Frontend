@@ -33,21 +33,6 @@ type ExecutionTransition = Extract<
   WorkflowCommand,
   { type: 'pauseExecution' | 'resumePausedExecution' }
 >;
-type EdgeCommand =
-  | Extract<
-      WorkflowCommand,
-      {
-        type:
-          | 'setPreparationCheck'
-          | 'completePreparation'
-          | 'startDeviceCheck'
-          | 'startExecution'
-          | 'requestVoiceClarification'
-          | 'resolveVoiceClarification'
-          | 'dismissVoiceClarification';
-      }
-    >
-  | { type: 'pause' | 'resume' };
 
 export class EdgeWorkflowRepository implements WorkflowRepository {
   private readonly reads = new Map<string, Promise<ExperimentSession>>();
@@ -94,9 +79,21 @@ export class EdgeWorkflowRepository implements WorkflowRepository {
     requestId: string,
     operatorId = 'operator-01',
   ) {
-    const payload = { requestId, ...selection, workProfileId: 'kit-distance-v1', operatorId };
+    const payload = {
+      requestId,
+      ...selection,
+      workProfileId: 'kit-distance-v1',
+      operatorId,
+      workflowVersion: '2.0',
+    };
     const { session } = await writeEdgeSession(this.request, '/sessions', payload, (value) => {
       const session = parseEdgeSession(value);
+      if (session.workflowVersion !== '2.0') {
+        throw new WorkflowError(
+          'WORKFLOW_VERSION_REQUIRED',
+          '정리와 결과 제출을 지원하는 Edge 서버에 연결해 주세요.',
+        );
+      }
       if (
         session.procedure.procedureId !== selection.procedureId ||
         session.procedure.version !== selection.procedureVersion ||
@@ -119,6 +116,13 @@ export class EdgeWorkflowRepository implements WorkflowRepository {
     return read;
   }
 
+  async heartbeat(sessionId: string, signal?: AbortSignal) {
+    await this.request(`/sessions/${encodeURIComponent(sessionId)}/heartbeat`, {
+      heartbeat: true,
+      signal,
+    });
+  }
+
   async executeCommand(sessionId: string, command: WorkflowCommand, context: CommandContext) {
     switch (command.type) {
       case 'pauseExecution':
@@ -133,6 +137,11 @@ export class EdgeWorkflowRepository implements WorkflowRepository {
       case 'completePreparation':
       case 'startDeviceCheck':
       case 'startExecution':
+      case 'requestExecutionSample':
+      case 'completeExecutionStep':
+      case 'requestCleanup':
+      case 'setCleanupCheck':
+      case 'submitResult':
       case 'requestVoiceClarification':
       case 'resolveVoiceClarification':
       case 'dismissVoiceClarification':
@@ -166,21 +175,37 @@ export class EdgeWorkflowRepository implements WorkflowRepository {
     }
   }
 
-  private async writeCommand(sessionId: string, command: EdgeCommand, context: CommandContext) {
+  private async writeCommand(
+    sessionId: string,
+    command: WorkflowCommand | { type: 'pause' | 'resume' },
+    context: CommandContext,
+  ) {
     const payload = { ...context, command };
-    const { session, replayed } = await writeEdgeSession(
-      this.request,
-      `/sessions/${encodeURIComponent(sessionId)}/commands`,
-      payload,
-      (value) => parseEdgeSession(value, sessionId),
-    );
-    if (replayed) {
-      // A poll might have begun before the write. Re-read after it settles.
-      await this.reads.get(sessionId)?.catch(() => null);
-      const latest = await this.getSession(sessionId).catch(() => null);
-      if (latest) return latest;
+    try {
+      const { session, replayed } = await writeEdgeSession(
+        this.request,
+        `/sessions/${encodeURIComponent(sessionId)}/commands`,
+        payload,
+        (value) => parseEdgeSession(value, sessionId),
+        { sessionId, retryUnknown: command.type !== 'submitResult' },
+      );
+      const latest = replayed ? await this.readAfterReplay(sessionId) : null;
+      return latest && latest.revision >= session.revision ? latest : this.publish(session);
+    } catch (reason) {
+      if (!(reason instanceof WorkflowError)) throw reason;
+      const latest = reason.replayed ? await this.readAfterReplay(sessionId) : null;
+      const attached = reason.session ? this.publish(reason.session) : undefined;
+      throw new WorkflowError(reason.code, reason.message, {
+        session: latest && latest.revision >= (attached?.revision ?? 0) ? latest : attached,
+        resultId: reason.resultId,
+      });
     }
-    return this.publish(session);
+  }
+
+  private async readAfterReplay(sessionId: string) {
+    // A poll might have begun before the write. Re-read after it settles.
+    await this.reads.get(sessionId)?.catch(() => null);
+    return this.getSession(sessionId).catch(() => null);
   }
 
   subscribe(sessionId: string, listener: Listener, onReadError?: (error: unknown) => void) {

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createRequestId } from '../application/request-id';
+import type { WorkflowRepository } from '../application/WorkflowRepository';
 import {
   WorkflowError,
   type CommandContext,
@@ -27,6 +28,11 @@ type CommandAttempt = {
   context: CommandContext;
 };
 
+type PendingSubmission = {
+  repository: WorkflowRepository;
+  attempt: CommandAttempt;
+};
+
 const failure = (reason: unknown) => ({
   error: workflowErrorMessage(reason),
   errorCode: reason instanceof WorkflowError ? reason.code : null,
@@ -45,15 +51,26 @@ export function useWorkflowSession(sessionId: string) {
   const [reload, setReload] = useState(0);
   const [retry, setRetry] = useState<CommandAttempt | null>(null);
   const busy = useRef(false);
+  const canReadAfterHeartbeat = useRef(false);
   const lifetime = useRef<{ active: boolean }>({ active: false });
+  const pendingSubmission = useRef<PendingSubmission | null>(null);
   const session = resource.sessionId === sessionId ? resource.session : null;
   const retryable = retry?.sessionId === sessionId ? retry : null;
+  const heartbeatOwnsRead = session?.phase === 'running' && session.pendingJob?.kind !== 'sample';
+
+  useEffect(() => {
+    canReadAfterHeartbeat.current = heartbeatOwnsRead;
+  }, [heartbeatOwnsRead]);
 
   useEffect(() => {
     const scope = { active: true };
     lifetime.current = scope;
+    const awaitingSubmission = () =>
+      pendingSubmission.current?.repository === repository &&
+      pendingSubmission.current.attempt.sessionId === sessionId;
     const receive = (next: ExperimentSession) => {
-      if (scope.active) {
+      // A background read can observe a committed write whose response never reached this screen.
+      if (scope.active && !awaitingSubmission()) {
         setResource((previous) => {
           if (
             previous.session?.sessionId === next.sessionId &&
@@ -71,13 +88,14 @@ export function useWorkflowSession(sessionId: string) {
       }
     };
     const unsubscribe = repository.subscribe(sessionId, receive, (reason) => {
-      if (scope.active) setResource((previous) => ({ ...previous, ...failure(reason) }));
+      if (scope.active && !awaitingSubmission())
+        setResource((previous) => ({ ...previous, ...failure(reason) }));
     });
     repository
       .getSession(sessionId)
       .then(receive)
       .catch((reason: unknown) => {
-        if (scope.active)
+        if (scope.active && !awaitingSubmission())
           setResource((previous) =>
             previous.sessionId === sessionId && previous.session && !previous.loading
               ? previous
@@ -91,9 +109,13 @@ export function useWorkflowSession(sessionId: string) {
   }, [repository, sessionId, reload]);
 
   const send = useCallback(
-    async ({ sessionId: target, command, context }: CommandAttempt) => {
+    async (attempt: CommandAttempt) => {
+      const { sessionId: target, command, context } = attempt;
       if (!session || target !== sessionId || busy.current) return;
       const scope = lifetime.current;
+      const submission = command.type === 'submitResult' ? { repository, attempt } : null;
+      if (submission) pendingSubmission.current = submission;
+      let keepSubmission = false;
       busy.current = true;
       setPending(true);
       setResource((previous) => ({ ...previous, error: null, errorCode: null }));
@@ -110,15 +132,32 @@ export function useWorkflowSession(sessionId: string) {
         }
       } catch (reason) {
         const error = failure(reason);
-        // A rejected Edge command can still advance the server revision or invalidate its check.
+        const rejected = reason instanceof WorkflowError ? reason : undefined;
+        keepSubmission = Boolean(submission && error.errorCode === 'OUTCOME_UNKNOWN');
+        // Edge may commit a new revision even when the requested operation fails.
         const latest =
-          session.source === 'api' && error.errorCode !== 'OUTCOME_UNKNOWN'
+          rejected?.session ??
+          (session.source === 'api' && error.errorCode !== 'OUTCOME_UNKNOWN'
             ? await repository.getSession(target).catch(() => null)
-            : null;
+            : null);
         if (scope.active) {
-          setRetry(
-            error.errorCode === 'OUTCOME_UNKNOWN' ? { sessionId: target, command, context } : null,
-          );
+          setRetry(error.errorCode === 'OUTCOME_UNKNOWN' ? attempt : null);
+          if (
+            command.type === 'submitResult' &&
+            rejected?.code === 'ALREADY_SUBMITTED' &&
+            rejected.resultId === target &&
+            latest?.submission?.status === 'submitted' &&
+            latest.submission.resultId === rejected.resultId
+          ) {
+            setResource({
+              sessionId: target,
+              session: latest,
+              loading: false,
+              error: null,
+              errorCode: null,
+            });
+            return latest;
+          }
           setResource((previous) => ({
             ...previous,
             session:
@@ -129,6 +168,12 @@ export function useWorkflowSession(sessionId: string) {
           }));
         }
       } finally {
+        if (
+          submission &&
+          pendingSubmission.current === submission &&
+          (!scope.active || !keepSubmission)
+        )
+          pendingSubmission.current = null;
         busy.current = false;
         if (scope.active) setPending(false);
       }
@@ -147,6 +192,20 @@ export function useWorkflowSession(sessionId: string) {
     },
     [retryable, send, session, sessionId],
   );
+  const heartbeat = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!repository.heartbeat || signal?.aborted) return;
+      try {
+        await repository.heartbeat(sessionId, signal);
+      } finally {
+        // A pending measurement has its own poller and deadline.
+        if (!signal?.aborted && canReadAfterHeartbeat.current && !busy.current) {
+          await repository.getSession(sessionId);
+        }
+      }
+    },
+    [repository, sessionId],
+  );
 
   return {
     session,
@@ -155,12 +214,13 @@ export function useWorkflowSession(sessionId: string) {
     error: resource.sessionId === sessionId ? resource.error : null,
     errorCode: resource.sessionId === sessionId ? resource.errorCode : null,
     execute,
+    heartbeat,
     canRetryCommand: retryable !== null,
     retryCommand: () => {
       if (retryable) return send(retryable);
     },
     refresh: () => {
-      if (busy.current) return;
+      if (busy.current || retryable?.command.type === 'submitResult') return;
       setResource({ sessionId, session: null, loading: true, error: null, errorCode: null });
       setReload((value) => value + 1);
     },

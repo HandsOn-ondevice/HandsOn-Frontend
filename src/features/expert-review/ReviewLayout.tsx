@@ -105,6 +105,9 @@ export function ReviewLayout({
             }
           }}
         >
+          {result?.dataOrigin === 'simulation' ? (
+            <AppText variant="caption">Edge 장치 시뮬레이션</AppText>
+          ) : null}
           {children}
         </ScrollView>
         {footer}

@@ -61,6 +61,26 @@ test('진행 중 작업과 목록이 없으면 새 실험 안내와 빈 목록�
   });
 });
 
+test('장치를 사용하는 실험과 별개로 이전 실험의 제출 대기를 이어간다', async () => {
+  const data = await loadStudentHome(environment);
+  const ongoingSessionId = data.ongoingSession!.id;
+  data.pendingSessions = [
+    { sessionId: ongoingSessionId, phase: 'awaitingCleanup' },
+    { sessionId: 'session-awaiting-submit', phase: 'readyToSubmit' },
+  ];
+  const actions = callbacks();
+  const screen = await render(
+    <StudentHomeScreen environment={environment} lookup={{ status: 'ready', data }} {...actions} />,
+  );
+
+  expect(screen.queryByRole('button', { name: '정리 이어서 진행' })).toBeNull();
+  await fireEvent.press(screen.getByRole('button', { name: '제출 이어서 진행' }));
+  expect(actions.onNavigate).toHaveBeenCalledWith({
+    type: 'resume',
+    sessionId: 'session-awaiting-submit',
+  });
+});
+
 test('로딩과 조회 실패를 구분하며 재시도를 요청한다', async () => {
   const actions = callbacks();
   const screen = await render(

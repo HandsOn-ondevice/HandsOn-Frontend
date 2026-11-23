@@ -64,6 +64,7 @@ const session = {
   dataOrigin: 'simulation',
   executionMode: 'simulation',
   schemaVersion: '1.0',
+  workflowVersion: '2.0',
   procedure,
   phase: 'preparing',
   revision: 0,
@@ -75,6 +76,17 @@ const session = {
   deviceChecks: [],
   pendingJob: null,
   holdReason: null,
+  cleanup: {
+    attempts: [],
+    checks: ['powerOff', 'cables', 'storage'].map((id) => ({
+      id,
+      checked: false,
+      confirmedAt: null,
+      evidenceId: null,
+    })),
+    deviceReleasedAt: null,
+  },
+  submission: { status: 'not_submitted', resultId: null, submittedAt: null },
 };
 
 const startLabel = '이 버전으로 준비 시작';
@@ -311,6 +323,7 @@ for (const viewport of [
     expect(api.creates[0].key).toBeTruthy();
     expect(api.creates[0].body).toEqual({
       requestId: api.creates[0].key,
+      workflowVersion: '2.0',
       procedureId: procedure.procedureId,
       procedureVersion: procedure.version,
       workProfileId: profileId,

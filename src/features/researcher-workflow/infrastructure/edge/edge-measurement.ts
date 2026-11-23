@@ -7,9 +7,19 @@ export function withEdgeMeasurement(
   base: WorkflowRepository,
   request: EdgeSessionRequest,
 ): WorkflowRepository {
+  async function latestSession(id: string, minimumRevision: number) {
+    // The first GET may join a request already in flight before the write.
+    let latest = await base.getSession(id).catch(() => null);
+    if (latest && latest.revision < minimumRevision) {
+      latest = await base.getSession(id).catch(() => null);
+    }
+    return latest && latest.revision >= minimumRevision ? latest : null;
+  }
+
   return {
     createSession: (input) => base.createSession(input),
     getSession: (id) => base.getSession(id),
+    heartbeat: base.heartbeat?.bind(base),
     subscribe: (id, listener, onReadError) => base.subscribe(id, listener, onReadError),
     async executeCommand(id, command, context) {
       if (
@@ -26,14 +36,15 @@ export function withEdgeMeasurement(
         `/sessions/${encodeURIComponent(id)}/commands`,
         payload,
         (value) => parseEdgeSession(value, id),
-      );
+        { sessionId: id },
+      ).catch(async (reason: unknown) => {
+        if (!(reason instanceof WorkflowError) || !reason.replayed || !reason.session) throw reason;
+        const latest = await latestSession(id, reason.session.revision);
+        throw new WorkflowError(reason.code, reason.message, { session: latest ?? reason.session });
+      });
       // The base repository fans out GET snapshots to existing subscribers.
-      let latest = await base.getSession(id).catch(() => null);
-      if (latest && latest.revision < session.revision) {
-        // The first GET may have joined a request already in flight before the write.
-        latest = await base.getSession(id).catch(() => null);
-      }
-      if (latest && latest.revision >= session.revision) return latest;
+      const latest = await latestSession(id, session.revision);
+      if (latest) return latest;
       if (replayed) {
         throw new WorkflowError(
           'OUTCOME_UNKNOWN',
