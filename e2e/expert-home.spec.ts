@@ -53,17 +53,17 @@ for (const viewport of [
       .click();
     await expect
       .poll(() => decodeURIComponent(new URL(page.url()).pathname))
-      .toBe(`/expert/procedures/${draftId}`);
-    await expect(page.getByRole('heading', { name: '절차 편집' })).toBeVisible();
-    await returnHome(page);
+      .toBe(`/expert/drafts/${draftId}`);
+    await expect(page.getByRole('heading', { name: 'AI 절차 초안', exact: true })).toBeVisible();
+    await returnHome(page, '뒤로가기');
 
     await page.getByRole('button', { name: /노준혁.*LED-M03/ }).click();
     await expect
       .poll(() => decodeURIComponent(new URL(page.url()).pathname))
       .toBe(`/expert/results/${resultId}`);
     expect(new URL(page.url()).searchParams.get('procedureId')).toBe(procedureId);
-    await expect(page.getByRole('heading', { name: '결과 검토', exact: true })).toBeVisible();
-    await returnHome(page);
+    await expect(page.getByText('연구생 결과 검토', { exact: true })).toBeVisible();
+    await returnHome(page, '뒤로가기');
 
     await page.getByRole('tab', { name: '절차', exact: true }).click();
     await page.getByRole('radio', { name: '승인 절차' }).click();

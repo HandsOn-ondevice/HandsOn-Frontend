@@ -4,16 +4,16 @@
   "main": "expo-router/entry",
   "dependencies": {
     "@gorhom/bottom-sheet": "^5.2.14",
-    "expo": "~58.0.25",
+    "expo": "~58.0.26",
     "expo-asset": "~58.0.20",
     "expo-audio": "~58.0.12",
     "expo-constants": "~58.0.13",
-    "expo-dev-client": "~58.0.20",
-    "expo-file-system": "~58.0.13",
+    "expo-dev-client": "~58.0.21",
+    "expo-file-system": "~58.0.14",
     "expo-font": "~58.0.10",
     "expo-linear-gradient": "~58.0.4",
     "expo-linking": "~58.0.17",
-    "expo-router": "~58.0.31",
+    "expo-router": "~58.0.32",
     "expo-splash-screen": "~58.0.14",
     "expo-status-bar": "~58.0.5",
     "expo-system-ui": "~58.0.7",
@@ -36,7 +36,7 @@
     "eslint": "^9.39.5",
     "eslint-config-expo": "~58.0.4",
     "expo-doctor": "^1.21.5",
-    "jest-expo": "~58.0.14",
+    "jest-expo": "~58.0.15",
     "prettier": "^3.9.10",
     "react-native-svg-transformer": "^1.5.3",
     "typescript": "~6.0.3"
@@ -55,7 +55,8 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "doctor": "expo-doctor",
-    "export:android": "expo export --platform android"
+    "export:android": "expo export --platform android",
+    "verify:pr": "npm run doctor && npm run typecheck && npm run lint && npm run format:check && npm run test:ci && npm run export:android"
   },
   "private": true,
   "engines": {
