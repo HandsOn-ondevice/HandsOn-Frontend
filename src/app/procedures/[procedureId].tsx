@@ -28,15 +28,13 @@ export default function Procedure() {
     return <Redirect href="/procedures" />;
   }
 
-  const edgeToken =
-    'edgeToken' in selection && typeof selection.edgeToken === 'string'
-      ? selection.edgeToken
-      : undefined;
+  const { edgeToken } = selection;
 
   return (
     <ProcedureDetailScreen
       key={JSON.stringify([procedureId, approvedVersion, environmentId])}
       environment={selection.environment}
+      edgeToken={edgeToken}
       procedureId={procedureId}
       approvedVersion={approvedVersion}
       onBack={() => {

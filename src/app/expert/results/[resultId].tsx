@@ -1,6 +1,8 @@
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEntrySelection } from '@/features/entry/EntrySelectionProvider';
 import { ExpertReviewScreen } from '@/features/expert-review/ExpertReviewScreen';
+import { ExpertTaskScreen } from '@/features/expert-home/ExpertTaskScreen';
+import { isEdgeDataEnabled } from '@/lib/edgeApi';
 
 export default function ResultReview() {
   const router = useRouter();
@@ -13,6 +15,7 @@ export default function ResultReview() {
   if (typeof resultId !== 'string' || typeof procedureId !== 'string') {
     return <Redirect href="/expert" />;
   }
+  if (isEdgeDataEnabled()) return <ExpertTaskScreen kind="result" />;
 
   const environmentId = selection.environment.id;
   return (

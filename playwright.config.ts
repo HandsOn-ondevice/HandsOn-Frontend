@@ -4,6 +4,11 @@ const port = process.env.EXPO_E2E_PORT ?? '8081';
 const host = process.env.EXPO_E2E_HOST ?? 'localhost';
 const baseURL = `http://${host}:${port}`;
 const verifyEdge = process.env.EXPO_E2E_EDGE === '1';
+const useEdgeServer =
+  verifyEdge ||
+  process.env.HANDSON_E2E_EDGE_HOME === '1' ||
+  process.env.HANDSON_E2E_EDGE_SESSION === '1' ||
+  process.env.HANDSON_E2E_LIVE_EDGE === '1';
 const artifactsDir = verifyEdge ? 'artifacts/playwright/edge' : 'artifacts/playwright';
 
 export default defineConfig({
@@ -19,12 +24,12 @@ export default defineConfig({
   webServer: {
     command: `npm run web -- --${host === 'localhost' ? 'localhost' : 'lan'} --port ${port}`,
     url: baseURL,
-    reuseExistingServer: !verifyEdge,
+    reuseExistingServer: !useEdgeServer,
     timeout: 120_000,
     env: {
       CI: '1',
       HANDSON_E2E_EDGE_TOKEN: '',
-      ...(!verifyEdge && { EXPO_PUBLIC_HANDSON_EDGE_BASE_URL: '' }),
+      ...(!useEdgeServer && { EXPO_PUBLIC_HANDSON_EDGE_BASE_URL: '' }),
     },
   },
 });

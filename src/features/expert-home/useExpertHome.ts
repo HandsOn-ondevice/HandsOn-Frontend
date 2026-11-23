@@ -1,10 +1,13 @@
 import { useCallback, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
+import { getEdgeErrorMessage } from '@/lib/edgeApi';
 
 import { loadExpertHome, type ExpertHomeData, type LoadExpertHome } from './expertHomeData';
 
 export type ExpertHomeState =
-  { status: 'loading' } | { status: 'error' } | { status: 'ready'; data: ExpertHomeData };
+  | { status: 'loading' }
+  | { status: 'error'; detail?: string }
+  | { status: 'ready'; data: ExpertHomeData };
 
 export function useExpertHome(environmentId: string, loadHome: LoadExpertHome = loadExpertHome) {
   const [lookup, setLookup] = useState({
@@ -28,9 +31,13 @@ export function useExpertHome(environmentId: string, loadHome: LoadExpertHome = 
             setLookup({ environmentId, loadHome, state: { status: 'ready', data } });
           }
         },
-        () => {
+        (error: unknown) => {
           if (focused.current && request.current === currentRequest) {
-            setLookup({ environmentId, loadHome, state: { status: 'error' } });
+            setLookup({
+              environmentId,
+              loadHome,
+              state: { status: 'error', detail: getEdgeErrorMessage(error) },
+            });
           }
         },
       );

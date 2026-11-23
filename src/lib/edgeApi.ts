@@ -67,6 +67,7 @@ export function createEdgeApi({ baseUrl, token }: { baseUrl?: string; token?: st
           response = await fetch(`${origin}/api/v1${path}`, {
             method: 'GET',
             credentials: 'omit',
+            redirect: 'error',
             headers,
             signal: controller.signal,
           });
@@ -99,4 +100,36 @@ export function createEdgeApi({ baseUrl, token }: { baseUrl?: string; token?: st
       }
     },
   };
+}
+
+export const edgeBaseUrl = process.env.EXPO_PUBLIC_HANDSON_EDGE_BASE_URL?.trim();
+
+export function isEdgeDataEnabled() {
+  return Boolean(edgeBaseUrl) && process.env.EXPO_PUBLIC_HANDSON_MAESTRO !== '1';
+}
+
+export async function getEdge<T>(
+  path: `/${string}`,
+  query?: Record<string, string>,
+  token?: string,
+): Promise<T> {
+  const requestPath = query ? (`${path}?${new URLSearchParams(query)}` as const) : path;
+  return (await createEdgeApi({ baseUrl: edgeBaseUrl, token }).get(requestPath)) as T;
+}
+
+export function getEdgeErrorMessage(error: unknown) {
+  if (!(error instanceof EdgeApiError)) return undefined;
+  if (error.status === 401 || error.status === 403) {
+    return '선택한 역할의 Edge 접속 토큰을 확인해 주세요.';
+  }
+  switch (error.kind) {
+    case 'configuration':
+      return 'Edge 서버 주소를 확인해 주세요.';
+    case 'network':
+      return 'Edge 서버에 연결할 수 없어요.';
+    case 'server':
+      return `Edge 서버에서 조회하지 못했어요. (HTTP ${error.status})`;
+    case 'invalid-response':
+      return 'Edge 서버 응답을 읽을 수 없어요.';
+  }
 }

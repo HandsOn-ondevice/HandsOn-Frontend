@@ -1,8 +1,10 @@
 import { listDemoProcedureReleases } from '@/features/procedure-draft/procedureDraftRepository';
 import { demoLedProcedure } from '@/features/procedures/demoProcedures';
 import type { WorkEnvironment } from '../entry/entryEnvironment';
+import { EdgeApiError, getEdge, isEdgeDataEnabled } from '@/lib/edgeApi';
 
 export interface StudentHomeData {
+  dataOrigin?: 'simulation' | 'hardware';
   researcherName: string;
   deviceStatus: 'connected' | 'disconnected' | 'unknown';
   ongoingSession: {
@@ -33,10 +35,29 @@ export interface StudentHomeData {
   }[];
 }
 
-export type LoadStudentHome = (environment: WorkEnvironment) => Promise<StudentHomeData>;
+export type LoadStudentHome = (
+  environment: WorkEnvironment,
+  edgeToken?: string,
+) => Promise<StudentHomeData>;
 
-export const loadStudentHome: LoadStudentHome = async (environment) => {
-  // Replace this loader when the home response and device/session API contracts are agreed.
+export const loadStudentHome: LoadStudentHome = async (environment, edgeToken) => {
+  if (isEdgeDataEnabled()) {
+    const data = await getEdge<StudentHomeData>(
+      '/home/student',
+      { environmentId: environment.id },
+      edgeToken,
+    );
+    if (
+      typeof data?.researcherName !== 'string' ||
+      !Object.hasOwn(deviceStatuses, data.deviceStatus) ||
+      !Array.isArray(data.approvedProcedures) ||
+      !Array.isArray(data.recentResults) ||
+      (data.ongoingSession !== null && data.ongoingSession?.environmentId !== environment.id)
+    ) {
+      throw new EdgeApiError({ kind: 'invalid-response' });
+    }
+    return data;
+  }
   if (!__DEV__ && process.env.EXPO_PUBLIC_HANDSON_MAESTRO !== '1') {
     throw new Error('연구생 홈 조회가 아직 연결되지 않았습니다.');
   }
@@ -97,3 +118,5 @@ export const loadStudentHome: LoadStudentHome = async (environment) => {
     ],
   };
 };
+
+const deviceStatuses = { connected: true, disconnected: true, unknown: true };
