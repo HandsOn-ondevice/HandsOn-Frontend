@@ -20,6 +20,10 @@ import {
   spacing,
 } from '@/design-system';
 import {
+  getUnresolvedDraftItems,
+  stepNeedsCriteriaReview,
+} from '@/features/procedure-release/procedureReleaseRules';
+import {
   procedureDraftRepository,
   type ProcedureDraft,
   type ProcedureDraftStep,
@@ -118,8 +122,8 @@ export function StepCriteriaEditor({
   const [leave, setLeave] = useState<{ proceed: () => void } | null>(null);
   const saving = useRef(false);
   const busy = status === 'saving';
-  const pending = draft.pendingItems.filter(({ stepId }) => stepId === step.id);
-  const unresolved = step.needsReview || pending.length > 0;
+  const pending = getUnresolvedDraftItems(draft).filter(({ stepId }) => stepId === step.id);
+  const unresolved = stepNeedsCriteriaReview(draft, step);
 
   usePreventRemove(dirty || busy || showDetails, ({ repeat }) => {
     if (showDetails) setShowDetails(false);

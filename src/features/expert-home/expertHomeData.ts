@@ -1,8 +1,11 @@
 import {
   getDemoProcedureDraftId,
+  listDemoProcedureReleases,
   procedureDraftRepository,
 } from '@/features/procedure-draft/procedureDraftRepository';
 import { getDemoHomeReviews, type ReviewStatus } from '@/features/expert-review/reviewData';
+import { getUnresolvedDraftItems } from '@/features/procedure-release/procedureReleaseRules';
+import { demoLedProcedure } from '@/features/procedures/demoProcedures';
 import { EdgeApiError, getEdge, isEdgeDataEnabled } from '@/lib/edgeApi';
 
 export interface ExpertProcedure {
@@ -139,31 +142,52 @@ export const loadExpertHome: LoadExpertHome = async (environmentId, edgeToken) =
   if (__DEV__ || process.env.EXPO_PUBLIC_HANDSON_MAESTRO === '1') {
     const demo = createDemoHome(environmentId);
     const savedDrafts = await procedureDraftRepository.listSaved(environmentId);
-    const savedIds = new Set(savedDrafts.map((draft) => draft.id));
-    const savedProcedures = savedDrafts.map<ExpertProcedure>((draft) => ({
-      id: draft.id,
-      title: draft.title,
-      status: draft.status,
-      version: draft.version,
-      updatedLabel: '임시 저장 완료',
-      summary: `${draft.steps.length}단계 · 준비물 ${draft.materials.length}개`,
-      detail: draft.pendingItems.length ? `미확정 항목 ${draft.pendingItems.length}개` : undefined,
+    const releases = listDemoProcedureReleases(environmentId);
+    const replacedIds = new Set([
+      ...savedDrafts.map(({ id }) => id),
+      ...releases.map(({ draftId }) => draftId),
+    ]);
+    if (releases.some(({ procedure }) => procedure.id === demoLedProcedure.id)) {
+      replacedIds.add(`${environmentId}:procedure:led-output`);
+    }
+    const approved = releases.map<ExpertProcedure>(({ procedure }) => ({
+      id: procedure.id,
+      title: procedure.title,
+      status: 'approved',
+      version: procedure.approvedVersion,
+      updatedLabel: '승인·배포 완료',
+      summary: `${procedure.stepCount}단계 · 준비물 ${procedure.equipment.length}개`,
     }));
+    const savedProcedures = savedDrafts
+      .filter(({ id }) => !releases.some(({ draftId }) => draftId === id))
+      .map<ExpertProcedure>((draft) => {
+        const pendingCount = getUnresolvedDraftItems(draft).length;
+        return {
+          id: draft.id,
+          title: draft.title,
+          status: draft.status,
+          version: draft.version,
+          updatedLabel: '임시 저장 완료',
+          summary: `${draft.steps.length}단계 · 준비물 ${draft.materials.length}개`,
+          detail: pendingCount ? `미확정 항목 ${pendingCount}개` : undefined,
+        };
+      });
+    const latest = [...approved, ...savedProcedures];
 
     return {
       ...demo,
-      procedures: [...savedProcedures, ...demo.procedures.filter((item) => !savedIds.has(item.id))],
+      procedures: [...latest, ...demo.procedures.filter((item) => !replacedIds.has(item.id))],
       recentWork: [
-        ...savedProcedures.map<ExpertRecentWork>((draft) => ({
-          id: draft.id,
+        ...latest.map<ExpertRecentWork>((procedure) => ({
+          id: procedure.id,
           kind: 'procedure',
-          procedureId: draft.id,
-          title: draft.title,
-          summary: '초안 편집',
-          updatedLabel: draft.updatedLabel,
+          procedureId: procedure.id,
+          title: procedure.title,
+          summary: procedure.status === 'approved' ? '승인·배포' : '초안 편집',
+          updatedLabel: procedure.updatedLabel,
         })),
         ...demo.recentWork.filter(
-          (item) => item.kind !== 'procedure' || !savedIds.has(item.procedureId),
+          (item) => item.kind !== 'procedure' || !replacedIds.has(item.procedureId),
         ),
       ],
     };

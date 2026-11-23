@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   procedureDraftRepository,
   type ProcedureDraft,
@@ -43,10 +43,10 @@ export function useProcedureDraft(
     };
   }, [environmentId, draftId, loadAttempt, repository]);
 
-  function retryLoad() {
+  const retryLoad = useCallback(() => {
     setState({ status: 'loading' });
     setLoadAttempt((attempt) => attempt + 1);
-  }
+  }, []);
 
   function updateDraft(update: (draft: ProcedureDraft) => ProcedureDraft) {
     if (saving.current) return;

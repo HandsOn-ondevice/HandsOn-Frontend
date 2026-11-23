@@ -100,17 +100,19 @@ export function ProcedureDetailView({
                 {procedure.approvedBy}
               </AppText>
             </SurfaceCard>
-            <SurfaceCard style={styles.stat}>
-              <AppText variant="caption" color={colors.text.secondary}>
-                예상 소요
-              </AppText>
-              <AppText variant="title" color={colors.text.secondary}>
-                {procedure.estimatedMinutes}
-              </AppText>
-              <AppText variant="caption" color={colors.text.secondary}>
-                {`분 · 약 ${procedure.estimatedMinutes}분`}
-              </AppText>
-            </SurfaceCard>
+            {procedure.estimatedMinutes !== null ? (
+              <SurfaceCard style={styles.stat}>
+                <AppText variant="caption" color={colors.text.secondary}>
+                  예상 소요
+                </AppText>
+                <AppText variant="title" color={colors.text.secondary}>
+                  {procedure.estimatedMinutes}
+                </AppText>
+                <AppText variant="caption" color={colors.text.secondary}>
+                  {`분 · 약 ${procedure.estimatedMinutes}분`}
+                </AppText>
+              </SurfaceCard>
+            ) : null}
           </View>
 
           <AppText color={colors.text.secondary}>{procedure.description}</AppText>

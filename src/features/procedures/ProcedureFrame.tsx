@@ -19,6 +19,9 @@ interface ProcedureFrameProps {
   title: string;
   subtitle?: string;
   onBack: () => void;
+  navigationDisabled?: boolean;
+  help?: { title: string; subtitle: string };
+  heroAccessory?: ReactNode;
   children: ReactNode;
   footer: ReactNode;
 }
@@ -28,6 +31,13 @@ export function ProcedureFrame({
   title,
   subtitle,
   onBack,
+  navigationDisabled,
+  help = {
+    title: '승인 절차 안내',
+    subtitle:
+      '선택한 작업 환경에서 승인된 절차만 준비할 수 있어요. 준비를 시작한 승인 버전은 자동으로 최신화하지 않습니다.',
+  },
+  heroAccessory,
   children,
   footer,
 }: ProcedureFrameProps) {
@@ -50,17 +60,21 @@ export function ProcedureFrame({
           title={headerTitle}
           onBack={onBack}
           onMore={() => setShowHelp(true)}
+          navigationDisabled={navigationDisabled}
           style={styles.appBar}
         />
         <View style={styles.hero}>
-          <AppText variant="heading" color={colors.text.inverse} accessibilityRole="header">
-            {title}
-          </AppText>
-          {subtitle ? (
-            <AppText variant="caption" color={colors.text.inverse}>
-              {subtitle}
+          <View style={styles.heroCopy}>
+            <AppText variant="heading" color={colors.text.inverse} accessibilityRole="header">
+              {title}
             </AppText>
-          ) : null}
+            {subtitle ? (
+              <AppText variant="caption" color={colors.text.inverse}>
+                {subtitle}
+              </AppText>
+            ) : null}
+          </View>
+          {heroAccessory}
         </View>
       </SafeAreaView>
       <ScrollView
@@ -74,8 +88,8 @@ export function ProcedureFrame({
       <BottomSheet
         open={showHelp}
         onClose={() => setShowHelp(false)}
-        title="승인 절차 안내"
-        subtitle="선택한 작업 환경에서 승인된 절차만 준비할 수 있어요. 준비를 시작한 승인 버전은 자동으로 최신화하지 않습니다."
+        title={help.title}
+        subtitle={help.subtitle}
         icon="approval"
       >
         <Button label="닫기" variant="secondary" onPress={() => setShowHelp(false)} />
@@ -88,11 +102,14 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surface.canvas },
   appBar: { backgroundColor: 'transparent' },
   hero: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
     paddingHorizontal: spacing[24],
     paddingTop: spacing[12],
     paddingBottom: spacing[24],
     gap: spacing[6],
   },
+  heroCopy: { flex: 1, gap: spacing[6] },
   viewport: {
     flex: 1,
     backgroundColor: colors.surface.canvas,

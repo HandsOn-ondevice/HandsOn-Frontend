@@ -24,6 +24,9 @@ export default function ProcedureDraftRoute() {
       onReview={(stepId) =>
         router.push({ pathname: '/expert/drafts/[draftId]/review', params: { draftId, stepId } })
       }
+      onApproval={() =>
+        router.push({ pathname: '/expert/drafts/[draftId]/approval', params: { draftId } })
+      }
     />
   );
 }
