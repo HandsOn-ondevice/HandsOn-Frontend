@@ -1,3 +1,4 @@
+import { procedureVersionLabel } from './procedure-version-label';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -75,7 +76,7 @@ export function PauseScreen({
           <>
             <FeedbackPanel
               title="진행 상태를 안전하게 저장했어요"
-              subtitle={`완료한 측정과 절차 v${session.procedure.version}를 유지합니다.`}
+              subtitle={`완료한 측정과 절차 ${procedureVersionLabel(session.procedure.version)}를 유지합니다.`}
               tone="success"
               icon="check"
             />
@@ -99,7 +100,7 @@ export function PauseScreen({
               state="confirmed"
             />
             <EvidenceRow
-              title={`승인 버전 v${session.procedure.version} 유지`}
+              title={`승인 버전 ${procedureVersionLabel(session.procedure.version)} 유지`}
               subtitle="재개 시 최신 버전으로 바뀌지 않음"
               kind="program"
               state="confirmed"

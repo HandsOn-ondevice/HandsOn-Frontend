@@ -1,3 +1,4 @@
+import { procedureVersionLabel } from './procedure-version-label';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -171,7 +172,7 @@ export function PreparationScreen({
         <AppText>Mock 세션 · 앱을 재시작하면 초기화됩니다.</AppText>
         <AppText>
           {session
-            ? `${session.procedure.title} · v${session.procedure.version}`
+            ? `${session.procedure.title} · ${procedureVersionLabel(session.procedure.version)}`
             : loading
               ? '세션 조회 중'
               : '실험 기록을 조회하지 못했습니다.'}
