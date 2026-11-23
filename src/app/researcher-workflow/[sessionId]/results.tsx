@@ -3,17 +3,22 @@ import { ResultSummaryScreen } from '@/features/researcher-workflow/screens/Resu
 import { CompletionRouteGate } from '@/features/researcher-workflow/screens/CompletionRouteGate';
 
 export default function ResultsRoute() {
-  const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
+  const { sessionId, resultId, view } = useLocalSearchParams<{
+    sessionId: string;
+    resultId?: string;
+    view?: string;
+  }>();
   return (
-    <CompletionRouteGate sessionId={sessionId} screen="results">
+    <CompletionRouteGate sessionId={sessionId} screen="results" resultId={resultId}>
       <ResultSummaryScreen
         key={sessionId}
         sessionId={sessionId}
+        showSubmittedResult={view === 'summary'}
         onHome={() => router.replace('/student')}
-        onDetails={(conditionId) =>
+        onDetails={(conditionId, resolvedResultId) =>
           router.push({
             pathname: '/researcher-workflow/[sessionId]/measurement-details',
-            params: { sessionId, conditionId },
+            params: { sessionId, conditionId, resultId: resolvedResultId },
           })
         }
       />

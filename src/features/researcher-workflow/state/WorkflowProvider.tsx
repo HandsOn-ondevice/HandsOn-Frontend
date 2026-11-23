@@ -3,9 +3,9 @@ import { AppText, Screen } from '@/design-system';
 import { isMockWorkflowEnabled } from '../infrastructure/mock/mock-environment';
 import type { WorkflowRepository } from '../application/WorkflowRepository';
 import { MockWorkflowRepository } from '../infrastructure/mock/MockWorkflowRepository';
+import { developmentRepository } from './workflow-repository';
 
 // 화면·feature 레이아웃을 나갔다 와도 앱 실행 중에는 같은 Mock 세션을 유지한다.
-const developmentRepository = new MockWorkflowRepository();
 const RepositoryContext = createContext<WorkflowRepository | null>(null);
 
 export function WorkflowProvider({

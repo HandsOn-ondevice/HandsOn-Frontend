@@ -9,6 +9,12 @@ export default function ExecutionRoute() {
       <ExecutionScreen
         key={sessionId}
         sessionId={sessionId}
+        onMenu={() =>
+          router.push({
+            pathname: '/researcher-workflow/[sessionId]/session-menu',
+            params: { sessionId },
+          })
+        }
         onBack={() =>
           router.dismissTo({
             pathname: '/researcher-workflow/[sessionId]/device-check',

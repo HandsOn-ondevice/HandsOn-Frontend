@@ -14,7 +14,7 @@ import {
   type MockExecutionRunner,
 } from '../src/features/researcher-workflow/infrastructure/mock/execution-scenarios';
 import { WorkflowProvider } from '../src/features/researcher-workflow/state/WorkflowProvider';
-import { ExecutionScreen } from '../src/features/researcher-workflow/screens/ExecutionScreen';
+import { SessionMenuScreen } from '../src/features/researcher-workflow/screens/SessionMenuScreen';
 import { PauseScreen } from '../src/features/researcher-workflow/screens/PauseScreen';
 
 function repository(
@@ -242,7 +242,7 @@ describe('S10 사용자 일시정지와 기존 기록 보존', () => {
   });
 });
 
-describe('S06 본문 버튼과 S10 화면', () => {
+describe('S06 세션 메뉴의 일시정지와 S10 화면', () => {
   test('명시적인 버튼 조작이 성공한 뒤에만 한 번 이동하며 홈·재개 이동 요청은 상태를 유지한다', async () => {
     const repo = repository();
     const session = await running(repo);
@@ -257,10 +257,10 @@ describe('S06 본문 버튼과 S10 화면', () => {
     });
     const screen = await render(
       <WorkflowProvider repository={repo}>
-        <ExecutionScreen
+        <SessionMenuScreen
           sessionId={session.sessionId}
-          onBack={() => {}}
-          onClarification={() => {}}
+          onExecution={() => {}}
+          onDeviceStatus={() => {}}
           onPause={onPause}
         />
       </WorkflowProvider>,
@@ -291,7 +291,7 @@ describe('S06 본문 버튼과 S10 화면', () => {
     expect(await repo.getSession(session.sessionId)).toEqual(paused);
   });
 
-  test('저장 실패는 S06에 오류를 표시하고 S10으로 이동하지 않는다', async () => {
+  test('저장 실패는 세션 메뉴에 오류를 표시하고 S10으로 이동하지 않는다', async () => {
     const repo = repository();
     const session = await running(repo);
     const onPause = jest.fn();
@@ -300,10 +300,10 @@ describe('S06 본문 버튼과 S10 화면', () => {
       .mockRejectedValueOnce(new Error('일시정지 상태를 저장하지 못했습니다.'));
     const screen = await render(
       <WorkflowProvider repository={repo}>
-        <ExecutionScreen
+        <SessionMenuScreen
           sessionId={session.sessionId}
-          onBack={() => {}}
-          onClarification={() => {}}
+          onExecution={() => {}}
+          onDeviceStatus={() => {}}
           onPause={onPause}
         />
       </WorkflowProvider>,

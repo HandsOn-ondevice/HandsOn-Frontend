@@ -3,20 +3,21 @@ import { MeasurementDetailsScreen } from '@/features/researcher-workflow/screens
 import { CompletionRouteGate } from '@/features/researcher-workflow/screens/CompletionRouteGate';
 
 export default function MeasurementDetailsRoute() {
-  const { sessionId, conditionId } = useLocalSearchParams<{
+  const { sessionId, conditionId, resultId } = useLocalSearchParams<{
     sessionId: string;
     conditionId?: string;
+    resultId?: string;
   }>();
   return (
-    <CompletionRouteGate sessionId={sessionId} screen="details">
+    <CompletionRouteGate sessionId={sessionId} screen="details" resultId={resultId}>
       <MeasurementDetailsScreen
         key={`${sessionId}:${conditionId}`}
         sessionId={sessionId}
         conditionId={conditionId ?? ''}
-        onResults={() =>
+        onResults={(resolvedResultId) =>
           router.dismissTo({
             pathname: '/researcher-workflow/[sessionId]/results',
-            params: { sessionId },
+            params: { sessionId, resultId: resolvedResultId, view: 'summary' },
           })
         }
       />
