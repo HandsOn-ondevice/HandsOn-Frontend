@@ -14,6 +14,7 @@ import {
 } from '@/design-system';
 import { useEntrySelection } from '@/features/entry/EntrySelectionProvider';
 import type { WorkflowRepository } from '../application/WorkflowRepository';
+import { currentEdgeHold } from '../domain/edge-hold';
 import { selectEdgeRecovery } from '../domain/edge-recovery';
 import { needsEdgeRemeasurement } from '../domain/edge-remeasurement';
 import { voiceChoiceLabels } from '../domain/voice-clarification';
@@ -171,17 +172,23 @@ function EdgeMeasurementContent({
         ? item.status === 'valid'
         : item.cursor.cursorId === activeCursor?.cursorId,
     );
+  const needsFreshSample =
+    !!cursor &&
+    !!session?.hold?.resolvedAt &&
+    session.hold.cursorId === cursor.cursorId &&
+    session.hold.nextSampleCommand === 'requestExecutionSample';
   const canSample = Boolean(
     cursor &&
     !session?.pendingJob &&
     !session?.execution?.pendingVoice &&
     !needsEdgeRemeasurement(session) &&
-    attempt?.purpose !== 'recoveryCheck' &&
+    (needsFreshSample || attempt?.purpose !== 'recoveryCheck') &&
     !pending &&
     !canRetryCommand,
   );
   const canComplete =
     canSample &&
+    attempt?.purpose !== 'recoveryCheck' &&
     attempt?.status === 'ready' &&
     attempt.report?.source === 'api' &&
     attempt.report.cursorId === cursor?.cursorId &&
@@ -192,7 +199,15 @@ function EdgeMeasurementContent({
   const recovery = selectEdgeRecovery(session);
   const pendingVoice = session?.execution?.pendingVoice;
   const lastVoiceResolution = session?.execution?.voiceResolutions?.at(-1);
-  const userPaused = session?.phase === 'held' && session.holdReason?.code === 'USER_PAUSED';
+  const hold = currentEdgeHold(session);
+  const userPaused =
+    session?.phase === 'held' && (hold?.reasonCode ?? session.holdReason?.code) === 'USER_PAUSED';
+  const canConfirmOtherHold =
+    !userPaused &&
+    session?.resumePolicyVersion === '2.0' &&
+    hold?.allowedCommands.includes('resume');
+  const requestSampleAvailable =
+    canSample && (needsFreshSample || attempt?.purpose !== 'remeasurement');
 
   if (
     session &&
@@ -250,7 +265,7 @@ function EdgeMeasurementContent({
               label="현재 회차 측정값 확인"
               variant="secondary"
               loading={sampling}
-              disabled={!canSample || attempt?.purpose === 'remeasurement'}
+              disabled={!requestSampleAvailable}
               onPress={() =>
                 void execute({ type: 'requestExecutionSample', cursorId: cursor.cursorId })
               }
@@ -286,6 +301,8 @@ function EdgeMeasurementContent({
             />
             {userPaused ? (
               <Button label="일시정지 기록 확인" variant="secondary" onPress={onPause} />
+            ) : canConfirmOtherHold ? (
+              <Button label="센서 오류와 작업 보류 확인" variant="secondary" onPress={onRecovery} />
             ) : null}
           </>
         ) : session && !recovery ? (
@@ -370,7 +387,7 @@ function EdgeMeasurementContent({
               revision={session.revision}
               cursorId={cursor.cursorId}
               canInterpret={canSample}
-              canSample={canSample && attempt?.purpose !== 'remeasurement'}
+              canSample={requestSampleAvailable}
               completableAttemptId={canComplete ? attempt?.attemptId : undefined}
               execute={async (command) => {
                 const next = await execute(command);

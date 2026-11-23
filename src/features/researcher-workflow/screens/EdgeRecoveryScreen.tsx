@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useIsFocused } from 'expo-router';
 import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,14 +13,22 @@ import {
 } from '@/design-system';
 import { useEntrySelection } from '@/features/entry/EntrySelectionProvider';
 import type { WorkflowRepository } from '../application/WorkflowRepository';
+import { currentEdgeHold } from '../domain/edge-hold';
 import { selectEdgeRecovery } from '../domain/edge-recovery';
 import { selectEdgeRemeasurement } from '../domain/edge-remeasurement';
+import type { ExperimentSession } from '../domain/models';
 import { withEdgeMeasurement } from '../infrastructure/edge/edge-measurement';
 import { createEdgeSessionRequest } from '../infrastructure/edge/edge-session-request';
 import { WorkflowProvider, useWorkflowRepository } from '../state/WorkflowProvider';
 import { useWorkflowSession } from '../state/useWorkflowSession';
+import { EdgeHoldConfirmation, useEdgeHoldConfirmation } from './EdgeHoldConfirmation';
 
-type Props = { sessionId: string; onBack: () => void; onRemeasurement: () => void };
+type Props = {
+  sessionId: string;
+  onBack: () => void;
+  onRemeasurement: () => void;
+  onContinue: (session: ExperimentSession) => void;
+};
 type Deadline = { attemptId: string; expiresAt: number };
 const deadlines = new WeakMap<WorkflowRepository, Map<string, Deadline>>();
 const POLL_INTERVAL_MS = 600;
@@ -55,12 +63,18 @@ function RecoveryContent({
   sessionId,
   onBack,
   onRemeasurement,
+  onContinue,
   base,
 }: Props & { base: WorkflowRepository }) {
   const { session, loading, error, pending, execute, refresh, canRetryCommand, retryCommand } =
     useWorkflowSession(sessionId);
   const repository = useWorkflowRepository();
   const focused = useIsFocused();
+  const confirmation = useEdgeHoldConfirmation(session);
+  const retryingResume = useRef(false);
+  const hold = currentEdgeHold(session);
+  const cursor = session?.execution?.cursor;
+  const canResume = hold?.reasonCode !== 'USER_PAUSED' && hold?.allowedCommands.includes('resume');
   const state = selectEdgeRecovery(session);
   const remeasurement = selectEdgeRemeasurement(session);
   const attemptId = state?.checking ? state.recovery?.sampleAttemptId : undefined;
@@ -119,13 +133,41 @@ function RecoveryContent({
   }, [base, focused, attemptId, pending, canRetryCommand, readError, repository, sessionId]);
 
   const condition = session?.procedure.execution?.conditions.find(
-    (item) => item.id === state?.cursor.conditionId,
+    (item) => item.id === cursor?.conditionId,
   );
   const reload = () => {
     deadlines.get(base)?.delete(sessionId);
     setReadFailure(undefined);
     refresh();
   };
+  async function resume() {
+    if (pending || canRetryCommand || !canResume || !confirmation.ready) return;
+    const operatorConfirmation = confirmation.take();
+    if (confirmation.required && !operatorConfirmation) return;
+    retryingResume.current = true;
+    const next = await execute({
+      type: 'resumePausedExecution',
+      cursorId: cursor?.cursorId ?? null,
+      ...(operatorConfirmation && { confirmation: operatorConfirmation }),
+    });
+    if (next && next.phase !== 'held') onContinue(next);
+  }
+  async function rerun() {
+    const next = await retryCommand();
+    if (retryingResume.current && next && next.phase !== 'held') onContinue(next);
+  }
+  function recover() {
+    if (!state?.canRecover || pending || canRetryCommand || !confirmation.ready) return;
+    const operatorConfirmation = confirmation.take();
+    if (confirmation.required && !operatorConfirmation) return;
+    retryingResume.current = false;
+    void execute({
+      type: 'requestRecovery',
+      cursorId: state.cursor.cursorId,
+      blockedAttemptId: state.blocked.attemptId,
+      ...(operatorConfirmation && { confirmation: operatorConfirmation }),
+    });
+  }
   return (
     <SafeAreaView style={styles.root} edges={['top']} testID="edge-recovery-screen">
       <StatusBar tone="light" />
@@ -145,7 +187,7 @@ function RecoveryContent({
               label={canRetryCommand ? '같은 요청 다시 시도' : '복구 결과 다시 조회'}
               variant="secondary"
               disabled={pending}
-              onPress={canRetryCommand ? retryCommand : reload}
+              onPress={canRetryCommand ? rerun : reload}
             />
           </>
         ) : null}
@@ -191,22 +233,52 @@ function RecoveryContent({
                 ) : null}
               </>
             ) : (
-              <Button
-                label="센서 다시 확인"
-                loading={pending || (state.checking && !readError)}
-                disabled={!state.canRecover || pending || canRetryCommand}
-                onPress={() =>
-                  void execute({
-                    type: 'requestRecovery',
-                    cursorId: state.cursor.cursorId,
-                    blockedAttemptId: state.blocked.attemptId,
-                  })
-                }
-              />
+              <>
+                {state.canRecover ? (
+                  <EdgeHoldConfirmation
+                    value={confirmation}
+                    disabled={pending || canRetryCommand}
+                  />
+                ) : null}
+                <Button
+                  label="센서 다시 확인"
+                  loading={pending || (state.checking && !readError)}
+                  disabled={!state.canRecover || pending || canRetryCommand || !confirmation.ready}
+                  onPress={recover}
+                />
+              </>
             )}
           </>
         ) : remeasurement && (remeasurement.sampling || remeasurement.ready) ? (
           <Button label="재측정 상태 보기" onPress={onRemeasurement} />
+        ) : canResume ? (
+          <>
+            {cursor ? (
+              <AppText variant="heading">
+                {condition?.label ?? cursor.conditionId} 조건 · {cursor.trialIndex}회차
+              </AppText>
+            ) : null}
+            <FeedbackPanel
+              title="실험이 보류되었어요"
+              subtitle={session?.holdReason?.message}
+              tone="warning"
+            />
+            <AppText>서버가 현재 장치와 센서 상태를 확인하고, 점검을 통과하면 재개합니다.</AppText>
+            {pending ? (
+              <AppText accessibilityLiveRegion="polite">
+                장치와 센서 상태를 다시 확인하고 있습니다.
+              </AppText>
+            ) : null}
+            <EdgeHoldConfirmation value={confirmation} disabled={pending || canRetryCommand} />
+            <Button
+              label="장치 점검하고 재개"
+              loading={pending}
+              disabled={pending || canRetryCommand || !confirmation.ready}
+              onPress={resume}
+            />
+          </>
+        ) : session?.hold?.resolvedAt && session.phase !== 'held' ? (
+          <Button label="현재 실험으로 이동" onPress={() => onContinue(session)} />
         ) : session ? (
           <FeedbackPanel title="복구할 측정 오류가 없습니다" />
         ) : null}

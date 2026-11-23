@@ -1,6 +1,7 @@
 import type { CreateSessionInput, WorkflowRepository } from '../../application/WorkflowRepository';
 import { createRequestId } from '../../application/request-id';
 import { selectDeviceCheck } from '../../domain/device-check';
+import { currentEdgeHold, type ResumeConfirmation } from '../../domain/edge-hold';
 import {
   WorkflowError,
   type CommandContext,
@@ -33,6 +34,8 @@ type ExecutionTransition = Extract<
   WorkflowCommand,
   { type: 'pauseExecution' | 'resumePausedExecution' }
 >;
+type EdgeCommand =
+  WorkflowCommand | { type: 'pause' } | { type: 'resume'; confirmation?: ResumeConfirmation };
 
 export class EdgeWorkflowRepository implements WorkflowRepository {
   private readonly reads = new Map<string, Promise<ExperimentSession>>();
@@ -84,6 +87,7 @@ export class EdgeWorkflowRepository implements WorkflowRepository {
       ...selection,
       workProfileId: 'kit-distance-v1',
       operatorId,
+      resumePolicyVersion: '2.0',
       workflowVersion: '2.0',
     };
     const { session } = await writeEdgeSession(this.request, '/sessions', payload, (value) => {
@@ -126,11 +130,16 @@ export class EdgeWorkflowRepository implements WorkflowRepository {
   async executeCommand(sessionId: string, command: WorkflowCommand, context: CommandContext) {
     switch (command.type) {
       case 'pauseExecution':
-      case 'resumePausedExecution':
         await this.checkExecutionTransition(sessionId, command, context.expectedRevision);
+        return this.writeCommand(sessionId, { type: 'pause' }, context);
+      case 'resumePausedExecution':
+        // A 2.0 retry needs to reach the server even if its original hold already resolved.
+        if (!command.confirmation) {
+          await this.checkExecutionTransition(sessionId, command, context.expectedRevision);
+        }
         return this.writeCommand(
           sessionId,
-          { type: command.type === 'pauseExecution' ? 'pause' : 'resume' },
+          { type: 'resume', confirmation: command.confirmation },
           context,
         );
       case 'setPreparationCheck':
@@ -169,17 +178,15 @@ export class EdgeWorkflowRepository implements WorkflowRepository {
     const canTransition =
       command.type === 'pauseExecution'
         ? session.phase === 'running'
-        : session.phase === 'held' && session.holdReason?.code === 'USER_PAUSED';
-    if (!canTransition || session.execution?.cursor?.cursorId !== command.cursorId) {
+        : session.phase === 'held' &&
+          (currentEdgeHold(session)?.allowedCommands.includes('resume') ??
+            session.holdReason?.code === 'USER_PAUSED');
+    if (!canTransition || (session.execution?.cursor?.cursorId ?? null) !== command.cursorId) {
       throw new WorkflowError('INVALID_STATE', '현재 작업 상태와 회차를 다시 확인해 주세요.');
     }
   }
 
-  private async writeCommand(
-    sessionId: string,
-    command: WorkflowCommand | { type: 'pause' | 'resume' },
-    context: CommandContext,
-  ) {
+  private async writeCommand(sessionId: string, command: EdgeCommand, context: CommandContext) {
     const payload = { ...context, command };
     try {
       const { session, replayed } = await writeEdgeSession(
@@ -190,7 +197,14 @@ export class EdgeWorkflowRepository implements WorkflowRepository {
         { sessionId, retryUnknown: command.type !== 'submitResult' },
       );
       const latest = replayed ? await this.readAfterReplay(sessionId) : null;
-      return latest && latest.revision >= session.revision ? latest : this.publish(session);
+      if (latest && latest.revision >= session.revision) return latest;
+      if (replayed && command.type === 'resume') {
+        throw new WorkflowError(
+          'OUTCOME_UNKNOWN',
+          '이전 요청은 처리됐지만 현재 상태를 확인하지 못했어요. 같은 요청을 다시 시도해 주세요.',
+        );
+      }
+      return this.publish(session);
     } catch (reason) {
       if (!(reason instanceof WorkflowError)) throw reason;
       const latest = reason.replayed ? await this.readAfterReplay(sessionId) : null;

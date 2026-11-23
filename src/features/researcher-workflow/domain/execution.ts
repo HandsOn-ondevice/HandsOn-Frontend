@@ -56,6 +56,7 @@ export interface PendingVoiceCommand {
 }
 
 export interface ExecutionState {
+  readonly needsRemeasurement?: boolean;
   readonly recoveries?: readonly RecoveryAttempt[];
   readonly cursor: ExecutionCursor | null;
   readonly attempts: readonly MeasurementAttempt[];
