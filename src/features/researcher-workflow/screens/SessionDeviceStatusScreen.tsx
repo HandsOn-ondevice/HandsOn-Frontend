@@ -15,6 +15,7 @@ import {
 } from '@/design-system';
 import { selectSessionDeviceStatus } from '../domain/session-device-status';
 import { useWorkflowSession } from '../state/useWorkflowSession';
+import { useEdgeExecutionHeartbeat } from './useEdgeExecutionHeartbeat';
 import { useMeasurementAge } from './useMeasurementAge';
 
 type Sensor = ReturnType<typeof selectSessionDeviceStatus>['sensors'][number];
@@ -83,12 +84,15 @@ function SensorStatus({ sensor }: { sensor: Sensor }) {
 
 export function SessionDeviceStatusScreen({
   sessionId,
+  onBack,
   onExecution,
 }: {
   sessionId: string;
+  onBack: () => void;
   onExecution: () => void;
 }) {
-  const { session, loading, error } = useWorkflowSession(sessionId);
+  const { session, loading, error, heartbeat } = useWorkflowSession(sessionId);
+  useEdgeExecutionHeartbeat(session?.source === 'api' && session.phase === 'running', heartbeat);
   const state = session ? selectSessionDeviceStatus(session) : null;
   const age = useMeasurementAge(state?.report?.checkedAt);
   const [info, setInfo] = useState(false);
@@ -96,12 +100,7 @@ export function SessionDeviceStatusScreen({
   return (
     <SafeAreaView style={styles.root} edges={['top']} testID="session-device-status-screen">
       <StatusBar tone="light" />
-      <AppBar
-        title="장치 상태 확인"
-        mode="back"
-        onBack={onExecution}
-        onMore={() => setInfo(true)}
-      />
+      <AppBar title="장치 상태 확인" mode="back" onBack={onBack} onMore={() => setInfo(true)} />
       <ScrollView contentContainerStyle={styles.content}>
         <AppText variant="heading" accessibilityRole="header">
           실행 중 장치 상태
@@ -109,7 +108,7 @@ export function SessionDeviceStatusScreen({
         <AppText variant="caption" color={colors.text.secondary}>
           {session?.source === 'mock'
             ? '시뮬레이션 · 실제 장치 연결·실측값이 아닙니다.'
-            : '저장된 실행 응답입니다.'}
+            : `${session?.dataOrigin === 'simulation' ? '모의 장치 · ' : ''}저장된 실행 응답입니다.`}
         </AppText>
         {loading ? <AppText>장치 응답 기록을 불러오고 있습니다.</AppText> : null}
         {error ? (

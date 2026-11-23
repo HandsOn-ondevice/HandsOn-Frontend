@@ -7,6 +7,12 @@ export default function SessionDeviceStatusRoute() {
     <SessionDeviceStatusScreen
       key={sessionId}
       sessionId={sessionId}
+      onBack={() =>
+        router.dismissTo({
+          pathname: '/researcher-workflow/[sessionId]/session-menu',
+          params: { sessionId },
+        })
+      }
       onExecution={() =>
         router.dismissTo({
           pathname: '/researcher-workflow/[sessionId]/execution',

@@ -17,6 +17,8 @@ import { WorkflowProvider } from '../src/features/researcher-workflow/state/Work
 import { SessionMenuScreen } from '../src/features/researcher-workflow/screens/SessionMenuScreen';
 import { PauseScreen } from '../src/features/researcher-workflow/screens/PauseScreen';
 
+jest.mock('expo-router', () => ({ useFocusEffect: jest.fn() }));
+
 function repository(
   sample: MockExecutionRunner = async (input) => buildMockExecutionReport(input),
 ) {
