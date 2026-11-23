@@ -15,6 +15,7 @@ import {
 import { useEntrySelection } from '@/features/entry/EntrySelectionProvider';
 import type { WorkflowRepository } from '../application/WorkflowRepository';
 import { selectEdgeRecovery } from '../domain/edge-recovery';
+import { needsEdgeRemeasurement } from '../domain/edge-remeasurement';
 import { withEdgeMeasurement } from '../infrastructure/edge/edge-measurement';
 import { createEdgeSessionRequest } from '../infrastructure/edge/edge-session-request';
 import { WorkflowProvider, useWorkflowRepository } from '../state/WorkflowProvider';
@@ -149,6 +150,7 @@ function EdgeMeasurementContent({
     cursor &&
     !session?.pendingJob &&
     !session?.execution?.pendingVoice &&
+    !needsEdgeRemeasurement(session) &&
     attempt?.purpose !== 'recoveryCheck' &&
     !pending &&
     !canRetryCommand,
@@ -201,7 +203,7 @@ function EdgeMeasurementContent({
               label="현재 회차 측정값 확인"
               variant="secondary"
               loading={sampling}
-              disabled={!canSample}
+              disabled={!canSample || attempt?.purpose === 'remeasurement'}
               onPress={() =>
                 void execute({ type: 'requestExecutionSample', cursorId: cursor.cursorId })
               }

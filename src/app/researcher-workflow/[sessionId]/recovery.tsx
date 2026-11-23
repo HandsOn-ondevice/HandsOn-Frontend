@@ -11,7 +11,19 @@ export default function RecoveryRoute() {
       params: { sessionId },
     });
   if (isEdgeWorkflowEnabled()) {
-    return <EdgeRecoveryScreen key={sessionId} sessionId={sessionId} onBack={onBack} />;
+    return (
+      <EdgeRecoveryScreen
+        key={sessionId}
+        sessionId={sessionId}
+        onBack={onBack}
+        onRemeasurement={() =>
+          router.push({
+            pathname: '/researcher-workflow/[sessionId]/remeasurement',
+            params: { sessionId },
+          })
+        }
+      />
+    );
   }
   return (
     <RecoveryScreen
