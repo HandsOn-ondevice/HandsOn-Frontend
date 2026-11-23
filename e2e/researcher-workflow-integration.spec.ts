@@ -5,7 +5,7 @@ for (const viewport of [
   { width: 360, height: 800 },
   { width: 412, height: 920 },
 ]) {
-  test(`${viewport.width}px 준비 중인 세션을 S01에서 이어 S04·S05·S06을 연결하고 회차를 보존한다`, async ({
+  test(`${viewport.width}px에서 준비를 이어가고 S06 상단 뒤로 가기로 일시정지한 회차를 재개한다`, async ({
     page,
   }, testInfo) => {
     await page.setViewportSize(viewport);
@@ -57,11 +57,39 @@ for (const viewport of [
     await complete.click();
     await expect(page.getByText('“0% 조건 2회차 완료했어”', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: '뒤로가기', exact: true }).click();
-    await expect(page).toHaveURL(`${route}/device-check`);
-    await page.getByRole('button', { name: '실험 진행으로 돌아가기', exact: true }).click();
+    await expect(page).toHaveURL(`${route}/paused`);
+    const pause = page.getByTestId('pause-screen');
+    await expect(
+      pause
+        .getByTestId('pause-heading')
+        .getByText(`세션 ${route.split('/').at(-1)}`, { exact: true }),
+    ).toBeVisible();
+    await expect(pause.getByText('진행 상태를 안전하게 저장했어요', { exact: true })).toBeVisible();
+    await expect(pause.getByText('승인 버전 v1.2 유지', { exact: true })).toBeVisible();
+    await expect(pause.getByText('마지막 유효 측정 · 0% 1회차', { exact: true })).toBeVisible();
+    await expect(pause.getByText('다음 작업 · 0% 2회차', { exact: true })).toBeVisible();
+    await expect(pause.getByText('완료 근거 5건 유지', { exact: true })).toBeVisible();
+    await pause.getByRole('button', { name: '바로 재개', exact: true }).click();
+    await expect(page).toHaveURL(`${route}/resume`);
+    const resume = page.getByTestId('resume-screen');
+    await expect(resume.getByText('v1.2', { exact: true })).toBeVisible();
+    await expect(resume.getByText(/0% 조건\s+2회차부터 재개합니다/)).toBeVisible();
+    const resumeButton = resume.getByRole('button', { name: '확인하고 재개', exact: true });
+    await expect(resumeButton).toBeDisabled();
+    for (const name of [
+      /^센서 근거, Orange Pi 5\+와 필수 센서 3개 연결,/,
+      /^센서 근거, 공급 전압/,
+    ]) {
+      const card = resume.getByRole('button', { name });
+      await card.click();
+      await expect(card).toHaveAccessibleName(/, 확인$/);
+    }
+    await resume.getByText('거리 20cm와 지그 고정 확인', { exact: true }).click();
+    await resumeButton.click();
     await expect(page).toHaveURL(`${route}/execution`);
     await expect(page.getByText('유효 측정 1 / 15회', { exact: true })).toBeVisible();
     await expect(page.getByText('“0% 조건 2회차 완료했어”', { exact: true })).toBeVisible();
+    await expect(complete).toBeDisabled();
     await page.screenshot({ path: testInfo.outputPath('s06-resumed.png') });
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(
       false,

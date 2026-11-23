@@ -17,14 +17,14 @@ import {
 } from '@/design-system';
 import { selectExecution, selectLastValidMeasurement } from '../domain/execution';
 import { voiceChoiceLabels } from '../domain/voice-clarification';
-import { useWorkflowSession } from '../state/useWorkflowSession';
 import { procedureDisplayTitle } from './procedure-display-title';
 import { ExecutionMetrics } from './ExecutionMetrics';
 import { ExecutionInfoSheet } from './ExecutionInfoSheet';
+import { useExecutionSession } from './useExecutionSession';
 
 export function ExecutionScreen({
   sessionId,
-  onBack,
+  onDeviceCheck,
   onClarification,
   onRecovery,
   onRemeasurement,
@@ -32,14 +32,15 @@ export function ExecutionScreen({
   onMenu,
 }: {
   sessionId: string;
-  onBack: () => void;
+  onDeviceCheck: () => void;
   onClarification: () => void;
   onRecovery?: () => void;
   onRemeasurement?: () => void;
-  onPause?: () => void;
+  onPause: () => void;
   onMenu?: () => void;
 }) {
-  const { session, loading, pending, error, refresh, execute } = useWorkflowSession(sessionId);
+  const { session, loading, pending, error, refresh, execute, onHeaderBack, retryPause } =
+    useExecutionSession(sessionId, onDeviceCheck, onPause);
   const [menu, setMenu] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const state = session ? selectExecution(session) : null;
@@ -73,8 +74,9 @@ export function ExecutionScreen({
       <AppBar
         title="핵심 실행 화면"
         mode="back"
-        onBack={onBack}
+        onBack={onHeaderBack}
         onMore={onMenu ?? (() => setMenu(true))}
+        navigationDisabled={loading || pending}
       />
       <ScrollView contentContainerStyle={styles.content}>
         <AppText variant="title" accessibilityRole="header">
@@ -93,17 +95,17 @@ export function ExecutionScreen({
         {loading ? (
           <AppText accessibilityLiveRegion="polite">실험 상태를 불러오고 있습니다.</AppText>
         ) : null}
-        {error ? (
+        {error || retryPause ? (
           <>
             <FeedbackPanel
               title="요청을 처리하지 못했습니다"
-              subtitle={error}
+              subtitle={error ?? '같은 요청을 다시 시도해 저장 상태를 확인해 주세요.'}
               tone="danger"
               icon="alert"
             />
             <Button
-              label="실험 상태 다시 불러오기"
-              onPress={refresh}
+              label={retryPause ? '같은 요청 다시 시도' : '실험 상태 다시 불러오기'}
+              onPress={retryPause ?? refresh}
               disabled={pending}
               variant="secondary"
             />
@@ -166,7 +168,7 @@ export function ExecutionScreen({
                       : 'info'
               }
             />
-            {session.phase === 'paused' && onPause ? (
+            {session.phase === 'paused' ? (
               <Button label="일시정지 기록 확인" variant="secondary" onPress={onPause} />
             ) : null}
             {state.authorized && state.configured ? (
@@ -255,7 +257,7 @@ export function ExecutionScreen({
         pending={pending}
         open={menu}
         onClose={() => setMenu(false)}
-        onDeviceCheck={onBack}
+        onDeviceCheck={onDeviceCheck}
       />
     </SafeAreaView>
   );

@@ -172,7 +172,8 @@ describe('S04~S06 장치 점검 화면 연결', () => {
       <WorkflowProvider repository={repository}>
         <ExecutionConnectionScreen
           sessionId={session.sessionId}
-          onBack={() => {}}
+          onDeviceCheck={() => {}}
+          onPause={() => {}}
           onClarification={() => {}}
         />
       </WorkflowProvider>,
