@@ -23,6 +23,7 @@ export default function ExecutionRoute() {
         sessionId={sessionId}
         onBack={onBack}
         onRecovery={onRecovery}
+        onHome={() => router.dismissTo('/student')}
       />
     );
   }

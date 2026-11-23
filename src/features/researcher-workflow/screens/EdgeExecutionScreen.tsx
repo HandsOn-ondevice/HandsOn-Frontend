@@ -25,6 +25,7 @@ type Props = {
   sessionId: string;
   onBack: () => void;
   onRecovery: () => void;
+  onHome: () => void;
 };
 
 const POLL_INTERVAL_MS = 600;
@@ -70,6 +71,7 @@ function EdgeMeasurementContent({
   sessionId,
   onBack,
   onRecovery,
+  onHome,
   base,
 }: Props & { base: WorkflowRepository }) {
   const { session, loading, error, refresh, execute, pending, canRetryCommand, retryCommand } =
@@ -223,10 +225,13 @@ function EdgeMeasurementContent({
             />
           </>
         ) : session?.phase === 'completed' ? (
-          <FeedbackPanel
-            title="반복 측정 완료"
-            subtitle="서버가 마지막 회차의 완료를 확인했습니다."
-          />
+          <>
+            <FeedbackPanel
+              title="반복 측정 완료"
+              subtitle="서버가 마지막 회차의 완료를 확인했습니다."
+            />
+            <Button label="연구생 홈으로" onPress={onHome} />
+          </>
         ) : session && !recovery ? (
           <FeedbackPanel
             title="진행 중인 회차가 없습니다"
