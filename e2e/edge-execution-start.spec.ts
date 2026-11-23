@@ -181,6 +181,7 @@ test.use({
   viewport,
   isMobile: true,
   hasTouch: true,
+  reducedMotion: 'reduce',
   trace: 'off',
   screenshot: 'off',
   video: 'off',
@@ -229,7 +230,9 @@ for (const { title, slug, distanceCm } of [
     await expect(page.getByText('초음파 거리 센서', { exact: true })).toBeVisible();
     await expect(page.getByLabel(/^초음파 거리 센서, 정상,/)).toBeVisible();
     await button(page, '더 보기').click();
-    await expect(page.getByText(`세션 ${id} · 절차 ${version}`, { exact: true })).toBeVisible();
+    await expect(page.getByText(`세션 ${id} · 절차 ${version}`, { exact: true })).toBeInViewport({
+      ratio: 1,
+    });
     if (slug === 'normal') {
       await page.screenshot({
         path: testInfo.outputPath('approved-session.png'),
